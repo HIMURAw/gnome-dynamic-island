@@ -25,7 +25,11 @@ export class GlassMenus {
         const glass = new Glass({radius: 22, opacity: 0});
         parent.insert_child_below(glass, actor);
 
-        const item = {menu, glass, boxStyle: box.style, ids: []};
+        const item = {menu, glass, boxStyle: box.style, ids: [], glassGone: false};
+        // At shell shutdown the glass can be destroyed together with its parent first.
+        glass.connect('destroy', () => {
+            item.glassGone = true;
+        });
         box.style = `${box.style ?? ''} ${MENU_STYLE}`;
         box.add_style_class_name('dynada-glass-menu');
 
@@ -46,7 +50,9 @@ export class GlassMenus {
         sync();
     }
 
-    _sync({menu, glass}) {
+    _sync({menu, glass, glassGone}) {
+        if (glassGone)
+            return;
         const actor = menu.actor;
         const box = menu.box;
         const [w, h] = box.get_transformed_size();
@@ -75,7 +81,8 @@ export class GlassMenus {
             menu.box.style = item.boxStyle;
             menu.box.remove_style_class_name('dynada-glass-menu');
         }
-        item.glass.destroy();
+        if (!item.glassGone)
+            item.glass.destroy();
     }
 
     destroy() {
