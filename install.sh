@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
-# Eklentiyi bu klasöre sembolik bağla ve etkinleştir. Wayland'de ilk kurulumdan sonra
-# oturumu kapatıp açmak gerekir; sonraki kod değişikliklerinde de aynısı geçerli.
+# Link this folder into the GNOME Shell extensions directory and enable it.
+# On Wayland you need to log out and back in once after the first install.
 set -euo pipefail
-UUID="dinamik-ada@himuraw"
+cd "$(dirname "$0")"
+UUID="dynamic-island@himuraw"
 DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
+
+./build.sh locale
 mkdir -p "$(dirname "$DEST")"
-ln -sfn "$(cd "$(dirname "$0")" && pwd)" "$DEST"
-gnome-extensions enable "$UUID" 2>/dev/null || true
-echo "Kuruldu: $DEST"
-echo "Oturumu kapatıp aç, sonra: gnome-extensions info $UUID"
+ln -sfn "$PWD" "$DEST"
+
+# The shell only sees new extensions after a restart, so enable through GSettings too.
+enabled=$(gsettings get org.gnome.shell enabled-extensions)
+if [[ "$enabled" != *"'$UUID'"* ]]; then
+    if [[ "$enabled" == "@as []" || "$enabled" == "[]" ]]; then
+        gsettings set org.gnome.shell enabled-extensions "['$UUID']"
+    else
+        gsettings set org.gnome.shell enabled-extensions "${enabled%]}, '$UUID']"
+    fi
+fi
+
+echo "Installed to $DEST"
+echo "Log out and back in to start it."

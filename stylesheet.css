@@ -1,4 +1,4 @@
-/* Ada gerçek siyah: amaç ekran çerçevesiyle birleşen bir donanım parçası gibi durması. */
+/* True black, so the island blends into the screen bezel like a piece of hardware. */
 .dynada-island {
   background-color: #000000;
   color: #f2f2f0;
@@ -10,7 +10,7 @@
   border-radius: 30px;
 }
 
-/* Kapalı hal */
+/* Collapsed */
 .dynada-compact {
   border-radius: 18px;
   padding: 6px 16px;
@@ -47,7 +47,7 @@
   color: -st-accent-color;
 }
 
-/* Açık hal */
+/* Expanded */
 .dynada-expanded {
   padding: 18px 22px 14px 22px;
   spacing: 16px;
@@ -119,8 +119,8 @@
   color: rgba(242, 242, 240, 0.6);
 }
 
-/* Diğer eklentilerin simgeleri. Her yuva "panel" adını taşır ki
-   temaların #panel .panel-button kuralları aynen uygulansın. */
+/* Panel indicators. Each slot is named "panel" so theme rules for
+   #panel .panel-button still apply. */
 .dynada-tray {
   padding-top: 2px;
 }

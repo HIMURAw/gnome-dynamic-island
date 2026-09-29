@@ -1,0 +1,81 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the Dynamic Island package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Dynamic Island\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-29 22:10+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: extension.js:126
+msgid "Open Dynamic Island"
+msgstr ""
+
+#: extension.js:162
+msgid "Close Dynamic Island"
+msgstr ""
+
+#: extension.js:190
+msgid "Mute or unmute"
+msgstr ""
+
+#: extension.js:196
+msgid "Volume"
+msgstr ""
+
+#. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
+#: extension.js:397
+#, javascript-format
+msgid "%d%%"
+msgstr ""
+
+#: extension.js:415
+msgid "Fully charged"
+msgstr ""
+
+#: extension.js:418
+#, javascript-format
+msgid "Charging, full in %s"
+msgstr ""
+
+#: extension.js:419
+msgid "Charging"
+msgstr ""
+
+#: extension.js:422
+msgid "Plugged in, not charging"
+msgstr ""
+
+#: extension.js:424
+#, javascript-format
+msgid "%s left"
+msgstr ""
+
+#: extension.js:425
+msgid "On battery"
+msgstr ""
+
+#: extension.js:433
+#, javascript-format
+msgid "%d min"
+msgstr ""
+
+#: extension.js:434
+#, javascript-format
+msgid "%d h"
+msgstr ""
+
+#: extension.js:434
+#, javascript-format
+msgid "%d h %d min"
+msgstr ""
