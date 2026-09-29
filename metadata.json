@@ -1,8 +1,9 @@
 {
-  "uuid": "dinamik-ada@himuraw",
-  "name": "Dinamik Ada",
-  "description": "Üst paneli ortada küçük bir adaya çevirir: saat, tarih, şarj. Tıklayınca açılır; ses ve diğer eklentilerin simgeleri içinde.",
+  "uuid": "dynamic-island@himuraw",
+  "name": "Dynamic Island",
+  "description": "Turns the top bar into a small island in the middle of the screen showing the time, date and battery. Click it to expand: volume control and every panel icon, including other extensions', live inside.",
   "shell-version": ["48", "49", "50"],
-  "url": "https://github.com/HIMURAw/dinamik-ada",
+  "url": "https://github.com/HIMURAw/gnome-dynamic-island",
+  "gettext-domain": "dynamic-island@himuraw",
   "version": 1
 }

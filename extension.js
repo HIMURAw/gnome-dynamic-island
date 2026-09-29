@@ -1,28 +1,143 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import GnomeDesktop from 'gi://GnomeDesktop';
 import Graphene from 'gi://Graphene';
 import St from 'gi://St';
 import UPower from 'gi://UPowerGlib';
 
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
-// Pencerelerin üstte bırakacağı boşluk (px). 0 yapılırsa ada pencerelerin üstünde yüzer.
+// Space reserved above windows (px). Set to 0 to let the island float over windows.
 const STRIP_HEIGHT = 40;
 const TOP_MARGIN = 4;
 const EXPANDED_WIDTH = 460;
-// İmleç adadan çıktıktan sonra kapanmadan önce beklenen süre (ms).
+// How long to wait after the pointer leaves before collapsing (ms).
 const COLLAPSE_DELAY = 700;
 
 const DisplayDeviceProxy = Gio.DBusProxy.makeProxyWrapper(
     loadInterfaceXML('org.freedesktop.UPower.Device'));
 
-export default class DinamikAdaExtension extends Extension {
+// Minimal printf for translated strings: %d and %s in order, %% for a literal percent.
+function fmt(str, ...args) {
+    return str.replace(/%([ds%])/g, (m, c) => (c === '%' ? '%' : String(args.shift())));
+}
+
+// Lays children out left to right and wraps to a new row when the width runs out.
+// Unlike Clutter.FlowLayout every child keeps its own width, and hidden or empty
+// children take no space. Rows are centered.
+const WrapLayout = GObject.registerClass(
+class WrapLayout extends Clutter.LayoutManager {
+    _init(spacing, rowSpacing) {
+        super._init();
+        this._spacing = spacing;
+        this._rowSpacing = rowSpacing;
+    }
+
+    _items(container) {
+        const items = [];
+        for (const child of container.get_children()) {
+            if (!child.visible)
+                continue;
+            const [, w] = child.get_preferred_width(-1);
+            if (w <= 0)
+                continue;
+            items.push({child, w});
+        }
+        return items;
+    }
+
+    _rows(container, forWidth) {
+        const rows = [];
+        let row = null;
+        for (const item of this._items(container)) {
+            const w = Math.min(item.w, forWidth);
+            const [, h] = item.child.get_preferred_height(w);
+            if (row && row.width + this._spacing + w > forWidth)
+                row = null;
+            if (!row) {
+                row = {items: [], width: 0, height: 0};
+                rows.push(row);
+            } else {
+                row.width += this._spacing;
+            }
+            row.items.push({child: item.child, x: row.width, w, h});
+            row.width += w;
+            row.height = Math.max(row.height, h);
+        }
+        return rows;
+    }
+
+    vfunc_get_preferred_width(container, _forHeight) {
+        const items = this._items(container);
+        const min = Math.max(0, ...items.map(i => i.w));
+        const nat = items.reduce((sum, i) => sum + i.w, 0) +
+            this._spacing * Math.max(0, items.length - 1);
+        return [min, nat];
+    }
+
+    vfunc_get_preferred_height(container, forWidth) {
+        if (forWidth < 0)
+            forWidth = this.vfunc_get_preferred_width(container, -1)[1];
+        const rows = this._rows(container, forWidth);
+        const h = rows.reduce((sum, r) => sum + r.height, 0) +
+            this._rowSpacing * Math.max(0, rows.length - 1);
+        return [h, h];
+    }
+
+    vfunc_allocate(container, box) {
+        const width = box.get_width();
+        const placed = new Set();
+        let y = box.y1;
+        for (const row of this._rows(container, width)) {
+            const offset = box.x1 + Math.floor((width - row.width) / 2);
+            for (const item of row.items) {
+                const x = offset + item.x;
+                const top = y + Math.floor((row.height - item.h) / 2);
+                item.child.allocate(new Clutter.ActorBox({
+                    x1: x, y1: top, x2: x + item.w, y2: top + item.h,
+                }));
+                placed.add(item.child);
+            }
+            y += row.height + this._rowSpacing;
+        }
+        for (const child of container.get_children()) {
+            if (!placed.has(child))
+                child.allocate(new Clutter.ActorBox());
+        }
+    }
+});
+
+// Places each child horizontally centered, TOP_MARGIN below the top, at its preferred
+// size. The child may be taller than the container (the expanded island overflows the
+// strip), and it stays centered while its width animates.
+const TopCenterLayout = GObject.registerClass(
+class TopCenterLayout extends Clutter.LayoutManager {
+    vfunc_get_preferred_width(_container, _forHeight) {
+        return [0, 0];
+    }
+
+    vfunc_get_preferred_height(_container, _forWidth) {
+        return [0, 0];
+    }
+
+    vfunc_allocate(container, box) {
+        for (const child of container.get_children()) {
+            const [, w] = child.get_preferred_width(-1);
+            const [, h] = child.get_preferred_height(w);
+            const x = box.x1 + Math.round((box.get_width() - w) / 2);
+            const y = box.y1 + TOP_MARGIN;
+            child.allocate(new Clutter.ActorBox({x1: x, y1: y, x2: x + w, y2: y + h}));
+        }
+    }
+});
+
+export default class DynamicIslandExtension extends Extension {
     enable() {
         this._signals = [];
         this._slots = [];
@@ -49,7 +164,6 @@ export default class DinamikAdaExtension extends Extension {
 
         this._releasePanel();
 
-        Main.layoutManager.untrackChrome(this._island);
         this._strip.destroy();
         this._strip = this._island = null;
 
@@ -62,13 +176,13 @@ export default class DinamikAdaExtension extends Extension {
         this._signals.push([obj, obj.connect(signal, handler)]);
     }
 
-    // ---------- Ada ----------
+    // ---------- Island ----------
 
     _buildIsland() {
-        // Üst paneli taşıyan kutunun içine koyulan, tam genişlikte şeffaf şerit.
-        // Yüksekliği sabit: pencerelerin ayırdığı alan = bu şerit.
+        // Full-width transparent strip placed inside the panel box. Its fixed height
+        // is the space windows keep free at the top of the screen.
         this._strip = new St.Widget({
-            layout_manager: new Clutter.FixedLayout(),
+            layout_manager: new TopCenterLayout(),
             height: STRIP_HEIGHT,
             x_expand: true,
         });
@@ -78,7 +192,6 @@ export default class DinamikAdaExtension extends Extension {
             reactive: true,
             track_hover: true,
             clip_to_allocation: true,
-            y: TOP_MARGIN,
             pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
             layout_manager: new Clutter.BinLayout(),
         });
@@ -90,10 +203,8 @@ export default class DinamikAdaExtension extends Extension {
 
         this._strip.add_child(this._island);
 
-        this._connect(this._island, 'notify::width', () => this._center());
-        this._connect(this._strip, 'notify::width', () => this._center());
-        // Kapalı hap ve açık haldeki başlık ayrı düğmeler: tepsideki simgelere
-        // tıklamak adayı kapatmasın.
+        // The collapsed pill and the expanded header are separate buttons, so clicks
+        // on tray icons never toggle the island.
         this._connect(this._compact, 'clicked', () => this._expand());
         this._connect(this._header, 'clicked', () => this._collapse());
         this._connect(this._compact, 'notify::pressed', () => {
@@ -110,7 +221,6 @@ export default class DinamikAdaExtension extends Extension {
         });
 
         Main.layoutManager.panelBox.add_child(this._strip);
-        Main.layoutManager.trackChrome(this._island, {affectsInputRegion: true});
     }
 
     _buildCompact() {
@@ -118,7 +228,7 @@ export default class DinamikAdaExtension extends Extension {
         const button = new St.Button({
             style_class: 'dynada-compact',
             can_focus: true,
-            accessible_name: 'Dinamik Adayı aç',
+            accessible_name: _('Open Dynamic Island'),
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.START,
             child: box,
@@ -149,12 +259,12 @@ export default class DinamikAdaExtension extends Extension {
             visible: false,
         });
 
-        // Başlık: büyük saat + tarih solda, şarj sağda. Tıklanınca ada kapanır.
+        // Header: big time + date on the left, battery on the right. Clicking it collapses.
         const header = new St.BoxLayout({x_expand: true});
         this._header = new St.Button({
             style_class: 'dynada-header',
             can_focus: true,
-            accessible_name: 'Dinamik Adayı kapat',
+            accessible_name: _('Close Dynamic Island'),
             x_expand: true,
             child: header,
         });
@@ -177,43 +287,33 @@ export default class DinamikAdaExtension extends Extension {
         header.add_child(this._batteryColumn);
         box.add_child(this._header);
 
-        // Ses
+        // Volume
         this._volumeRow = new St.BoxLayout({style_class: 'dynada-volume', x_expand: true});
         this._muteButton = new St.Button({
             style_class: 'dynada-volume-button',
             can_focus: true,
-            accessible_name: 'Sesi kapat/aç',
+            accessible_name: _('Mute or unmute'),
             child: new St.Icon({style_class: 'dynada-volume-icon', icon_name: 'audio-volume-high-symbolic'}),
         });
         this._slider = new Slider(0);
         this._slider.x_expand = true;
         this._slider.y_align = Clutter.ActorAlign.CENTER;
-        this._slider.accessible_name = 'Ses düzeyi';
+        this._slider.accessible_name = _('Volume');
         this._volumeLabel = new St.Label({style_class: 'dynada-volume-label', y_align: Clutter.ActorAlign.CENTER});
         this._volumeRow.add_child(this._muteButton);
         this._volumeRow.add_child(this._slider);
         this._volumeRow.add_child(this._volumeLabel);
         box.add_child(this._volumeRow);
 
-        // Diğer eklentilerin simgeleri buraya taşınır.
+        // Panel indicators, including other extensions', are moved here.
         this._tray = new St.Widget({
             style_class: 'dynada-tray',
             x_expand: true,
-            layout_manager: new Clutter.FlowLayout({
-                orientation: Clutter.Orientation.HORIZONTAL,
-                column_spacing: 2,
-                row_spacing: 2,
-            }),
+            layout_manager: new WrapLayout(2, 4),
         });
         box.add_child(this._tray);
 
         return box;
-    }
-
-    _center() {
-        if (!this._island)
-            return;
-        this._island.x = Math.round((this._strip.width - this._island.width) / 2);
     }
 
     _expand() {
@@ -243,7 +343,7 @@ export default class DinamikAdaExtension extends Extension {
             duration: 520,
             mode: Clutter.AnimationMode.EASE_OUT_BACK,
             onComplete: () => {
-                // Açıldıktan sonra doğal boyuta bırak: simge eklenip çıkarsa ada kendini ayarlar.
+                // Fall back to natural size so the island follows icons being added or removed.
                 if (this._expanded)
                     this._island.set_size(-1, -1);
             },
@@ -302,8 +402,8 @@ export default class DinamikAdaExtension extends Extension {
     _scheduleCollapse() {
         if (this._collapseTimeout)
             return;
-        // İmleç dışarıdayken ve hiçbir menü açık değilken kapan.
-        // Menü açıkken beklemeye devam et; menü kapanınca tekrar bak.
+        // Collapse once the pointer is outside and no menu is open.
+        // While a menu is open keep waiting and check again when it closes.
         this._collapseTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, COLLAPSE_DELAY, () => {
             if (!this._expanded) {
                 this._collapseTimeout = 0;
@@ -323,7 +423,7 @@ export default class DinamikAdaExtension extends Extension {
         this._collapseTimeout = 0;
     }
 
-    // ---------- Saat ----------
+    // ---------- Clock ----------
 
     _setupClock() {
         this._interfaceSettings = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
@@ -343,7 +443,7 @@ export default class DinamikAdaExtension extends Extension {
         this._longDate.text = now.format('%A, %-d %B');
     }
 
-    // ---------- Şarj ----------
+    // ---------- Battery ----------
 
     _setupBattery() {
         this._compactBattery.hide();
@@ -354,7 +454,7 @@ export default class DinamikAdaExtension extends Extension {
             '/org/freedesktop/UPower/devices/DisplayDevice',
             (proxy, error) => {
                 if (error) {
-                    console.error(`Dinamik Ada: UPower'a bağlanılamadı: ${error.message}`);
+                    console.error(`Dynamic Island: could not connect to UPower: ${error.message}`);
                     return;
                 }
                 if (!this._island)
@@ -388,8 +488,10 @@ export default class DinamikAdaExtension extends Extension {
         else if (charging)
             suffix = '-charging';
         this._compactBatteryIcon.icon_name = `battery-level-${full ? 100 : level}${suffix}-symbolic`;
-        this._compactBatteryLabel.text = `%${pct}`;
-        this._bigBattery.text = `%${pct}`;
+        // Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
+        const pctText = fmt(_('%d%%'), pct);
+        this._compactBatteryLabel.text = pctText;
+        this._bigBattery.text = pctText;
 
         for (const actor of [this._compactBattery, this._bigBattery]) {
             actor.remove_style_class_name('dynada-low');
@@ -405,17 +507,17 @@ export default class DinamikAdaExtension extends Extension {
 
     _batteryStateText(p, charging, full) {
         if (full)
-            return 'Dolu';
+            return _('Fully charged');
         if (charging) {
             return p.TimeToFull > 0
-                ? `Şarj oluyor, ${this._formatDuration(p.TimeToFull)} sonra dolu`
-                : 'Şarj oluyor';
+                ? fmt(_('Charging, full in %s'), this._formatDuration(p.TimeToFull))
+                : _('Charging');
         }
         if (p.State === UPower.DeviceState.PENDING_CHARGE)
-            return 'Takılı, şarj beklemede';
+            return _('Plugged in, not charging');
         return p.TimeToEmpty > 0
-            ? `${this._formatDuration(p.TimeToEmpty)} kaldı`
-            : 'Pilde';
+            ? fmt(_('%s left'), this._formatDuration(p.TimeToEmpty))
+            : _('On battery');
     }
 
     _formatDuration(seconds) {
@@ -423,11 +525,11 @@ export default class DinamikAdaExtension extends Extension {
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
         if (h === 0)
-            return `${m} dk`;
-        return m === 0 ? `${h} sa` : `${h} sa ${m} dk`;
+            return fmt(_('%d min'), m);
+        return m === 0 ? fmt(_('%d h'), h) : fmt(_('%d h %d min'), h, m);
     }
 
-    // ---------- Ses ----------
+    // ---------- Volume ----------
 
     _setupVolume() {
         this._control = getMixerControl();
@@ -494,7 +596,7 @@ export default class DinamikAdaExtension extends Extension {
         this._sink.push_volume();
     }
 
-    // ---------- Panel simgeleri ----------
+    // ---------- Panel indicators ----------
 
     _panelBoxes() {
         return [Main.panel._leftBox, Main.panel._centerBox, Main.panel._rightBox];
@@ -502,7 +604,7 @@ export default class DinamikAdaExtension extends Extension {
 
     _adoptPanel() {
         Main.panel.hide();
-        // Başka bir eklenti paneli geri açarsa tekrar gizle.
+        // If another extension shows the panel again, hide it again.
         this._connect(Main.panel, 'notify::visible', () => {
             if (!Main.panel.visible && this._panelIdle)
                 return;
@@ -517,7 +619,7 @@ export default class DinamikAdaExtension extends Extension {
 
         for (const box of this._panelBoxes()) {
             box.get_children().forEach((child, i) => this._adopt(child, box, i));
-            // Bizden sonra açılan eklentiler de adaya gelsin.
+            // Extensions enabled after us land in the island too.
             this._connect(box, 'child-added', () => this._queueAdopt());
         }
     }
@@ -535,16 +637,19 @@ export default class DinamikAdaExtension extends Extension {
         });
     }
 
-    // index: simgenin kutudaki yeri; kapatırken aynı sırayla geri konur.
+    // index: position in the panel box, used to put it back in order on disable.
     _adopt(container, box, index) {
+        // Adding an actor to a new parent shows it; keep hidden indicators hidden.
+        const visible = container.visible;
         box.remove_child(container);
 
-        // "panel" adı temanın panel düğmesi stillerini (yükseklik, dolgu, renk) korur.
+        // Naming the slot "panel" keeps the theme's #panel .panel-button styles.
         const slot = new St.Bin({
             name: 'panel',
             style: 'background-color: transparent; box-shadow: none; border: none;',
             child: container,
         });
+        container.visible = visible;
         const record = {container, box, index, slot};
         this._slots.push(record);
         this._tray.add_child(slot);
@@ -552,7 +657,7 @@ export default class DinamikAdaExtension extends Extension {
         if (container === Main.panel.statusArea.dateMenu?.container)
             this._shrinkDateMenu(record);
 
-        // Simge başka yere taşınırsa ya da yok olursa boş yuvayı temizle.
+        // Drop the empty slot if the indicator is moved elsewhere or destroyed.
         record.removedId = slot.connect('child-removed', () => {
             if (this._releasing)
                 return;
@@ -561,7 +666,7 @@ export default class DinamikAdaExtension extends Extension {
         });
     }
 
-    // Saat zaten adada; takvim düğmesi tepside saat yerine simge göstersin.
+    // The island already shows the time, so the calendar button shows an icon instead.
     _shrinkDateMenu(record) {
         const clock = Main.panel.statusArea.dateMenu._clockDisplay;
         if (!clock)
@@ -583,9 +688,11 @@ export default class DinamikAdaExtension extends Extension {
         for (const r of this._slots) {
             r.slot.disconnect(r.removedId);
             r.restore?.();
+            const visible = r.container.visible;
             r.slot.set_child(null);
             const index = Math.min(r.index, r.box.get_n_children());
             r.box.insert_child_at_index(r.container, index);
+            r.container.visible = visible;
         }
         this._slots = [];
         this._releasing = false;

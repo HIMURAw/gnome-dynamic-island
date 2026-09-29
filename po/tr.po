@@ -1,0 +1,60 @@
+# Turkish translation for Dynamic Island.
+msgid ""
+msgstr ""
+"Project-Id-Version: Dynamic Island\n"
+"PO-Revision-Date: 2026-09-29 23:00+0300\n"
+"Last-Translator: Umut Öztürk\n"
+"Language-Team: Turkish\n"
+"Language: tr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Open Dynamic Island"
+msgstr "Dinamik Adayı aç"
+
+msgid "Close Dynamic Island"
+msgstr "Dinamik Adayı kapat"
+
+msgid "Mute or unmute"
+msgstr "Sesi kapat/aç"
+
+msgid "Volume"
+msgstr "Ses düzeyi"
+
+#, javascript-format
+msgid "%d%%"
+msgstr "%%%d"
+
+msgid "Fully charged"
+msgstr "Dolu"
+
+#, javascript-format
+msgid "Charging, full in %s"
+msgstr "Şarj oluyor, %s sonra dolu"
+
+msgid "Charging"
+msgstr "Şarj oluyor"
+
+msgid "Plugged in, not charging"
+msgstr "Takılı, şarj beklemede"
+
+#, javascript-format
+msgid "%s left"
+msgstr "%s kaldı"
+
+msgid "On battery"
+msgstr "Pilde"
+
+#, javascript-format
+msgid "%d min"
+msgstr "%d dk"
+
+#, javascript-format
+msgid "%d h"
+msgstr "%d sa"
+
+#, javascript-format
+msgid "%d h %d min"
+msgstr "%d sa %d dk"
