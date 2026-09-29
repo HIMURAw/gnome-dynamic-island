@@ -1,0 +1,126 @@
+/* Ada gerçek siyah: amaç ekran çerçevesiyle birleşen bir donanım parçası gibi durması. */
+.dynada-island {
+  background-color: #000000;
+  color: #f2f2f0;
+  border-radius: 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.dynada-island:expanded {
+  border-radius: 30px;
+}
+
+/* Kapalı hal */
+.dynada-compact {
+  border-radius: 18px;
+  padding: 6px 16px;
+  font-size: 10.5pt;
+}
+
+.dynada-compact-row {
+  spacing: 14px;
+}
+
+.dynada-compact-time {
+  font-weight: bold;
+  font-feature-settings: "tnum";
+}
+
+.dynada-compact-date {
+  color: rgba(242, 242, 240, 0.6);
+}
+
+.dynada-battery {
+  spacing: 5px;
+  font-feature-settings: "tnum";
+}
+
+.dynada-battery-icon {
+  icon-size: 16px;
+}
+
+.dynada-low {
+  color: #f0a33a;
+}
+
+.dynada-charging {
+  color: -st-accent-color;
+}
+
+/* Açık hal */
+.dynada-expanded {
+  padding: 18px 22px 14px 22px;
+  spacing: 16px;
+}
+
+.dynada-header {
+  border-radius: 14px;
+}
+
+.dynada-big-time {
+  font-size: 30pt;
+  font-weight: 300;
+  font-feature-settings: "tnum";
+}
+
+.dynada-long-date {
+  font-size: 10.5pt;
+  color: rgba(242, 242, 240, 0.6);
+}
+
+.dynada-big-battery {
+  font-size: 17pt;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+  text-align: right;
+}
+
+.dynada-battery-state {
+  font-size: 9pt;
+  color: rgba(242, 242, 240, 0.55);
+  text-align: right;
+}
+
+.dynada-volume {
+  spacing: 12px;
+}
+
+.dynada-volume-button {
+  border-radius: 99px;
+  padding: 7px;
+  color: #f2f2f0;
+}
+
+.dynada-volume-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-volume-button:active {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.dynada-volume-icon {
+  icon-size: 16px;
+}
+
+.dynada-volume .slider {
+  height: 22px;
+  color: #ffffff;
+  -barlevel-height: 6px;
+  -barlevel-background-color: rgba(255, 255, 255, 0.14);
+  -barlevel-active-background-color: -st-accent-color;
+  -slider-handle-radius: 9px;
+}
+
+.dynada-volume-label {
+  min-width: 2.4em;
+  text-align: right;
+  font-feature-settings: "tnum";
+  color: rgba(242, 242, 240, 0.6);
+}
+
+/* Diğer eklentilerin simgeleri. Her yuva "panel" adını taşır ki
+   temaların #panel .panel-button kuralları aynen uygulansın. */
+.dynada-tray {
+  padding-top: 2px;
+}

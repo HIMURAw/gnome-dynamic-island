@@ -1,0 +1,8 @@
+{
+  "uuid": "dinamik-ada@himuraw",
+  "name": "Dinamik Ada",
+  "description": "Üst paneli ortada küçük bir adaya çevirir: saat, tarih, şarj. Tıklayınca açılır; ses ve diğer eklentilerin simgeleri içinde.",
+  "shell-version": ["48", "49", "50"],
+  "url": "https://github.com/HIMURAw/dinamik-ada",
+  "version": 1
+}
