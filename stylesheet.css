@@ -245,22 +245,23 @@
   max-height: 2.8em;
 }
 
-/* Inside glass menus: cards turn translucent so the glass shows through.
-   The extra .popup-menu keeps these above the theme's own card colours. */
+/* Inside glass menus. Notification cards stay opaque: GNOME stacks a group's
+   cards on top of each other, and see-through cards would show the text of the
+   ones underneath. The glass shows around them. */
 .popup-menu .dynada-glass-menu .message,
 .popup-menu .dynada-glass-menu .message:second-in-stack,
 .popup-menu .dynada-glass-menu .message:lower-in-stack {
-  background-color: rgba(255, 255, 255, 0.07);
+  background-color: rgb(40, 40, 45);
   border-radius: 16px;
 }
 
 .popup-menu .dynada-glass-menu .message:hover,
 .popup-menu .dynada-glass-menu .message:focus {
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: rgb(52, 52, 58);
 }
 
 .popup-menu .dynada-glass-menu .message:active {
-  background-color: rgba(255, 255, 255, 0.18);
+  background-color: rgb(62, 62, 68);
 }
 
 .popup-menu .dynada-glass-menu .events-button,
