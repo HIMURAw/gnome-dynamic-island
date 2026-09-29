@@ -9,6 +9,7 @@ import UPower from 'gi://UPowerGlib';
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {BarLevel} from 'resource:///org/gnome/shell/ui/barLevel.js';
+import {Urgency} from 'resource:///org/gnome/shell/ui/messageTray.js';
 import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
 import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.js';
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
@@ -17,6 +18,7 @@ import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 import {Glass, RoundedMask} from './glass.js';
 import {ChipLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
+import {GlassMenus} from './menus.js';
 import {spring, stopAllSprings} from './spring.js';
 
 const TOP_MARGIN = 6;
@@ -31,6 +33,9 @@ const COLLAPSE_DELAY = 700;
 // In fullscreen, hide again once the pointer is this far below the island (px).
 const REVEAL_SLACK = 60;
 const ART_SIZE = 72;
+const NOTIFICATION_ICON = 44;
+// How long a notification stays in the island (ms). Critical ones stay until dismissed.
+const NOTIFICATION_DURATION = 5000;
 
 const DisplayDeviceProxy = Gio.DBusProxy.makeProxyWrapper(
     loadInterfaceXML('org.freedesktop.UPower.Device'));
@@ -61,8 +66,10 @@ export default class DynamicIslandExtension extends Extension {
         this._setupBattery();
         this._setupVolume();
         this._setupMedia();
+        this._glassMenus = new GlassMenus();
         this._adoptPanel();
         this._setupFullscreen();
+        this._setupNotifications();
     }
 
     disable() {
@@ -71,6 +78,9 @@ export default class DynamicIslandExtension extends Extension {
             GLib.source_remove(id);
         this._timeouts.clear();
         this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
+        this._notificationTimeout = 0;
+
+        this._releaseNotifications();
 
         this._pointerWatch?.remove();
         this._pointerWatch = null;
@@ -83,6 +93,8 @@ export default class DynamicIslandExtension extends Extension {
         this._media.destroy();
         this._media = null;
 
+        this._glassMenus.destroy();
+        this._glassMenus = null;
         this._releasePanel();
 
         Main.layoutManager.removeChrome(this._strip);
@@ -138,7 +150,8 @@ export default class DynamicIslandExtension extends Extension {
         this._compact = this._buildCompact();
         this._controls = this._buildControls();
         this._mediaView = this._buildMediaView();
-        for (const view of [this._compact, this._controls, this._mediaView])
+        this._notificationView = this._buildNotificationView();
+        for (const view of [this._compact, this._controls, this._mediaView, this._notificationView])
             this._island.add_child(view);
 
         this._left = new Glass({
@@ -160,6 +173,7 @@ export default class DynamicIslandExtension extends Extension {
 
         this._connect(this._compact, 'clicked', () => this._open('controls'));
         this._connect(this._controlsHeader, 'clicked', () => this._close());
+        this._connect(this._notificationView, 'clicked', () => this._activateNotification());
         this._connect(this._compact, 'notify::pressed', () => {
             const scale = this._compact.pressed ? 0.95 : 1;
             this._island.ease({
@@ -350,6 +364,51 @@ export default class DynamicIslandExtension extends Extension {
         return view;
     }
 
+    _buildNotificationView() {
+        const row = new St.BoxLayout({style_class: 'dynada-notification-row', x_expand: true});
+        const button = new St.Button({
+            style_class: 'dynada-notification',
+            can_focus: true,
+            accessible_name: _('Open notification'),
+            width: CONTENT_WIDTH,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.START,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0}),
+            opacity: 0,
+            visible: false,
+            child: row,
+        });
+
+        const iconBin = new St.Bin({
+            style_class: 'dynada-notification-icon-bin',
+            width: NOTIFICATION_ICON,
+            height: NOTIFICATION_ICON,
+            y_align: Clutter.ActorAlign.START,
+        });
+        const iconMask = new RoundedMask();
+        iconMask.setGeometry(NOTIFICATION_ICON, NOTIFICATION_ICON, 11);
+        iconBin.add_effect(iconMask);
+        this._notificationIcon = new St.Icon({icon_size: NOTIFICATION_ICON});
+        iconBin.set_child(this._notificationIcon);
+
+        const text = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._notificationApp = new St.Label({style_class: 'dynada-notification-app'});
+        this._notificationTitle = new St.Label({style_class: 'dynada-notification-title'});
+        this._notificationBody = new St.Label({style_class: 'dynada-notification-body'});
+        this._notificationBody.clutter_text.line_wrap = true;
+        text.add_child(this._notificationApp);
+        text.add_child(this._notificationTitle);
+        text.add_child(this._notificationBody);
+
+        row.add_child(iconBin);
+        row.add_child(text);
+        return button;
+    }
+
     _buildMediaBubble() {
         const bubble = new Glass({
             style_class: 'dynada-bubble',
@@ -381,7 +440,14 @@ export default class DynamicIslandExtension extends Extension {
     // ---------- Open / close ----------
 
     _viewFor(mode) {
-        return mode === 'media' ? this._mediaView : this._controls;
+        switch (mode) {
+        case 'media':
+            return this._mediaView;
+        case 'notification':
+            return this._notificationView;
+        default:
+            return this._controls;
+        }
     }
 
     _freezeSize() {
@@ -395,6 +461,8 @@ export default class DynamicIslandExtension extends Extension {
         const previous = this._mode;
         this._mode = mode;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
+        if (previous === 'notification')
+            this._finishNotification();
 
         const view = this._viewFor(mode);
         const outgoing = previous ? this._viewFor(previous) : this._compact;
@@ -452,6 +520,8 @@ export default class DynamicIslandExtension extends Extension {
         if (!this._mode)
             return;
         const view = this._viewFor(this._mode);
+        if (this._mode === 'notification')
+            this._finishNotification();
         this._mode = null;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
         this._positionTimeout = this._clearTimeout(this._positionTimeout);
@@ -519,6 +589,148 @@ export default class DynamicIslandExtension extends Extension {
             this._close();
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    // ---------- Notifications ----------
+
+    // GNOME's own banners are switched off and every notification that would have
+    // shown one appears in the island instead, with the same rules: Do Not Disturb,
+    // per-app banner settings, low urgency and critical urgency all behave as before.
+    _setupNotifications() {
+        const tray = Main.messageTray;
+        let proto = Object.getPrototypeOf(tray);
+        let desc = null;
+        while (proto && !(desc = Object.getOwnPropertyDescriptor(proto, 'bannerBlocked')))
+            proto = Object.getPrototypeOf(proto);
+        this._bannerSetter = desc?.set;
+        if (!this._bannerSetter)
+            return;
+
+        // The shell blocks banners itself while the notification list is open;
+        // remember what it asks for and keep the real flag on.
+        this._bannerRequested = tray._bannerBlocked ?? false;
+        this._bannerSetter.call(tray, true);
+        Object.defineProperty(tray, 'bannerBlocked', {
+            configurable: true,
+            get: () => this._bannerRequested,
+            set: value => {
+                this._bannerRequested = value;
+            },
+        });
+
+        this._sourceIds = new Map();
+        tray.getSources().forEach(source => this._watchSource(source));
+        this._connect(tray, 'source-added', (_tray, source) => this._watchSource(source));
+        this._connect(tray, 'source-removed', (_tray, source) => this._unwatchSource(source));
+    }
+
+    _watchSource(source) {
+        if (this._sourceIds.has(source))
+            return;
+        this._sourceIds.set(source, source.connect('notification-request-banner',
+            (_source, notification) => this._onBannerRequest(notification)));
+    }
+
+    _unwatchSource(source) {
+        const id = this._sourceIds.get(source);
+        if (id)
+            source.disconnect(id);
+        this._sourceIds.delete(source);
+    }
+
+    _releaseNotifications() {
+        if (!this._bannerSetter)
+            return;
+        for (const source of [...this._sourceIds.keys()])
+            this._unwatchSource(source);
+        const tray = Main.messageTray;
+        delete tray.bannerBlocked;
+        // Drop banners that queued up while we had them blocked, so they do not all
+        // pop up at once when GNOME takes over again.
+        if (Array.isArray(tray._notificationQueue) && tray._notificationQueue.length) {
+            tray._notificationQueue.splice(0);
+            tray.emit('queue-changed');
+        }
+        this._bannerSetter.call(tray, this._bannerRequested);
+        this._bannerSetter = null;
+    }
+
+    _onBannerRequest(notification) {
+        if (notification.acknowledged || notification.urgency === Urgency.LOW)
+            return;
+        const critical = notification.urgency === Urgency.CRITICAL;
+        if (!notification.source.policy.showBanners && !critical)
+            return;
+        // Not while the notification list is open, while the island is hidden in
+        // fullscreen, or while the person is using the island for something else.
+        if (this._bannerRequested || (this._hidden && !critical))
+            return;
+        if (this._mode && this._mode !== 'notification')
+            return;
+        this._showNotification(notification);
+    }
+
+    _showNotification(notification) {
+        if (this._notification && this._notification !== notification)
+            this._finishNotification();
+        this._notification = notification;
+        this._notificationDestroyId = notification.connect('destroy', () => {
+            this._notificationDestroyId = 0;
+            if (this._notification === notification && this._mode === 'notification')
+                this._close();
+        });
+
+        const plain = text => (text ?? '').replace(/<[^>]*>/g, '').trim();
+        const gicon = notification.gicon ?? notification.source.icon ??
+            new Gio.ThemedIcon({name: 'dialog-information-symbolic'});
+        // App icons fill the tile; single-colour symbolic icons sit smaller on it.
+        const symbolic = gicon instanceof Gio.ThemedIcon &&
+            gicon.get_names().some(n => n.endsWith('-symbolic'));
+        this._notificationIcon.gicon = gicon;
+        this._notificationIcon.icon_size = symbolic ? 24 : NOTIFICATION_ICON;
+        this._notificationApp.text = plain(notification.source.title);
+        this._notificationTitle.text = plain(notification.title);
+        this._notificationBody.text = plain(notification.body);
+        this._notificationBody.visible = !!this._notificationBody.text;
+        notification.playSound?.();
+
+        if (this._hidden)
+            this._setHidden(false);
+        this._open('notification');
+
+        this._notificationTimeout = this._clearTimeout(this._notificationTimeout);
+        if (notification.urgency !== Urgency.CRITICAL) {
+            this._notificationTimeout = this._timeout(NOTIFICATION_DURATION, () => {
+                this._notificationTimeout = 0;
+                // If the pointer is on it, leaving will close it.
+                if (this._mode === 'notification' && !this._anyHover())
+                    this._close();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+
+    // Called when the notification leaves the island, whatever the reason.
+    _finishNotification() {
+        this._notificationTimeout = this._clearTimeout(this._notificationTimeout);
+        const notification = this._notification;
+        this._notification = null;
+        if (!notification)
+            return;
+        if (this._notificationDestroyId) {
+            notification.disconnect(this._notificationDestroyId);
+            this._notificationDestroyId = 0;
+            // Seen it, like when a GNOME banner times out. It stays in the list.
+            notification.acknowledged = true;
+        }
+    }
+
+    _activateNotification() {
+        const notification = this._notification;
+        if (!notification)
+            return;
+        this._close();
+        notification.activate();
     }
 
     // ---------- Fullscreen ----------
@@ -932,6 +1144,21 @@ export default class DynamicIslandExtension extends Extension {
         if (isDateMenu)
             this._shrinkDateMenu(record);
 
+        // Its menu, and any menu it swaps in later, gets the glass look.
+        const indicator = Object.values(Main.panel.statusArea).find(i => i?.container === container);
+        if (indicator) {
+            if (indicator.menu)
+                this._glassMenus.add(indicator.menu);
+            record.indicator = indicator;
+            record.menuSetId = indicator.connect('menu-set', () => {
+                if (indicator.menu)
+                    this._glassMenus?.add(indicator.menu);
+            });
+            record.indicatorDestroyId = indicator.connect('destroy', () => {
+                record.indicator = null;
+            });
+        }
+
         // Drop the empty slot if the indicator is moved elsewhere or destroyed.
         record.removedId = slot.connect('child-removed', () => {
             if (this._releasing)
@@ -962,6 +1189,10 @@ export default class DynamicIslandExtension extends Extension {
         this._releasing = true;
         for (const r of this._slots) {
             r.slot.disconnect(r.removedId);
+            if (r.indicator) {
+                r.indicator.disconnect(r.menuSetId);
+                r.indicator.disconnect(r.indicatorDestroyId);
+            }
             r.restore?.();
             const visible = r.container.visible;
             r.slot.set_child(null);

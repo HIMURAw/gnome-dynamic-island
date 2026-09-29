@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-29 22:36+0300\n"
+"POT-Creation-Date: 2026-09-29 22:50+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,85 +17,89 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:198
+#: extension.js:212
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:241
+#: extension.js:255
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:269
+#: extension.js:283
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:275
+#: extension.js:289
 msgid "Volume"
 msgstr ""
 
-#: extension.js:340
+#: extension.js:356
 msgid "Previous"
 msgstr ""
 
-#: extension.js:341
+#: extension.js:357
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:342
+#: extension.js:358
 msgid "Next"
 msgstr ""
 
-#: extension.js:364
+#: extension.js:372
+msgid "Open notification"
+msgstr ""
+
+#: extension.js:425
 msgid "Now playing"
 msgstr ""
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:640
+#: extension.js:849
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:658
+#: extension.js:867
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:661
+#: extension.js:870
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:662
+#: extension.js:871
 msgid "Charging"
 msgstr ""
 
-#: extension.js:665
+#: extension.js:874
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:667
+#: extension.js:876
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:668
+#: extension.js:877
 msgid "On battery"
 msgstr ""
 
-#: extension.js:676
+#: extension.js:885
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:677
+#: extension.js:886
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:677
+#: extension.js:886
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:800
+#: extension.js:1014
 msgid "Nothing is playing"
 msgstr ""
