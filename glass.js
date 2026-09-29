@@ -117,6 +117,13 @@ class Glass extends St.Widget {
         this._mask.setGeometry(w, h, Math.min(this._radius, w / 2, h / 2));
     }
 
+    setRadius(radius) {
+        if (radius === this._radius)
+            return;
+        this._radius = radius;
+        this.queue_relayout();
+    }
+
     // Call when the glass moves without being re-laid out (translation, etc.).
     syncBackdrop() {
         this.backdrop.queue_relayout();

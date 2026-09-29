@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-29 22:36+0300\n"
+"POT-Creation-Date: 2026-09-29 22:50+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,85 +13,89 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:198
+#: extension.js:212
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:241
+#: extension.js:255
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:269
+#: extension.js:283
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:275
+#: extension.js:289
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:340
+#: extension.js:356
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:341
+#: extension.js:357
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:342
+#: extension.js:358
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:364
+#: extension.js:372
+msgid "Open notification"
+msgstr "Bildirimi aç"
+
+#: extension.js:425
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:640
+#: extension.js:849
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:658
+#: extension.js:867
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:661
+#: extension.js:870
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:662
+#: extension.js:871
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:665
+#: extension.js:874
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:667
+#: extension.js:876
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:668
+#: extension.js:877
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:676
+#: extension.js:885
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:677
+#: extension.js:886
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:677
+#: extension.js:886
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:800
+#: extension.js:1014
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
