@@ -3,10 +3,15 @@
 A GNOME Shell extension that turns the top bar into a small black island in the middle
 of the screen.
 
-- **Collapsed:** time, date and battery level.
+- **Collapsed:** a small frosted-glass pill with the time, date and battery level.
+  Windows use the whole screen; the island floats over them.
 - **Click it:** it springs open with a large clock, remaining battery time, a volume
-  slider and every panel icon: Quick Settings, the calendar and icons from your other
-  extensions.
+  slider and every panel icon (Quick Settings and your other extensions) laid out as
+  tidy chips.
+- **Left bubble:** notifications and the calendar.
+- **Right bubble:** what is playing right now, from Spotify, a browser video or any
+  MPRIS player. Click it for cover art, progress and play/pause/next/previous.
+- **Fullscreen:** the island slides away. Push the pointer to the top edge to bring it back.
 - **Closing:** click the clock or move the pointer away. It stays open while a menu is open.
 
 The text follows your system language. Translations live in `po/`.
@@ -31,12 +36,12 @@ gnome-extensions disable dynamic-island@himuraw
 
 ## How it works
 
-- The top bar (`Main.panel`) is hidden, not removed. A 40 px transparent strip takes its
-  place, so maximized windows stay below the island. Set `STRIP_HEIGHT` in
-  `extension.js` to `0` if you want the island to float over windows.
+- The top bar (`Main.panel`) is hidden, not removed, and reserves no space.
 - Icons from the panel's left, center and right boxes move into the island. Icons that
   extensions add later move in on their own. Disabling the extension puts every icon
   back where it was.
+- The glass is a blurred clone of the windows behind the island, clipped to a rounded
+  shape by a small shader (`glass.js`). Motion uses a damped spring (`spring.js`).
 
 ## Development
 
