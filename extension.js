@@ -1,7 +1,6 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
 import GnomeDesktop from 'gi://GnomeDesktop';
 import Graphene from 'gi://Graphene';
 import St from 'gi://St';
@@ -9,16 +8,29 @@ import UPower from 'gi://UPowerGlib';
 
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {BarLevel} from 'resource:///org/gnome/shell/ui/barLevel.js';
 import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
+import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.js';
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
-// Space reserved above windows (px). Set to 0 to let the island float over windows.
-const STRIP_HEIGHT = 40;
-const TOP_MARGIN = 4;
-const EXPANDED_WIDTH = 460;
+import {Glass, RoundedMask} from './glass.js';
+import {ChipLayout, TopCenterLayout} from './layouts.js';
+import {MediaWatcher} from './media.js';
+import {spring, stopAllSprings} from './spring.js';
+
+const TOP_MARGIN = 6;
+const PILL_HEIGHT = 38;
+const BORDER = 1;
+const BUBBLE_GAP = 8;
+const EXPANDED_WIDTH = 520;
+const EXPANDED_RADIUS = 34;
+const CONTENT_WIDTH = EXPANDED_WIDTH - 2 * BORDER;
 // How long to wait after the pointer leaves before collapsing (ms).
 const COLLAPSE_DELAY = 700;
+// In fullscreen, hide again once the pointer is this far below the island (px).
+const REVEAL_SLACK = 60;
+const ART_SIZE = 72;
 
 const DisplayDeviceProxy = Gio.DBusProxy.makeProxyWrapper(
     loadInterfaceXML('org.freedesktop.UPower.Device'));
@@ -28,144 +40,54 @@ function fmt(str, ...args) {
     return str.replace(/%([ds%])/g, (m, c) => (c === '%' ? '%' : String(args.shift())));
 }
 
-// Lays children out left to right and wraps to a new row when the width runs out.
-// Unlike Clutter.FlowLayout every child keeps its own width, and hidden or empty
-// children take no space. Rows are centered.
-const WrapLayout = GObject.registerClass(
-class WrapLayout extends Clutter.LayoutManager {
-    _init(spacing, rowSpacing) {
-        super._init();
-        this._spacing = spacing;
-        this._rowSpacing = rowSpacing;
-    }
-
-    _items(container) {
-        const items = [];
-        for (const child of container.get_children()) {
-            if (!child.visible)
-                continue;
-            const [, w] = child.get_preferred_width(-1);
-            if (w <= 0)
-                continue;
-            items.push({child, w});
-        }
-        return items;
-    }
-
-    _rows(container, forWidth) {
-        const rows = [];
-        let row = null;
-        for (const item of this._items(container)) {
-            const w = Math.min(item.w, forWidth);
-            const [, h] = item.child.get_preferred_height(w);
-            if (row && row.width + this._spacing + w > forWidth)
-                row = null;
-            if (!row) {
-                row = {items: [], width: 0, height: 0};
-                rows.push(row);
-            } else {
-                row.width += this._spacing;
-            }
-            row.items.push({child: item.child, x: row.width, w, h});
-            row.width += w;
-            row.height = Math.max(row.height, h);
-        }
-        return rows;
-    }
-
-    vfunc_get_preferred_width(container, _forHeight) {
-        const items = this._items(container);
-        const min = Math.max(0, ...items.map(i => i.w));
-        const nat = items.reduce((sum, i) => sum + i.w, 0) +
-            this._spacing * Math.max(0, items.length - 1);
-        return [min, nat];
-    }
-
-    vfunc_get_preferred_height(container, forWidth) {
-        if (forWidth < 0)
-            forWidth = this.vfunc_get_preferred_width(container, -1)[1];
-        const rows = this._rows(container, forWidth);
-        const h = rows.reduce((sum, r) => sum + r.height, 0) +
-            this._rowSpacing * Math.max(0, rows.length - 1);
-        return [h, h];
-    }
-
-    vfunc_allocate(container, box) {
-        const width = box.get_width();
-        const placed = new Set();
-        let y = box.y1;
-        for (const row of this._rows(container, width)) {
-            const offset = box.x1 + Math.floor((width - row.width) / 2);
-            for (const item of row.items) {
-                const x = offset + item.x;
-                const top = y + Math.floor((row.height - item.h) / 2);
-                item.child.allocate(new Clutter.ActorBox({
-                    x1: x, y1: top, x2: x + item.w, y2: top + item.h,
-                }));
-                placed.add(item.child);
-            }
-            y += row.height + this._rowSpacing;
-        }
-        for (const child of container.get_children()) {
-            if (!placed.has(child))
-                child.allocate(new Clutter.ActorBox());
-        }
-    }
-});
-
-// Places each child horizontally centered, TOP_MARGIN below the top, at its preferred
-// size. The child may be taller than the container (the expanded island overflows the
-// strip), and it stays centered while its width animates.
-const TopCenterLayout = GObject.registerClass(
-class TopCenterLayout extends Clutter.LayoutManager {
-    vfunc_get_preferred_width(_container, _forHeight) {
-        return [0, 0];
-    }
-
-    vfunc_get_preferred_height(_container, _forWidth) {
-        return [0, 0];
-    }
-
-    vfunc_allocate(container, box) {
-        for (const child of container.get_children()) {
-            const [, w] = child.get_preferred_width(-1);
-            const [, h] = child.get_preferred_height(w);
-            const x = box.x1 + Math.round((box.get_width() - w) / 2);
-            const y = box.y1 + TOP_MARGIN;
-            child.allocate(new Clutter.ActorBox({x1: x, y1: y, x2: x + w, y2: y + h}));
-        }
-    }
-});
+function formatTime(microseconds) {
+    const total = Math.max(0, Math.floor(microseconds / 1e6));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor(total / 60) % 60;
+    const s = String(total % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
 
 export default class DynamicIslandExtension extends Extension {
     enable() {
         this._signals = [];
         this._slots = [];
-        this._expanded = false;
+        this._timeouts = new Set();
+        this._mode = null;
+        this._hidden = false;
 
-        this._buildIsland();
+        this._buildUi();
         this._setupClock();
         this._setupBattery();
         this._setupVolume();
+        this._setupMedia();
         this._adoptPanel();
+        this._setupFullscreen();
     }
 
     disable() {
-        for (const id of [this._collapseTimeout, this._adoptIdle, this._panelIdle]) {
-            if (id)
-                GLib.source_remove(id);
-        }
-        this._collapseTimeout = this._adoptIdle = this._panelIdle = 0;
+        stopAllSprings();
+        for (const id of this._timeouts)
+            GLib.source_remove(id);
+        this._timeouts.clear();
+        this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
+
+        this._pointerWatch?.remove();
+        this._pointerWatch = null;
 
         for (const [obj, id] of this._signals)
             obj.disconnect(id);
         this._signals = [];
         this._unbindSink();
 
+        this._media.destroy();
+        this._media = null;
+
         this._releasePanel();
 
+        Main.layoutManager.removeChrome(this._strip);
         this._strip.destroy();
-        this._strip = this._island = null;
+        this._strip = this._island = this._left = this._right = null;
 
         this._power = null;
         this._clock = null;
@@ -176,61 +98,108 @@ export default class DynamicIslandExtension extends Extension {
         this._signals.push([obj, obj.connect(signal, handler)]);
     }
 
-    // ---------- Island ----------
-
-    _buildIsland() {
-        // Full-width transparent strip placed inside the panel box. Its fixed height
-        // is the space windows keep free at the top of the screen.
-        this._strip = new St.Widget({
-            layout_manager: new TopCenterLayout(),
-            height: STRIP_HEIGHT,
-            x_expand: true,
+    _timeout(ms, callback) {
+        const id = GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+            const result = callback();
+            if (result !== GLib.SOURCE_CONTINUE)
+                this._timeouts.delete(id);
+            return result;
         });
+        this._timeouts.add(id);
+        return id;
+    }
 
-        this._island = new St.Widget({
+    _clearTimeout(id) {
+        if (id && this._timeouts.delete(id))
+            GLib.source_remove(id);
+        return 0;
+    }
+
+    // ---------- Layout ----------
+
+    _buildUi() {
+        // Full-monitor, non-reactive layer: clicks fall through to the windows below
+        // except on the island and its bubbles. It reserves no screen space.
+        this._layout = new TopCenterLayout(TOP_MARGIN, BUBBLE_GAP);
+        this._strip = new St.Widget({layout_manager: this._layout});
+        Main.layoutManager.addChrome(this._strip, {affectsStruts: false, trackFullscreen: false});
+        // Below the panel menus, so menus opened from the island are not covered by it.
+        Main.layoutManager.uiGroup.set_child_above_sibling(this._strip, Main.layoutManager.panelBox);
+        this._syncStripGeometry();
+        this._connect(Main.layoutManager, 'monitors-changed', () => this._syncStripGeometry());
+
+        this._island = new Glass({
             style_class: 'dynada-island',
+            radius: EXPANDED_RADIUS,
             reactive: true,
             track_hover: true,
-            clip_to_allocation: true,
             pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
-            layout_manager: new Clutter.BinLayout(),
         });
-
         this._compact = this._buildCompact();
-        this._full = this._buildExpanded();
-        this._island.add_child(this._compact);
-        this._island.add_child(this._full);
+        this._controls = this._buildControls();
+        this._mediaView = this._buildMediaView();
+        for (const view of [this._compact, this._controls, this._mediaView])
+            this._island.add_child(view);
 
+        this._left = new Glass({
+            style_class: 'dynada-bubble',
+            radius: PILL_HEIGHT / 2,
+            reactive: true,
+            track_hover: true,
+            width: PILL_HEIGHT,
+            height: PILL_HEIGHT,
+        });
+        this._right = this._buildMediaBubble();
+
+        this._strip.add_child(this._left);
         this._strip.add_child(this._island);
+        this._strip.add_child(this._right);
+        this._layout.left = this._left;
+        this._layout.center = this._island;
+        this._layout.right = this._right;
 
-        // The collapsed pill and the expanded header are separate buttons, so clicks
-        // on tray icons never toggle the island.
-        this._connect(this._compact, 'clicked', () => this._expand());
-        this._connect(this._header, 'clicked', () => this._collapse());
+        this._connect(this._compact, 'clicked', () => this._open('controls'));
+        this._connect(this._controlsHeader, 'clicked', () => this._close());
         this._connect(this._compact, 'notify::pressed', () => {
+            const scale = this._compact.pressed ? 0.95 : 1;
             this._island.ease({
-                scale_x: this._compact.pressed ? 0.96 : 1,
-                scale_y: this._compact.pressed ? 0.96 : 1,
-                duration: 120,
+                scale_x: scale,
+                scale_y: scale,
+                duration: 140,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         });
-        this._connect(this._island, 'notify::hover', () => {
-            if (this._expanded && !this._island.hover)
-                this._scheduleCollapse();
+        for (const actor of [this._island, this._left, this._right]) {
+            this._connect(actor, 'notify::hover', () => {
+                if (this._mode && !this._anyHover())
+                    this._scheduleCollapse();
+            });
+        }
+        // The blur behind the glass follows layout; moving the whole layer needs a nudge.
+        this._connect(this._strip, 'notify::translation-y', () => {
+            for (const glass of [this._island, this._left, this._right])
+                glass.syncBackdrop();
         });
+    }
 
-        Main.layoutManager.panelBox.add_child(this._strip);
+    _syncStripGeometry() {
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor)
+            return;
+        this._strip.set_position(monitor.x, monitor.y);
+        this._strip.set_size(monitor.width, monitor.height);
     }
 
     _buildCompact() {
-        const box = new St.BoxLayout({style_class: 'dynada-compact-row'});
+        const box = new St.BoxLayout({style_class: 'dynada-compact-row', y_align: Clutter.ActorAlign.CENTER});
         const button = new St.Button({
             style_class: 'dynada-compact',
             can_focus: true,
             accessible_name: _('Open Dynamic Island'),
+            height: PILL_HEIGHT - 2 * BORDER,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.START,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
             child: box,
         });
         this._compactTime = new St.Label({style_class: 'dynada-compact-time', y_align: Clutter.ActorAlign.CENTER});
@@ -248,20 +217,25 @@ export default class DynamicIslandExtension extends Extension {
         return button;
     }
 
-    _buildExpanded() {
-        const box = new St.BoxLayout({
+    _expandedView() {
+        return new St.BoxLayout({
             style_class: 'dynada-expanded',
             orientation: Clutter.Orientation.VERTICAL,
-            width: EXPANDED_WIDTH,
+            width: CONTENT_WIDTH,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.START,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0}),
             opacity: 0,
             visible: false,
         });
+    }
 
-        // Header: big time + date on the left, battery on the right. Clicking it collapses.
+    _buildControls() {
+        const view = this._expandedView();
+
+        // Header: big time and date on the left, battery on the right. Clicking it collapses.
         const header = new St.BoxLayout({x_expand: true});
-        this._header = new St.Button({
+        this._controlsHeader = new St.Button({
             style_class: 'dynada-header',
             can_focus: true,
             accessible_name: _('Close Dynamic Island'),
@@ -285,12 +259,12 @@ export default class DynamicIslandExtension extends Extension {
 
         header.add_child(left);
         header.add_child(this._batteryColumn);
-        box.add_child(this._header);
+        view.add_child(this._controlsHeader);
 
         // Volume
-        this._volumeRow = new St.BoxLayout({style_class: 'dynada-volume', x_expand: true});
+        this._volumeRow = new St.BoxLayout({style_class: 'dynada-volume dynada-chip', x_expand: true});
         this._muteButton = new St.Button({
-            style_class: 'dynada-volume-button',
+            style_class: 'dynada-round-button',
             can_focus: true,
             accessible_name: _('Mute or unmute'),
             child: new St.Icon({style_class: 'dynada-volume-icon', icon_name: 'audio-volume-high-symbolic'}),
@@ -303,96 +277,226 @@ export default class DynamicIslandExtension extends Extension {
         this._volumeRow.add_child(this._muteButton);
         this._volumeRow.add_child(this._slider);
         this._volumeRow.add_child(this._volumeLabel);
-        box.add_child(this._volumeRow);
+        view.add_child(this._volumeRow);
 
         // Panel indicators, including other extensions', are moved here.
         this._tray = new St.Widget({
             style_class: 'dynada-tray',
             x_expand: true,
-            layout_manager: new WrapLayout(2, 4),
+            layout_manager: new ChipLayout(52, 40, 8),
         });
-        box.add_child(this._tray);
+        view.add_child(this._tray);
 
-        return box;
+        return view;
     }
 
-    _expand() {
-        if (this._expanded)
-            return;
-        this._expanded = true;
+    _buildMediaView() {
+        const view = this._expandedView();
 
+        const top = new St.BoxLayout({style_class: 'dynada-media-top', x_expand: true});
+        this._artButton = new St.Button({
+            style_class: 'dynada-art-button',
+            can_focus: true,
+            width: ART_SIZE,
+            height: ART_SIZE,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        const artMask = new RoundedMask();
+        artMask.setGeometry(ART_SIZE, ART_SIZE, 14);
+        this._artButton.add_effect(artMask);
+        this._art = new St.Icon({style_class: 'dynada-art', icon_size: ART_SIZE});
+        this._artButton.set_child(this._art);
+
+        const text = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._mediaTitle = new St.Label({style_class: 'dynada-media-title'});
+        this._mediaArtist = new St.Label({style_class: 'dynada-media-artist'});
+        this._mediaApp = new St.Label({style_class: 'dynada-media-app'});
+        text.add_child(this._mediaTitle);
+        text.add_child(this._mediaArtist);
+        text.add_child(this._mediaApp);
+
+        top.add_child(this._artButton);
+        top.add_child(text);
+        view.add_child(top);
+
+        this._progressRow = new St.BoxLayout({style_class: 'dynada-progress-row', x_expand: true});
+        this._elapsed = new St.Label({style_class: 'dynada-time-label', y_align: Clutter.ActorAlign.CENTER});
+        this._progress = new BarLevel({style_class: 'dynada-progress', x_expand: true, y_align: Clutter.ActorAlign.CENTER});
+        this._remaining = new St.Label({style_class: 'dynada-time-label', y_align: Clutter.ActorAlign.CENTER});
+        this._progressRow.add_child(this._elapsed);
+        this._progressRow.add_child(this._progress);
+        this._progressRow.add_child(this._remaining);
+        view.add_child(this._progressRow);
+
+        this._transport = new St.BoxLayout({style_class: 'dynada-transport', x_align: Clutter.ActorAlign.CENTER});
+        const button = (icon, name, big = false) => new St.Button({
+            style_class: big ? 'dynada-round-button dynada-play' : 'dynada-round-button',
+            can_focus: true,
+            accessible_name: name,
+            child: new St.Icon({icon_name: icon, style_class: big ? 'dynada-play-icon' : 'dynada-transport-icon'}),
+        });
+        this._prevButton = button('media-skip-backward-symbolic', _('Previous'));
+        this._playButton = button('media-playback-start-symbolic', _('Play or pause'), true);
+        this._nextButton = button('media-skip-forward-symbolic', _('Next'));
+        this._transport.add_child(this._prevButton);
+        this._transport.add_child(this._playButton);
+        this._transport.add_child(this._nextButton);
+        view.add_child(this._transport);
+
+        return view;
+    }
+
+    _buildMediaBubble() {
+        const bubble = new Glass({
+            style_class: 'dynada-bubble',
+            radius: PILL_HEIGHT / 2,
+            reactive: true,
+            track_hover: true,
+            width: PILL_HEIGHT,
+            height: PILL_HEIGHT,
+        });
+        this._bubbleIcon = new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: 16});
+        this._bubbleButton = new St.Button({
+            style_class: 'dynada-bubble-button',
+            can_focus: true,
+            accessible_name: _('Now playing'),
+            x_expand: true,
+            y_expand: true,
+            child: this._bubbleIcon,
+        });
+        bubble.add_child(this._bubbleButton);
+        this._connect(this._bubbleButton, 'clicked', () => {
+            if (this._mode === 'media')
+                this._close();
+            else
+                this._open('media');
+        });
+        return bubble;
+    }
+
+    // ---------- Open / close ----------
+
+    _viewFor(mode) {
+        return mode === 'media' ? this._mediaView : this._controls;
+    }
+
+    _freezeSize() {
         const [w, h] = this._island.get_size();
         this._island.set_size(w, h);
+    }
+
+    _open(mode) {
+        if (this._mode === mode)
+            return;
+        const previous = this._mode;
+        this._mode = mode;
+        this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
+
+        const view = this._viewFor(mode);
+        const outgoing = previous ? this._viewFor(previous) : this._compact;
+
+        if (mode === 'media') {
+            this._syncMedia();
+            this._startPositionPolling();
+        } else {
+            this._positionTimeout = this._clearTimeout(this._positionTimeout);
+        }
+
+        this._freezeSize();
         this._island.add_style_pseudo_class('expanded');
 
-        this._full.show();
-        const [, targetH] = this._full.get_preferred_height(EXPANDED_WIDTH);
-
-        this._compact.ease({
+        outgoing.ease({
             opacity: 0,
-            duration: 120,
+            scale_x: 0.94,
+            scale_y: 0.94,
+            duration: 140,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
-                if (this._expanded)
-                    this._compact.hide();
+                if (outgoing !== this._currentView())
+                    outgoing.hide();
             },
         });
-        this._island.ease({
+
+        view.show();
+        view.opacity = 0;
+        view.set_scale(0.94, 0.94);
+        const [, height] = view.get_preferred_height(CONTENT_WIDTH);
+
+        spring(this._island, {
             width: EXPANDED_WIDTH,
-            height: targetH,
-            duration: 520,
-            mode: Clutter.AnimationMode.EASE_OUT_BACK,
+            height: height + 2 * BORDER,
+        }, {
+            response: 0.5,
+            damping: 0.76,
             onComplete: () => {
-                // Fall back to natural size so the island follows icons being added or removed.
-                if (this._expanded)
+                // Natural size from here on, so the island follows content changes.
+                if (this._mode === mode)
                     this._island.set_size(-1, -1);
             },
         });
-        this._full.ease({
+        view.ease({
             opacity: 255,
-            delay: 140,
-            duration: 260,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            scale_x: 1,
+            scale_y: 1,
+            delay: 90,
+            duration: 320,
+            mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
         });
     }
 
-    _collapse() {
-        if (!this._expanded)
+    _close() {
+        if (!this._mode)
             return;
-        this._expanded = false;
-        this._stopCollapseTimer();
+        const view = this._viewFor(this._mode);
+        this._mode = null;
+        this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
+        this._positionTimeout = this._clearTimeout(this._positionTimeout);
 
-        const [w, h] = this._island.get_size();
-        this._island.set_size(w, h);
-
+        this._freezeSize();
         this._compact.show();
-        const [, cw] = this._compact.get_preferred_width(-1);
-        const [, ch] = this._compact.get_preferred_height(cw);
+        const [, width] = this._compact.get_preferred_width(-1);
 
-        this._full.ease({
+        view.ease({
             opacity: 0,
+            scale_x: 0.94,
+            scale_y: 0.94,
             duration: 120,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
-        this._island.ease({
-            width: cw,
-            height: ch,
-            duration: 380,
-            mode: Clutter.AnimationMode.EASE_OUT_QUINT,
+        spring(this._island, {
+            width: width + 2 * BORDER,
+            height: PILL_HEIGHT,
+        }, {
+            response: 0.42,
+            damping: 0.86,
             onComplete: () => {
-                if (this._expanded)
+                if (this._mode)
                     return;
-                this._full.hide();
+                view.hide();
                 this._island.remove_style_pseudo_class('expanded');
                 this._island.set_size(-1, -1);
             },
         });
         this._compact.ease({
             opacity: 255,
-            delay: 160,
-            duration: 200,
+            scale_x: 1,
+            scale_y: 1,
+            delay: 100,
+            duration: 220,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
+    }
+
+    _currentView() {
+        return this._mode ? this._viewFor(this._mode) : this._compact;
+    }
+
+    _anyHover() {
+        return [this._island, this._left, this._right].some(a => a.hover);
     }
 
     _anyMenuOpen() {
@@ -404,23 +508,69 @@ export default class DynamicIslandExtension extends Extension {
             return;
         // Collapse once the pointer is outside and no menu is open.
         // While a menu is open keep waiting and check again when it closes.
-        this._collapseTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, COLLAPSE_DELAY, () => {
-            if (!this._expanded) {
+        this._collapseTimeout = this._timeout(COLLAPSE_DELAY, () => {
+            if (!this._mode) {
                 this._collapseTimeout = 0;
                 return GLib.SOURCE_REMOVE;
             }
-            if (this._island.hover || this._anyMenuOpen())
+            if (this._anyHover() || this._anyMenuOpen())
                 return GLib.SOURCE_CONTINUE;
             this._collapseTimeout = 0;
-            this._collapse();
+            this._close();
             return GLib.SOURCE_REMOVE;
         });
     }
 
-    _stopCollapseTimer() {
-        if (this._collapseTimeout)
-            GLib.source_remove(this._collapseTimeout);
-        this._collapseTimeout = 0;
+    // ---------- Fullscreen ----------
+
+    _setupFullscreen() {
+        this._connect(global.display, 'in-fullscreen-changed', () => this._syncFullscreen());
+        this._syncFullscreen();
+    }
+
+    _syncFullscreen() {
+        const fullscreen = !!Main.layoutManager.primaryMonitor?.inFullscreen;
+        if (fullscreen && !this._pointerWatch) {
+            this._pointerWatch = getPointerWatcher().addWatch(100, (x, y) => this._onPointerMove(x, y));
+            this._setHidden(true);
+        } else if (!fullscreen && this._pointerWatch) {
+            this._pointerWatch.remove();
+            this._pointerWatch = null;
+            this._setHidden(false);
+        }
+    }
+
+    // In fullscreen the island waits above the screen and slides in when the
+    // pointer touches the top edge.
+    _onPointerMove(x, y) {
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor || x < monitor.x || x >= monitor.x + monitor.width)
+            return;
+        if (this._hidden) {
+            if (y <= monitor.y + 1)
+                this._setHidden(false);
+        } else if (!this._mode && !this._anyMenuOpen() &&
+                   y > monitor.y + TOP_MARGIN + this._island.height + REVEAL_SLACK) {
+            this._setHidden(true);
+        }
+    }
+
+    _setHidden(hidden) {
+        if (this._hidden === hidden)
+            return;
+        this._hidden = hidden;
+        if (hidden)
+            this._close();
+        const offset = -(TOP_MARGIN + PILL_HEIGHT + 12);
+        if (hidden) {
+            this._strip.ease({
+                translation_y: offset,
+                duration: 260,
+                mode: Clutter.AnimationMode.EASE_IN_CUBIC,
+            });
+        } else {
+            spring(this._strip, {translation_y: 0}, {response: 0.45, damping: 0.72});
+        }
     }
 
     // ---------- Clock ----------
@@ -596,6 +746,108 @@ export default class DynamicIslandExtension extends Extension {
         this._sink.push_volume();
     }
 
+    // ---------- Media ----------
+
+    _setupMedia() {
+        this._media = new MediaWatcher(() => this._syncMedia());
+        const withPlayer = action => () => {
+            const entry = this._media.current();
+            if (entry)
+                action(entry);
+        };
+        this._connect(this._playButton, 'clicked', withPlayer(e => this._media.playPause(e)));
+        this._connect(this._nextButton, 'clicked', withPlayer(e => this._media.next(e)));
+        this._connect(this._prevButton, 'clicked', withPlayer(e => this._media.previous(e)));
+        this._connect(this._artButton, 'clicked', withPlayer(e => this._media.raise(e)));
+        this._syncMedia();
+    }
+
+    _syncMedia() {
+        if (!this._island)
+            return;
+        const entry = this._media.current();
+        const info = entry ? this._media.info(entry) : null;
+        this._mediaEntry = entry;
+        this._mediaLength = info?.length ?? 0;
+
+        const artIcon = info?.artUrl
+            ? new Gio.FileIcon({file: Gio.File.new_for_uri(info.artUrl)})
+            : null;
+
+        // Side bubble: cover art filling the circle, else the app icon, else a note.
+        if (artIcon) {
+            this._bubbleIcon.gicon = artIcon;
+            this._bubbleIcon.icon_size = PILL_HEIGHT - 2 * BORDER;
+        } else if (info?.app) {
+            this._bubbleIcon.gicon = info.app.get_icon();
+            this._bubbleIcon.icon_size = 20;
+        } else {
+            this._bubbleIcon.gicon = null;
+            this._bubbleIcon.icon_name = 'audio-x-generic-symbolic';
+            this._bubbleIcon.icon_size = 16;
+        }
+        if (info?.playing)
+            this._right.add_style_pseudo_class('playing');
+        else
+            this._right.remove_style_pseudo_class('playing');
+
+        // Media view: cover art fills the square; otherwise a smaller icon on a tile.
+        if (artIcon)
+            this._art.gicon = artIcon;
+        else if (info?.app)
+            this._art.gicon = info.app.get_icon();
+        else
+            this._art.gicon = new Gio.ThemedIcon({name: 'audio-x-generic-symbolic'});
+        this._art.icon_size = artIcon ? ART_SIZE : 36;
+        if (artIcon)
+            this._artButton.remove_style_class_name('dynada-art-empty');
+        else
+            this._artButton.add_style_class_name('dynada-art-empty');
+
+        this._mediaTitle.text = info ? info.title || info.appName : _('Nothing is playing');
+        this._mediaArtist.text = info?.artist ?? '';
+        this._mediaArtist.visible = !!info?.artist;
+        this._mediaApp.text = info && info.title ? info.appName : '';
+        this._mediaApp.visible = !!this._mediaApp.text;
+
+        this._transport.visible = !!info;
+        this._prevButton.reactive = !!info?.canPrevious;
+        this._nextButton.reactive = !!info?.canNext;
+        this._prevButton.opacity = info?.canPrevious ? 255 : 90;
+        this._nextButton.opacity = info?.canNext ? 255 : 90;
+        this._playButton.child.icon_name = info?.playing
+            ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
+
+        this._progressRow.visible = this._mediaLength > 0;
+        this._syncPosition();
+    }
+
+    _startPositionPolling() {
+        if (this._positionTimeout)
+            return;
+        this._positionTimeout = this._timeout(1000, () => {
+            this._syncPosition();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    _syncPosition() {
+        const entry = this._mediaEntry;
+        if (!entry || this._mediaLength <= 0 || this._mode !== 'media')
+            return;
+        this._media.position(entry, position => {
+            if (!this._island || entry !== this._mediaEntry)
+                return;
+            if (position < 0) {
+                this._progressRow.hide();
+                return;
+            }
+            this._progress.value = Math.min(1, position / this._mediaLength);
+            this._elapsed.text = formatTime(position);
+            this._remaining.text = `-${formatTime(this._mediaLength - position)}`;
+        });
+    }
+
     // ---------- Panel indicators ----------
 
     _panelBoxes() {
@@ -604,16 +856,27 @@ export default class DynamicIslandExtension extends Extension {
 
     _adoptPanel() {
         Main.panel.hide();
+        // Other extensions (e.g. Blur my Shell) put their own actors in the panel box.
+        // Collapse it to zero height and clip it, so nothing is left on screen and no
+        // space is reserved at the top.
+        const panelBox = Main.layoutManager.panelBox;
+        this._panelBoxClip = panelBox.clip_to_allocation;
+        panelBox.clip_to_allocation = true;
+        panelBox.height = 0;
+        // The layout manager resets the panel box size when monitors change.
+        this._connect(Main.layoutManager, 'monitors-changed', () => {
+            panelBox.height = 0;
+        });
         // If another extension shows the panel again, hide it again.
         this._connect(Main.panel, 'notify::visible', () => {
-            if (!Main.panel.visible && this._panelIdle)
-                return;
             if (Main.panel.visible && !this._panelIdle) {
                 this._panelIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                    this._timeouts.delete(this._panelIdle);
                     this._panelIdle = 0;
                     Main.panel.hide();
                     return GLib.SOURCE_REMOVE;
                 });
+                this._timeouts.add(this._panelIdle);
             }
         });
 
@@ -628,6 +891,7 @@ export default class DynamicIslandExtension extends Extension {
         if (this._adoptIdle)
             return;
         this._adoptIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            this._timeouts.delete(this._adoptIdle);
             this._adoptIdle = 0;
             for (const box of this._panelBoxes()) {
                 for (const child of box.get_children())
@@ -635,6 +899,7 @@ export default class DynamicIslandExtension extends Extension {
             }
             return GLib.SOURCE_REMOVE;
         });
+        this._timeouts.add(this._adoptIdle);
     }
 
     // index: position in the panel box, used to put it back in order on disable.
@@ -643,18 +908,28 @@ export default class DynamicIslandExtension extends Extension {
         const visible = container.visible;
         box.remove_child(container);
 
+        // The calendar and notifications button becomes the left bubble;
+        // everything else goes into the island's grid.
+        const isDateMenu = container === Main.panel.statusArea.dateMenu?.container;
+
         // Naming the slot "panel" keeps the theme's #panel .panel-button styles.
         const slot = new St.Bin({
             name: 'panel',
-            style: 'background-color: transparent; box-shadow: none; border: none;',
+            style_class: isDateMenu ? 'dynada-bubble-slot' : 'dynada-slot',
+            // Inline style beats the theme's #panel background.
+            style: isDateMenu
+                ? 'background-color: transparent; box-shadow: none; border: none;'
+                : 'background-color: rgba(255, 255, 255, 0.07); border-radius: 14px; box-shadow: none; border: none;',
+            x_expand: isDateMenu,
+            y_expand: isDateMenu,
             child: container,
         });
         container.visible = visible;
         const record = {container, box, index, slot};
         this._slots.push(record);
-        this._tray.add_child(slot);
+        (isDateMenu ? this._left : this._tray).add_child(slot);
 
-        if (container === Main.panel.statusArea.dateMenu?.container)
+        if (isDateMenu)
             this._shrinkDateMenu(record);
 
         // Drop the empty slot if the indicator is moved elsewhere or destroyed.
@@ -666,13 +941,13 @@ export default class DynamicIslandExtension extends Extension {
         });
     }
 
-    // The island already shows the time, so the calendar button shows an icon instead.
+    // The island already shows the time, so the calendar button shows a bell instead.
     _shrinkDateMenu(record) {
         const clock = Main.panel.statusArea.dateMenu._clockDisplay;
         if (!clock)
             return;
         const icon = new St.Icon({
-            icon_name: 'x-office-calendar-symbolic',
+            icon_name: 'preferences-system-notifications-symbolic',
             style_class: 'system-status-icon',
         });
         clock.get_parent().insert_child_above(icon, clock);
@@ -696,6 +971,9 @@ export default class DynamicIslandExtension extends Extension {
         }
         this._slots = [];
         this._releasing = false;
+        const panelBox = Main.layoutManager.panelBox;
+        panelBox.height = -1;
+        panelBox.clip_to_allocation = this._panelBoxClip;
         Main.panel.show();
     }
 }

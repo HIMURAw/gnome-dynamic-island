@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-29 22:10+0300\n"
+"POT-Creation-Date: 2026-09-29 22:36+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,65 +17,85 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:126
+#: extension.js:198
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:162
+#: extension.js:241
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:190
+#: extension.js:269
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:196
+#: extension.js:275
 msgid "Volume"
 msgstr ""
 
+#: extension.js:340
+msgid "Previous"
+msgstr ""
+
+#: extension.js:341
+msgid "Play or pause"
+msgstr ""
+
+#: extension.js:342
+msgid "Next"
+msgstr ""
+
+#: extension.js:364
+msgid "Now playing"
+msgstr ""
+
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:397
+#: extension.js:640
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:415
+#: extension.js:658
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:418
+#: extension.js:661
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:419
+#: extension.js:662
 msgid "Charging"
 msgstr ""
 
-#: extension.js:422
+#: extension.js:665
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:424
+#: extension.js:667
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:425
+#: extension.js:668
 msgid "On battery"
 msgstr ""
 
-#: extension.js:433
+#: extension.js:676
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:434
+#: extension.js:677
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:434
+#: extension.js:677
 #, javascript-format
 msgid "%d h %d min"
+msgstr ""
+
+#: extension.js:800
+msgid "Nothing is playing"
 msgstr ""

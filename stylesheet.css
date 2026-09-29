@@ -1,20 +1,30 @@
-/* True black, so the island blends into the screen bezel like a piece of hardware. */
-.dynada-island {
-  background-color: #000000;
-  color: #f2f2f0;
-  border-radius: 18px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+/* Dark frosted glass. The blur itself comes from glass.js; these rules add the
+   tint over it, a hairline edge and the type. */
+
+.dynada-glass-tint {
+  background-color: rgba(22, 22, 26, 0.52);
+}
+
+.dynada-island,
+.dynada-bubble {
+  color: #f5f5f7;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 19px;
 }
 
 .dynada-island:expanded {
-  border-radius: 30px;
+  border-radius: 34px;
+}
+
+.dynada-bubble:playing {
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 /* Collapsed */
 .dynada-compact {
-  border-radius: 18px;
-  padding: 6px 16px;
+  padding: 0 18px;
   font-size: 10.5pt;
+  border-radius: 18px;
 }
 
 .dynada-compact-row {
@@ -27,7 +37,7 @@
 }
 
 .dynada-compact-date {
-  color: rgba(242, 242, 240, 0.6);
+  color: rgba(245, 245, 247, 0.62);
 }
 
 .dynada-battery {
@@ -40,32 +50,63 @@
 }
 
 .dynada-low {
-  color: #f0a33a;
+  color: #ff9f0a;
 }
 
 .dynada-charging {
-  color: -st-accent-color;
+  color: #30d158;
 }
 
-/* Expanded */
+/* Side bubbles */
+.dynada-bubble-button {
+  border-radius: 99px;
+  color: #f5f5f7;
+}
+
+.dynada-bubble-button:hover,
+.dynada-bubble-slot .panel-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Expanded, shared */
 .dynada-expanded {
-  padding: 18px 22px 14px 22px;
+  padding: 22px 24px 20px 24px;
   spacing: 16px;
 }
 
+.dynada-chip {
+  background-color: rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+}
+
+.dynada-round-button {
+  border-radius: 99px;
+  padding: 8px;
+  color: #f5f5f7;
+}
+
+.dynada-round-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-round-button:active {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Controls view */
 .dynada-header {
-  border-radius: 14px;
+  border-radius: 16px;
 }
 
 .dynada-big-time {
-  font-size: 30pt;
+  font-size: 32pt;
   font-weight: 300;
   font-feature-settings: "tnum";
 }
 
 .dynada-long-date {
   font-size: 10.5pt;
-  color: rgba(242, 242, 240, 0.6);
+  color: rgba(245, 245, 247, 0.62);
 }
 
 .dynada-big-battery {
@@ -77,38 +118,26 @@
 
 .dynada-battery-state {
   font-size: 9pt;
-  color: rgba(242, 242, 240, 0.55);
+  color: rgba(245, 245, 247, 0.55);
   text-align: right;
 }
 
 .dynada-volume {
-  spacing: 12px;
-}
-
-.dynada-volume-button {
-  border-radius: 99px;
-  padding: 7px;
-  color: #f2f2f0;
-}
-
-.dynada-volume-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.dynada-volume-button:active {
-  background-color: rgba(255, 255, 255, 0.18);
+  padding: 6px 14px 6px 6px;
+  spacing: 10px;
 }
 
 .dynada-volume-icon {
   icon-size: 16px;
 }
 
-.dynada-volume .slider {
+.dynada-volume .slider,
+.dynada-progress {
   height: 22px;
   color: #ffffff;
   -barlevel-height: 6px;
-  -barlevel-background-color: rgba(255, 255, 255, 0.14);
-  -barlevel-active-background-color: -st-accent-color;
+  -barlevel-background-color: rgba(255, 255, 255, 0.16);
+  -barlevel-active-background-color: #ffffff;
   -slider-handle-radius: 9px;
 }
 
@@ -116,11 +145,71 @@
   min-width: 2.4em;
   text-align: right;
   font-feature-settings: "tnum";
-  color: rgba(242, 242, 240, 0.6);
+  color: rgba(245, 245, 247, 0.62);
 }
 
-/* Panel indicators. Each slot is named "panel" so theme rules for
-   #panel .panel-button still apply. */
-.dynada-tray {
+/* Media view */
+.dynada-media-top {
+  spacing: 16px;
+}
+
+.dynada-art-button {
+  border-radius: 14px;
+}
+
+.dynada-art-empty {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-art {
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.dynada-media-title {
+  font-size: 13pt;
+  font-weight: bold;
+}
+
+.dynada-media-artist {
+  font-size: 10.5pt;
+  color: rgba(245, 245, 247, 0.72);
+}
+
+.dynada-media-app {
+  font-size: 9pt;
+  color: rgba(245, 245, 247, 0.48);
   padding-top: 2px;
+}
+
+.dynada-progress-row {
+  spacing: 10px;
+}
+
+.dynada-progress {
+  height: 14px;
+  -barlevel-height: 5px;
+}
+
+.dynada-time-label {
+  font-size: 9pt;
+  min-width: 3em;
+  font-feature-settings: "tnum";
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.dynada-transport {
+  spacing: 22px;
+}
+
+.dynada-transport-icon {
+  icon-size: 20px;
+}
+
+.dynada-play {
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynada-play-icon {
+  icon-size: 24px;
 }
