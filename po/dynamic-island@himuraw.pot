@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 12:36+0300\n"
+"POT-Creation-Date: 2026-09-30 13:10+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,99 +17,250 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:242
+#: extension.js:294
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:285
+#: extension.js:337
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:313
+#: extension.js:365
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:319
+#: extension.js:371
 msgid "Volume"
 msgstr ""
 
-#: extension.js:389
+#: extension.js:441
 msgid "Back"
 msgstr ""
 
-#: extension.js:459
+#: extension.js:511
 msgid "Previous"
 msgstr ""
 
-#: extension.js:460
+#: extension.js:512
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:461
+#: extension.js:513
 msgid "Next"
 msgstr ""
 
-#: extension.js:475
+#: extension.js:527
 msgid "Open notification"
 msgstr ""
 
-#: extension.js:552 center.js:176
+#: extension.js:604 center.js:176
 msgid "Notifications"
 msgstr ""
 
-#: extension.js:584
+#: extension.js:636 prefs.js:96
 msgid "Now playing"
 msgstr ""
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1251
+#: extension.js:1328
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1269
+#: extension.js:1346
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1272
+#: extension.js:1349
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1273
+#: extension.js:1350
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1276
+#: extension.js:1353
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1278
+#: extension.js:1355
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1279
+#: extension.js:1356
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1287 center.js:284
+#: extension.js:1364 center.js:284
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1288
+#: extension.js:1365
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1288
+#: extension.js:1365
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1423
+#: extension.js:1500
 msgid "Nothing is playing"
+msgstr ""
+
+#: prefs.js:13
+msgid ""
+"Dash to Panel moves the top bar into its own panel. Use one or the other."
+msgstr ""
+
+#: prefs.js:15
+msgid ""
+"Just Perfection can hide or restyle the top bar. Leave its panel options at "
+"their defaults."
+msgstr ""
+
+#: prefs.js:17
+msgid "Hide Top Bar hides the same bar the island replaces. Turn it off."
+msgstr ""
+
+#: prefs.js:19
+msgid "Open Bar restyles the top bar. Turn it off."
+msgstr ""
+
+#: prefs.js:21
+msgid ""
+"Blur my Shell: turn off its panel blur, or a strip can stay at the top of "
+"the screen."
+msgstr ""
+
+#: prefs.js:39
+msgid "Behaviour"
+msgstr ""
+
+#: prefs.js:43
+msgid "Slide out of the way"
+msgstr ""
+
+#: prefs.js:44
+msgid "Rest the pointer on the top edge to bring it back"
+msgstr ""
+
+#: prefs.js:46
+msgid "Never"
+msgstr ""
+
+#: prefs.js:47
+msgid "In fullscreen"
+msgstr ""
+
+#: prefs.js:48
+msgid "When a window reaches under it"
+msgstr ""
+
+#: prefs.js:56
+msgid "Notifications in the island"
+msgstr ""
+
+#: prefs.js:57
+msgid "In place of GNOME's banners"
+msgstr ""
+
+#: prefs.js:60
+msgid "Appearance"
+msgstr ""
+
+#: prefs.js:62
+msgid "Frosted glass"
+msgstr ""
+
+#: prefs.js:63
+msgid "Turn off for a plain dark island on slower graphics"
+msgstr ""
+
+#: prefs.js:66
+msgid "Width of the open island"
+msgstr ""
+
+#: prefs.js:75
+msgid "Primary monitor"
+msgstr ""
+
+#. Translators: a monitor in the list, e.g. "Monitor 2 (DELL U2720Q)".
+#: prefs.js:79 prefs.js:81
+msgid "Monitor"
+msgstr ""
+
+#: prefs.js:90
+msgid "Island"
+msgstr ""
+
+#: prefs.js:91
+msgid "What the island shows"
+msgstr ""
+
+#: prefs.js:94
+msgid "Notification center"
+msgstr ""
+
+#: prefs.js:95
+msgid "The bell on the left"
+msgstr ""
+
+#: prefs.js:97
+msgid "The bubble on the right"
+msgstr ""
+
+#: prefs.js:98
+msgid "Connectivity"
+msgstr ""
+
+#: prefs.js:99
+msgid "Wi-Fi, Bluetooth, tethering, VPN"
+msgstr ""
+
+#: prefs.js:100 apps.js:26 apps.js:92 apps.js:109
+msgid "Open apps"
+msgstr ""
+
+#: prefs.js:101
+msgid "Sliders"
+msgstr ""
+
+#: prefs.js:102
+msgid "Volume, microphone, brightness"
+msgstr ""
+
+#: prefs.js:103
+msgid "Toggles"
+msgstr ""
+
+#: prefs.js:104
+msgid ""
+"Power mode, dark style, Do Not Disturb and toggles from other extensions"
+msgstr ""
+
+#: prefs.js:105
+msgid "Other extensions' icons"
+msgstr ""
+
+#: prefs.js:119
+msgid "Compatibility"
+msgstr ""
+
+#: prefs.js:120
+msgid "These extensions also change the top bar"
+msgstr ""
+
+#: prefs.js:134
+msgid "About"
+msgstr ""
+
+#: prefs.js:138
+msgid "Report a problem or suggest an idea"
 msgstr ""
 
 #: center.js:61 center.js:66
@@ -137,10 +288,6 @@ msgstr ""
 msgid "now"
 msgstr ""
 
-#: apps.js:25 apps.js:89 apps.js:106
-msgid "Open apps"
-msgstr ""
-
-#: apps.js:41
+#: apps.js:36
 msgid "No open apps"
 msgstr ""

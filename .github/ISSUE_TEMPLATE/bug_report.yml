@@ -1,0 +1,41 @@
+name: Bug report
+description: Something does not work or looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. A screenshot or screen recording helps a lot.
+    validations:
+      required: true
+  - type: input
+    id: gnome
+    attributes:
+      label: GNOME Shell version
+      description: Output of `gnome-shell --version`
+      placeholder: GNOME Shell 50.5
+    validations:
+      required: true
+  - type: input
+    id: distro
+    attributes:
+      label: Distribution
+      placeholder: Fedora 44
+  - type: input
+    id: theme
+    attributes:
+      label: Shell theme
+      description: Default (Adwaita) or the name of a custom theme
+  - type: textarea
+    id: extensions
+    attributes:
+      label: Other enabled extensions
+      description: Output of `gnome-extensions list --enabled`
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Output of `journalctl -b -o cat /usr/bin/gnome-shell | grep -i -A5 "dynamic island"`
+      render: text

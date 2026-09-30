@@ -1,0 +1,24 @@
+name: Release
+
+# Push a tag like v1.0 to publish a release with the installable zip.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build zip
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libglib2.0-bin gettext zip
+          ./build.sh pack
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dynamic-island@himuraw.shell-extension.zip
+          generate_release_notes: true

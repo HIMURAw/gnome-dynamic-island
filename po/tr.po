@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 12:36+0300\n"
+"POT-Creation-Date: 2026-09-30 13:10+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,100 +13,251 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:242
+#: extension.js:294
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:285
+#: extension.js:337
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:313
+#: extension.js:365
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:319
+#: extension.js:371
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:389
+#: extension.js:441
 msgid "Back"
 msgstr "Geri"
 
-#: extension.js:459
+#: extension.js:511
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:460
+#: extension.js:512
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:461
+#: extension.js:513
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:475
+#: extension.js:527
 msgid "Open notification"
 msgstr "Bildirimi aç"
 
-#: extension.js:552 center.js:176
+#: extension.js:604 center.js:176
 msgid "Notifications"
 msgstr "Bildirimler"
 
-#: extension.js:584
+#: extension.js:636 prefs.js:96
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1251
+#: extension.js:1328
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:1269
+#: extension.js:1346
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:1272
+#: extension.js:1349
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:1273
+#: extension.js:1350
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:1276
+#: extension.js:1353
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:1278
+#: extension.js:1355
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:1279
+#: extension.js:1356
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:1287 center.js:284
+#: extension.js:1364 center.js:284
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:1288
+#: extension.js:1365
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:1288
+#: extension.js:1365
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1423
+#: extension.js:1500
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
+
+#: prefs.js:13
+msgid ""
+"Dash to Panel moves the top bar into its own panel. Use one or the other."
+msgstr "Dash to Panel üst çubuğu kendi paneline taşıyor. İkisinden birini kullanın."
+
+#: prefs.js:15
+msgid ""
+"Just Perfection can hide or restyle the top bar. Leave its panel options at "
+"their defaults."
+msgstr "Just Perfection üst çubuğu gizleyebilir ya da görünümünü değiştirebilir. Panel seçeneklerini varsayılanda bırakın."
+
+#: prefs.js:17
+msgid "Hide Top Bar hides the same bar the island replaces. Turn it off."
+msgstr "Hide Top Bar, adanın yerini aldığı çubuğu gizliyor. Kapatın."
+
+#: prefs.js:19
+msgid "Open Bar restyles the top bar. Turn it off."
+msgstr "Open Bar üst çubuğun görünümünü değiştiriyor. Kapatın."
+
+#: prefs.js:21
+msgid ""
+"Blur my Shell: turn off its panel blur, or a strip can stay at the top of "
+"the screen."
+msgstr "Blur my Shell: panel bulanıklığını kapatın, yoksa ekranın üstünde bir şerit kalabilir."
+
+#: prefs.js:39
+msgid "Behaviour"
+msgstr "Davranış"
+
+#: prefs.js:43
+msgid "Slide out of the way"
+msgstr "Yoldan çekil"
+
+#: prefs.js:44
+msgid "Rest the pointer on the top edge to bring it back"
+msgstr "Geri getirmek için imleci üst kenarda bekletin"
+
+#: prefs.js:46
+msgid "Never"
+msgstr "Hiçbir zaman"
+
+#: prefs.js:47
+msgid "In fullscreen"
+msgstr "Tam ekranda"
+
+#: prefs.js:48
+msgid "When a window reaches under it"
+msgstr "Bir pencere altına girince"
+
+#: prefs.js:56
+msgid "Notifications in the island"
+msgstr "Bildirimler adada"
+
+#: prefs.js:57
+msgid "In place of GNOME's banners"
+msgstr "GNOME'un bildirim kutuları yerine"
+
+#: prefs.js:60
+msgid "Appearance"
+msgstr "Görünüm"
+
+#: prefs.js:62
+msgid "Frosted glass"
+msgstr "Buzlu cam"
+
+#: prefs.js:63
+msgid "Turn off for a plain dark island on slower graphics"
+msgstr "Yavaş ekran kartlarında düz koyu ada için kapatın"
+
+#: prefs.js:66
+msgid "Width of the open island"
+msgstr "Açık adanın genişliği"
+
+#: prefs.js:75
+msgid "Primary monitor"
+msgstr "Ana monitör"
+
+#. Translators: a monitor in the list, e.g. "Monitor 2 (DELL U2720Q)".
+#: prefs.js:79 prefs.js:81
+msgid "Monitor"
+msgstr "Monitör"
+
+#: prefs.js:90
+msgid "Island"
+msgstr "Ada"
+
+#: prefs.js:91
+msgid "What the island shows"
+msgstr "Adada neler görünsün"
+
+#: prefs.js:94
+msgid "Notification center"
+msgstr "Bildirim merkezi"
+
+#: prefs.js:95
+msgid "The bell on the left"
+msgstr "Soldaki zil"
+
+#: prefs.js:97
+msgid "The bubble on the right"
+msgstr "Sağdaki baloncuk"
+
+#: prefs.js:98
+msgid "Connectivity"
+msgstr "Bağlantı"
+
+#: prefs.js:99
+msgid "Wi-Fi, Bluetooth, tethering, VPN"
+msgstr "Wi-Fi, Bluetooth, internet paylaşımı, VPN"
+
+#: prefs.js:100 apps.js:26 apps.js:92 apps.js:109
+msgid "Open apps"
+msgstr "Açık uygulamalar"
+
+#: prefs.js:101
+msgid "Sliders"
+msgstr "Kaydırıcılar"
+
+#: prefs.js:102
+msgid "Volume, microphone, brightness"
+msgstr "Ses, mikrofon, parlaklık"
+
+#: prefs.js:103
+msgid "Toggles"
+msgstr "Düğmeler"
+
+#: prefs.js:104
+msgid ""
+"Power mode, dark style, Do Not Disturb and toggles from other extensions"
+msgstr "Güç modu, karanlık stil, Rahatsız Etme ve diğer eklentilerin düğmeleri"
+
+#: prefs.js:105
+msgid "Other extensions' icons"
+msgstr "Diğer eklentilerin simgeleri"
+
+#: prefs.js:119
+msgid "Compatibility"
+msgstr "Uyumluluk"
+
+#: prefs.js:120
+msgid "These extensions also change the top bar"
+msgstr "Bu eklentiler de üst çubuğu değiştiriyor"
+
+#: prefs.js:134
+msgid "About"
+msgstr "Hakkında"
+
+#: prefs.js:138
+msgid "Report a problem or suggest an idea"
+msgstr "Sorun bildir ya da fikir öner"
 
 #: center.js:61 center.js:66
 msgid "Do Not Disturb"
@@ -133,10 +284,6 @@ msgstr "Kapat"
 msgid "now"
 msgstr "şimdi"
 
-#: apps.js:25 apps.js:89 apps.js:106
-msgid "Open apps"
-msgstr "Açık uygulamalar"
-
-#: apps.js:41
+#: apps.js:36
 msgid "No open apps"
 msgstr "Açık uygulama yok"

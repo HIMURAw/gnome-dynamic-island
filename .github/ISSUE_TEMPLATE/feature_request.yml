@@ -1,0 +1,11 @@
+name: Idea
+description: Something the island could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should the island do, and when would you use it?
+    validations:
+      required: true

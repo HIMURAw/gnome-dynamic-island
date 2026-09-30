@@ -159,10 +159,17 @@ export class NotificationCenter {
         this.onDndChanged?.(dnd);
     }
 
+    // An empty list if GNOME's message tray is not what we expect, so the
+    // center still opens.
     static notifications() {
-        return Main.messageTray.getSources()
-            .flatMap(source => source.notifications ?? [])
-            .sort((a, b) => b.datetime.compare(a.datetime));
+        try {
+            return Main.messageTray.getSources()
+                .flatMap(source => source.notifications ?? [])
+                .sort((a, b) => b.datetime.compare(a.datetime));
+        } catch (e) {
+            console.error('Dynamic Island: could not read notifications', e);
+            return [];
+        }
     }
 
     refresh() {

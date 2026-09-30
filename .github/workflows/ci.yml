@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npx eslint .
+      - name: Check schema and translations
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libglib2.0-bin gettext zip
+          glib-compile-schemas --strict --dry-run schemas
+          for po in po/*.po; do msgfmt --check -o /dev/null "$po"; done
+      - name: Build zip
+        run: ./build.sh pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-island
+          path: dynamic-island@himuraw.shell-extension.zip

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="dynamic-island@himuraw">
+  <enum id="org.gnome.shell.extensions.dynamic-island.AutoHide">
+    <value nick="never" value="0"/>
+    <value nick="fullscreen" value="1"/>
+    <value nick="smart" value="2"/>
+  </enum>
+
+  <schema id="org.gnome.shell.extensions.dynamic-island"
+          path="/org/gnome/shell/extensions/dynamic-island/">
+    <key name="auto-hide" enum="org.gnome.shell.extensions.dynamic-island.AutoHide">
+      <default>'smart'</default>
+      <summary>When the island slides out of the way</summary>
+      <description>never: always shown. fullscreen: hidden while a window is fullscreen. smart: also hidden while a window reaches up under it.</description>
+    </key>
+    <key name="blur" type="b">
+      <default>true</default>
+      <summary>Frosted glass</summary>
+      <description>Blur what is behind the island. Turn off for a plain dark island on slower graphics.</description>
+    </key>
+    <key name="monitor" type="i">
+      <default>-1</default>
+      <summary>Monitor</summary>
+      <description>Index of the monitor the island sits on, or -1 for the primary monitor.</description>
+    </key>
+    <key name="expanded-width" type="i">
+      <range min="480" max="760"/>
+      <default>600</default>
+      <summary>Width of the open island</summary>
+    </key>
+    <key name="notifications" type="b">
+      <default>true</default>
+      <summary>Show notifications in the island</summary>
+      <description>Replace GNOME's notification banners with the island.</description>
+    </key>
+    <key name="show-notification-bubble" type="b">
+      <default>true</default>
+      <summary>Notification center bubble</summary>
+    </key>
+    <key name="show-media-bubble" type="b">
+      <default>true</default>
+      <summary>Now playing bubble</summary>
+    </key>
+    <key name="show-connectivity" type="b">
+      <default>true</default>
+      <summary>Connectivity card</summary>
+    </key>
+    <key name="show-apps" type="b">
+      <default>true</default>
+      <summary>Open apps card</summary>
+    </key>
+    <key name="show-sliders" type="b">
+      <default>true</default>
+      <summary>Sliders</summary>
+    </key>
+    <key name="show-tiles" type="b">
+      <default>true</default>
+      <summary>Toggle tiles</summary>
+    </key>
+    <key name="show-tray" type="b">
+      <default>true</default>
+      <summary>Other extensions' icons</summary>
+    </key>
+  </schema>
+</schemalist>

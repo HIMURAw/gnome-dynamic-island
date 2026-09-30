@@ -18,7 +18,7 @@ import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
 import {AppsCard} from './apps.js';
-import {Glass, RoundedMask} from './glass.js';
+import {Glass, RoundedMask, setBlurEnabled} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
@@ -30,9 +30,7 @@ const TOP_MARGIN = 6;
 const PILL_HEIGHT = 38;
 const BORDER = 1;
 const BUBBLE_GAP = 8;
-const EXPANDED_WIDTH = 600;
 const EXPANDED_RADIUS = 34;
-const CONTENT_WIDTH = EXPANDED_WIDTH - 2 * BORDER;
 // How long to wait after the pointer leaves before collapsing (ms).
 const COLLAPSE_DELAY = 700;
 // In fullscreen, hide again once the pointer is this far below the island (px).
@@ -74,27 +72,81 @@ function formatTime(microseconds) {
 
 export default class DynamicIslandExtension extends Extension {
     enable() {
+        this._settings = this.getSettings();
+        // Any change rebuilds the island: disable() puts everything back, so
+        // building again with the new settings is the simplest safe way.
+        this._settingsId = this._settings.connect('changed', () => {
+            if (this._rebuildId)
+                return;
+            this._rebuildId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+                this._rebuildId = 0;
+                this._teardown();
+                this._start();
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        this._start();
+    }
+
+    // If even the core cannot be built, undo what was done and leave GNOME's
+    // own top bar in place rather than half an island.
+    _start() {
+        try {
+            this._build();
+        } catch (e) {
+            console.error('Dynamic Island: could not start, keeping the normal top bar', e);
+            this._teardown();
+        }
+    }
+
+    disable() {
+        if (this._rebuildId)
+            GLib.source_remove(this._rebuildId);
+        this._rebuildId = 0;
+        this._settings.disconnect(this._settingsId);
+        this._teardown();
+        this._settings = null;
+    }
+
+    // Also used after a failed start, so everything here copes with parts
+    // that were never set up.
+
+    // Each part is set up on its own: GNOME's internals change between
+    // versions, and one part failing should not take the island down with it.
+    _safely(what, fn) {
+        try {
+            fn();
+        } catch (e) {
+            console.error(`Dynamic Island: ${what} failed, carrying on without it`, e);
+        }
+    }
+
+    _build() {
         this._signals = [];
         this._slots = [];
         this._timeouts = new Set();
         this._mode = null;
         this._hidden = false;
+        this._expandedWidth = this._settings.get_int('expanded-width');
+        this._contentWidth = this._expandedWidth - 2 * BORDER;
+        setBlurEnabled(this._settings.get_boolean('blur'));
 
         this._buildUi();
         this._setupClock();
-        this._setupBattery();
-        this._setupVolume();
-        this._setupMedia();
+        this._safely('battery', () => this._setupBattery());
+        this._safely('volume', () => this._setupVolume());
+        this._safely('media', () => this._setupMedia());
         this._glassMenus = new GlassMenus();
-        this._adoptQuickSettings();
-        this._adoptPanel();
-        this._takeOverDateMenu();
-        this._setupNotifications();
-        this._setupAutoHide();
-        this._setupDesktopIcons();
+        this._safely('quick settings', () => this._adoptQuickSettings());
+        this._safely('panel icons', () => this._adoptPanel());
+        this._safely('calendar menu', () => this._takeOverDateMenu());
+        this._safely('notifications', () => this._setupNotifications());
+        this._safely('auto-hide', () => this._setupAutoHide());
+        this._safely('desktop icons', () => this._setupDesktopIcons());
+        this._syncModules();
     }
 
-    disable() {
+    _teardown() {
         stopAllSprings();
         for (const id of this._timeouts)
             GLib.source_remove(id);
@@ -103,33 +155,35 @@ export default class DynamicIslandExtension extends Extension {
         this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
         this._centerIdle = 0;
 
-        this._releaseDesktopIcons();
-        this._releaseAutoHide();
-        this._releaseDateMenu();
-        this._releaseNotifications();
-        this._releaseQuickSettings();
+        this._safely('releasing desktop icons', () => this._releaseDesktopIcons());
+        this._safely('releasing auto-hide', () => this._releaseAutoHide());
+        this._safely('releasing calendar menu', () => this._releaseDateMenu());
+        this._safely('releasing notifications', () => this._releaseNotifications());
+        this._safely('releasing quick settings', () => this._releaseQuickSettings());
 
         this._pointerWatch?.remove();
         this._pointerWatch = null;
 
-        for (const [obj, id] of this._signals)
+        for (const [obj, id] of this._signals ?? [])
             obj.disconnect(id);
         this._signals = [];
         this._unbindSink();
 
-        this._media.destroy();
+        this._media?.destroy();
         this._media = null;
-        this._apps.destroy();
+        this._apps?.destroy();
         this._apps = null;
-        this._center.destroy();
+        this._center?.destroy();
         this._center = null;
 
-        this._glassMenus.destroy();
+        this._glassMenus?.destroy();
         this._glassMenus = null;
-        this._releasePanel();
+        this._safely('releasing panel icons', () => this._releasePanel());
 
-        Main.layoutManager.removeChrome(this._strip);
-        this._strip.destroy();
+        if (this._strip) {
+            Main.layoutManager.removeChrome(this._strip);
+            this._strip.destroy();
+        }
         this._strip = this._island = this._left = this._right = null;
 
         this._power = null;
@@ -186,7 +240,7 @@ export default class DynamicIslandExtension extends Extension {
         this._mediaView = this._buildMediaView();
         this._notificationView = this._buildNotificationView();
         this._center = new NotificationCenter({
-            width: CONTENT_WIDTH,
+            width: this._contentWidth,
             dir: this.dir,
             onActivated: () => this._close(),
         });
@@ -196,6 +250,8 @@ export default class DynamicIslandExtension extends Extension {
         this._left = this._buildCenterBubble();
         this._right = this._buildMediaBubble();
 
+        this._left.visible = this._settings.get_boolean('show-notification-bubble');
+        this._right.visible = this._settings.get_boolean('show-media-bubble');
         this._strip.add_child(this._left);
         this._strip.add_child(this._island);
         this._strip.add_child(this._right);
@@ -228,8 +284,18 @@ export default class DynamicIslandExtension extends Extension {
         });
     }
 
+    // The monitor chosen in the settings, or the primary one.
+    _monitorIndex() {
+        const index = this._settings.get_int('monitor');
+        return Main.layoutManager.monitors[index] ? index : Main.layoutManager.primaryIndex;
+    }
+
+    _monitor() {
+        return Main.layoutManager.monitors[this._monitorIndex()] ?? Main.layoutManager.primaryMonitor;
+    }
+
     _syncStripGeometry() {
-        const monitor = Main.layoutManager.primaryMonitor;
+        const monitor = this._monitor();
         if (!monitor)
             return;
         this._strip.set_position(monitor.x, monitor.y);
@@ -267,7 +333,7 @@ export default class DynamicIslandExtension extends Extension {
         return new St.BoxLayout({
             style_class: 'dynada-expanded',
             orientation: Clutter.Orientation.VERTICAL,
-            width: CONTENT_WIDTH,
+            width: this._contentWidth,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.START,
             pivot_point: new Graphene.Point({x: 0.5, y: 0}),
@@ -475,7 +541,7 @@ export default class DynamicIslandExtension extends Extension {
             style_class: 'dynada-notification',
             can_focus: true,
             accessible_name: _('Open notification'),
-            width: CONTENT_WIDTH,
+            width: this._contentWidth,
             x_align: Clutter.ActorAlign.CENTER,
             y_align: Clutter.ActorAlign.START,
             pivot_point: new Graphene.Point({x: 0.5, y: 0}),
@@ -529,23 +595,13 @@ export default class DynamicIslandExtension extends Extension {
     // notifications not seen yet.
     _buildCenterBubble() {
         const bubble = this._bubble();
-        const content = new St.Widget({
-            layout_manager: new Clutter.BinLayout(),
-            width: PILL_HEIGHT - 2 * BORDER,
-            height: PILL_HEIGHT - 2 * BORDER,
-        });
-        this._bellIcon = new St.Icon({
-            gicon: bellIcon(this.dir),
-            icon_size: 16,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._badge = new St.Widget({
-            style_class: 'dynada-badge',
-            x_align: Clutter.ActorAlign.END,
-            y_align: Clutter.ActorAlign.START,
-            visible: false,
-        });
+        // Placed by hand: BinLayout centres its children whatever their alignment.
+        const size = PILL_HEIGHT - 2 * BORDER;
+        const content = new St.Widget({width: size, height: size});
+        this._bellIcon = new St.Icon({gicon: bellIcon(this.dir), icon_size: 16});
+        this._bellIcon.set_position((size - 16) / 2, (size - 16) / 2);
+        this._badge = new St.Widget({style_class: 'dynada-badge', visible: false});
+        this._badge.set_position(size - 7 - 10, 9);
         content.add_child(this._bellIcon);
         content.add_child(this._badge);
         const button = new St.Button({
@@ -669,10 +725,10 @@ export default class DynamicIslandExtension extends Extension {
         view.opacity = 0;
         view.set_scale(scale, scale);
         view.translation_x = nav * PAGE_SLIDE;
-        const [, height] = view.get_preferred_height(CONTENT_WIDTH);
+        const [, height] = view.get_preferred_height(this._contentWidth);
 
         spring(this._island, {
-            width: EXPANDED_WIDTH,
+            width: this._expandedWidth,
             height: height + 2 * BORDER,
         }, {
             response: 0.5,
@@ -792,6 +848,21 @@ export default class DynamicIslandExtension extends Extension {
     // per-app banner settings, low urgency and critical urgency all behave as before.
     _setupNotifications() {
         const tray = Main.messageTray;
+        this._sourceIds = new Map();
+        tray.getSources().forEach(source => this._watchSource(source));
+        this._connect(tray, 'source-added', (_tray, source) => this._watchSource(source));
+        this._connect(tray, 'source-removed', (_tray, source) => {
+            this._unwatchSource(source);
+            this._queueCenterSync();
+        });
+        this._syncBell();
+
+        if (this._settings.get_boolean('notifications'))
+            this._takeOverBanners();
+    }
+
+    _takeOverBanners() {
+        const tray = Main.messageTray;
         let proto = Object.getPrototypeOf(tray);
         let desc = null;
         while (proto && !(desc = Object.getOwnPropertyDescriptor(proto, 'bannerBlocked')))
@@ -811,15 +882,6 @@ export default class DynamicIslandExtension extends Extension {
                 this._bannerRequested = value;
             },
         });
-
-        this._sourceIds = new Map();
-        tray.getSources().forEach(source => this._watchSource(source));
-        this._connect(tray, 'source-added', (_tray, source) => this._watchSource(source));
-        this._connect(tray, 'source-removed', (_tray, source) => {
-            this._unwatchSource(source);
-            this._queueCenterSync();
-        });
-        this._syncBell();
     }
 
     _watchSource(source) {
@@ -881,10 +943,10 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _releaseNotifications() {
+        for (const source of [...(this._sourceIds?.keys() ?? [])])
+            this._unwatchSource(source);
         if (!this._bannerSetter)
             return;
-        for (const source of [...this._sourceIds.keys()])
-            this._unwatchSource(source);
         const tray = Main.messageTray;
         delete tray.bannerBlocked;
         // Drop banners that queued up while we had them blocked, so they do not all
@@ -898,6 +960,9 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _onBannerRequest(notification) {
+        // GNOME shows its own banners.
+        if (!this._bannerSetter)
+            return;
         if (notification.acknowledged || notification.urgency === Urgency.LOW)
             return;
         const critical = notification.urgency === Urgency.CRITICAL;
@@ -1037,20 +1102,26 @@ export default class DynamicIslandExtension extends Extension {
 
     // Where the collapsed island and its bubbles sit, in screen coordinates.
     _restingRect() {
-        const monitor = Main.layoutManager.primaryMonitor;
+        const monitor = this._monitor();
         const [, compact] = this._compact.get_preferred_width(-1);
-        const width = compact + 2 * BORDER + 2 * (BUBBLE_GAP + PILL_HEIGHT);
+        const bubbles = [this._left, this._right].filter(b => b.visible).length;
+        const width = compact + 2 * BORDER + bubbles * (BUBBLE_GAP + PILL_HEIGHT);
         const x = monitor.x + Math.round((monitor.width - width) / 2);
         return {x, y: monitor.y, width, height: TOP_MARGIN + PILL_HEIGHT + 4};
     }
 
     _checkOverlap() {
-        const monitor = Main.layoutManager.primaryMonitor;
+        const monitor = this._monitor();
         if (!monitor || !this._island)
             return;
+        const mode = this._settings.get_string('auto-hide');
+        if (mode === 'never') {
+            this._setAutoHide(false, false);
+            return;
+        }
         const fullscreen = !!monitor.inFullscreen;
         let covered = false;
-        if (!Main.overview.visible && !fullscreen) {
+        if (mode === 'smart' && !Main.overview.visible && !fullscreen) {
             const rect = this._restingRect();
             const workspace = global.workspace_manager.get_active_workspace();
             const types = [Meta.WindowType.NORMAL, Meta.WindowType.DIALOG,
@@ -1110,7 +1181,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _onPointerMove(x, y) {
-        const monitor = Main.layoutManager.primaryMonitor;
+        const monitor = this._monitor();
         if (!monitor || x < monitor.x || x >= monitor.x + monitor.width)
             return;
         if (!this._hidden) {
@@ -1182,7 +1253,7 @@ export default class DynamicIslandExtension extends Extension {
             // Keyed by monitor index. Some versions also accept -1 for the
             // primary monitor, but not all of them.
             area.setMarginsForExtension(this.uuid, {
-                [Main.layoutManager.primaryIndex]: {top, bottom: 0, left: 0, right: 0},
+                [this._monitorIndex()]: {top, bottom: 0, left: 0, right: 0},
             });
             this._desktopAreas.add(area);
         }
@@ -1385,7 +1456,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _syncMedia() {
-        if (!this._island)
+        if (!this._island || !this._media)
             return;
         const entry = this._media.current();
         const info = entry ? this._media.info(entry) : null;
@@ -1532,9 +1603,14 @@ export default class DynamicIslandExtension extends Extension {
 
     // Empty modules take no room.
     _syncModules() {
+        const on = key => this._settings.get_boolean(key);
         const used = box => box.get_children().some(c => c.visible);
-        for (const box of [this._ccConnect, this._ccSliders, this._ccTiles, this._ccSystem])
-            box.visible = used(box);
+        this._ccConnect.visible = on('show-connectivity') && used(this._ccConnect);
+        this._ccSliders.visible = on('show-sliders') && used(this._ccSliders);
+        this._ccTiles.visible = on('show-tiles') && used(this._ccTiles);
+        this._ccSystem.visible = used(this._ccSystem);
+        this._apps.actor.visible = on('show-apps');
+        this._ccTop.visible = this._ccConnect.visible || this._apps.actor.visible;
     }
 
     _releaseQuickSettings() {
@@ -1557,6 +1633,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _adoptPanel() {
+        this._panelAdopted = true;
         Main.panel.hide();
         // Other extensions (e.g. Blur my Shell) put their own actors in the panel box.
         // Collapse it to zero height and clip it, so nothing is left on screen and no
@@ -1684,7 +1761,8 @@ export default class DynamicIslandExtension extends Extension {
 
     // An empty tray would still leave a gap in the view.
     _syncTray() {
-        this._tray.visible = this._slots.some(r => r.container.visible);
+        this._tray.visible = this._settings.get_boolean('show-tray') &&
+            this._slots.some(r => r.container.visible);
     }
 
     _disconnectSlot(record) {
@@ -1705,6 +1783,9 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _releasePanel() {
+        if (!this._panelAdopted)
+            return;
+        this._panelAdopted = false;
         this._releasing = true;
         for (const r of this._slots) {
             r.slot.disconnect(r.removedId);
