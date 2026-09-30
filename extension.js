@@ -3,6 +3,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GnomeDesktop from 'gi://GnomeDesktop';
 import Graphene from 'gi://Graphene';
+import Meta from 'gi://Meta';
 import St from 'gi://St';
 import UPower from 'gi://UPowerGlib';
 
@@ -16,7 +17,8 @@ import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
 import {Glass, RoundedMask} from './glass.js';
-import {ChipLayout, TopCenterLayout} from './layouts.js';
+import {NotificationCenter, bellIcon} from './center.js';
+import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
 import {GlassMenus} from './menus.js';
 import {spring, stopAllSprings} from './spring.js';
@@ -36,6 +38,16 @@ const ART_SIZE = 72;
 const NOTIFICATION_ICON = 44;
 // How long a notification stays in the island (ms). Critical ones stay until dismissed.
 const NOTIFICATION_DURATION = 5000;
+// Panel indicators that are not moved into the island: GNOME's calendar menu is
+// replaced by the island's own notification center, and media controls would
+// only repeat the right bubble.
+const SKIPPED_ROLES = ['dateMenu', 'media-controls'];
+// Auto-hide: how long the pointer rests on the top edge before the island comes
+// back (ms), and how far outside the island it may go before it hides again (px).
+const REVEAL_DELAY = 180;
+// Desktop Icons NG (and forks) let other extensions reserve room on the desktop
+// through an object tagged with this id, the same way Dash to Dock does.
+const DESKTOP_ICONS_ID = '130cbc66-235c-4bd6-8571-98d2d8bba5e2';
 
 const DisplayDeviceProxy = Gio.DBusProxy.makeProxyWrapper(
     loadInterfaceXML('org.freedesktop.UPower.Device'));
@@ -68,8 +80,10 @@ export default class DynamicIslandExtension extends Extension {
         this._setupMedia();
         this._glassMenus = new GlassMenus();
         this._adoptPanel();
-        this._setupFullscreen();
+        this._takeOverDateMenu();
         this._setupNotifications();
+        this._setupAutoHide();
+        this._setupDesktopIcons();
     }
 
     disable() {
@@ -78,8 +92,12 @@ export default class DynamicIslandExtension extends Extension {
             GLib.source_remove(id);
         this._timeouts.clear();
         this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
-        this._notificationTimeout = 0;
+        this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
+        this._centerIdle = 0;
 
+        this._releaseDesktopIcons();
+        this._releaseAutoHide();
+        this._releaseDateMenu();
         this._releaseNotifications();
 
         this._pointerWatch?.remove();
@@ -92,6 +110,8 @@ export default class DynamicIslandExtension extends Extension {
 
         this._media.destroy();
         this._media = null;
+        this._center.destroy();
+        this._center = null;
 
         this._glassMenus.destroy();
         this._glassMenus = null;
@@ -151,17 +171,15 @@ export default class DynamicIslandExtension extends Extension {
         this._controls = this._buildControls();
         this._mediaView = this._buildMediaView();
         this._notificationView = this._buildNotificationView();
-        for (const view of [this._compact, this._controls, this._mediaView, this._notificationView])
+        this._center = new NotificationCenter({
+            width: CONTENT_WIDTH,
+            dir: this.dir,
+            onActivated: () => this._close(),
+        });
+        for (const view of [this._compact, this._controls, this._mediaView, this._notificationView, this._center.actor])
             this._island.add_child(view);
 
-        this._left = new Glass({
-            style_class: 'dynada-bubble',
-            radius: PILL_HEIGHT / 2,
-            reactive: true,
-            track_hover: true,
-            width: PILL_HEIGHT,
-            height: PILL_HEIGHT,
-        });
+        this._left = this._buildCenterBubble();
         this._right = this._buildMediaBubble();
 
         this._strip.add_child(this._left);
@@ -297,7 +315,7 @@ export default class DynamicIslandExtension extends Extension {
         this._tray = new St.Widget({
             style_class: 'dynada-tray',
             x_expand: true,
-            layout_manager: new ChipLayout(52, 40, 8),
+            layout_manager: new TileGridLayout(6, 44, 8),
         });
         view.add_child(this._tray);
 
@@ -409,8 +427,8 @@ export default class DynamicIslandExtension extends Extension {
         return button;
     }
 
-    _buildMediaBubble() {
-        const bubble = new Glass({
+    _bubble() {
+        return new Glass({
             style_class: 'dynada-bubble',
             radius: PILL_HEIGHT / 2,
             reactive: true,
@@ -418,6 +436,62 @@ export default class DynamicIslandExtension extends Extension {
             width: PILL_HEIGHT,
             height: PILL_HEIGHT,
         });
+    }
+
+    // Left bubble: a bell that opens the notification center, with a dot for
+    // notifications not seen yet.
+    _buildCenterBubble() {
+        const bubble = this._bubble();
+        const content = new St.Widget({
+            layout_manager: new Clutter.BinLayout(),
+            width: PILL_HEIGHT - 2 * BORDER,
+            height: PILL_HEIGHT - 2 * BORDER,
+        });
+        this._bellIcon = new St.Icon({
+            gicon: bellIcon(this.dir),
+            icon_size: 16,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._badge = new St.Widget({
+            style_class: 'dynada-badge',
+            x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.START,
+            visible: false,
+        });
+        content.add_child(this._bellIcon);
+        content.add_child(this._badge);
+        const button = new St.Button({
+            style_class: 'dynada-bubble-button',
+            can_focus: true,
+            accessible_name: _('Notifications'),
+            x_expand: true,
+            y_expand: true,
+            child: content,
+        });
+        bubble.add_child(button);
+        this._connect(button, 'clicked', () => this._toggleCenter());
+        this._center.onDndChanged = () => this._syncBell();
+        return bubble;
+    }
+
+    _toggleCenter() {
+        if (this._mode === 'center')
+            this._close();
+        else
+            this._open('center');
+    }
+
+    _syncBell() {
+        if (!this._bellIcon)
+            return;
+        const dnd = this._center.dndActive;
+        this._bellIcon.gicon = bellIcon(this.dir, dnd);
+        this._badge.visible = !dnd && NotificationCenter.notifications().some(n => !n.acknowledged);
+    }
+
+    _buildMediaBubble() {
+        const bubble = this._bubble();
         this._bubbleIcon = new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: 16});
         this._bubbleButton = new St.Button({
             style_class: 'dynada-bubble-button',
@@ -445,6 +519,8 @@ export default class DynamicIslandExtension extends Extension {
             return this._mediaView;
         case 'notification':
             return this._notificationView;
+        case 'center':
+            return this._center.actor;
         default:
             return this._controls;
         }
@@ -472,6 +548,11 @@ export default class DynamicIslandExtension extends Extension {
             this._startPositionPolling();
         } else {
             this._positionTimeout = this._clearTimeout(this._positionTimeout);
+        }
+        if (mode === 'center') {
+            this._center.refresh();
+            this._center.acknowledgeAll();
+            this._syncBell();
         }
 
         this._freezeSize();
@@ -549,6 +630,7 @@ export default class DynamicIslandExtension extends Extension {
                 view.hide();
                 this._island.remove_style_pseudo_class('expanded');
                 this._island.set_size(-1, -1);
+                this._maybeHide();
             },
         });
         this._compact.ease({
@@ -621,21 +703,69 @@ export default class DynamicIslandExtension extends Extension {
         this._sourceIds = new Map();
         tray.getSources().forEach(source => this._watchSource(source));
         this._connect(tray, 'source-added', (_tray, source) => this._watchSource(source));
-        this._connect(tray, 'source-removed', (_tray, source) => this._unwatchSource(source));
+        this._connect(tray, 'source-removed', (_tray, source) => {
+            this._unwatchSource(source);
+            this._queueCenterSync();
+        });
+        this._syncBell();
     }
 
     _watchSource(source) {
         if (this._sourceIds.has(source))
             return;
-        this._sourceIds.set(source, source.connect('notification-request-banner',
-            (_source, notification) => this._onBannerRequest(notification)));
+        this._sourceIds.set(source, [
+            source.connect('notification-request-banner',
+                (_source, notification) => this._onBannerRequest(notification)),
+            // Emitted when a notification is added, removed or seen.
+            source.connect('notify::count', () => this._queueCenterSync()),
+        ]);
+        this._queueCenterSync();
     }
 
     _unwatchSource(source) {
-        const id = this._sourceIds.get(source);
-        if (id)
-            source.disconnect(id);
+        this._sourceIds.get(source)?.forEach(id => source.disconnect(id));
         this._sourceIds.delete(source);
+    }
+
+    // Several notifications often change at once (Clear, an app closing), so the
+    // cards and the bell are updated once afterwards.
+    _queueCenterSync() {
+        if (this._centerIdle || !this._center)
+            return;
+        this._centerIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            this._timeouts.delete(this._centerIdle);
+            this._centerIdle = 0;
+            if (this._mode === 'center') {
+                this._center.refresh();
+                this._center.acknowledgeAll();
+            }
+            this._syncBell();
+            return GLib.SOURCE_REMOVE;
+        });
+        this._timeouts.add(this._centerIdle);
+    }
+
+    // GNOME's calendar menu stays in the hidden panel. Anything that opens it
+    // (Super+V, other extensions) opens the island's notification center instead.
+    _takeOverDateMenu() {
+        const menu = Main.panel.statusArea.dateMenu?.menu;
+        if (!menu)
+            return;
+        this._dateMenu = menu;
+        menu.open = () => {
+            if (this._hidden)
+                this._setHidden(false);
+            this._open('center');
+        };
+        menu.toggle = () => this._toggleCenter();
+    }
+
+    _releaseDateMenu() {
+        if (!this._dateMenu)
+            return;
+        delete this._dateMenu.open;
+        delete this._dateMenu.toggle;
+        this._dateMenu = null;
     }
 
     _releaseNotifications() {
@@ -661,9 +791,9 @@ export default class DynamicIslandExtension extends Extension {
         const critical = notification.urgency === Urgency.CRITICAL;
         if (!notification.source.policy.showBanners && !critical)
             return;
-        // Not while the notification list is open, while the island is hidden in
-        // fullscreen, or while the person is using the island for something else.
-        if (this._bannerRequested || (this._hidden && !critical))
+        // Not while the island is hidden in fullscreen, or while the person is
+        // using the island for something else.
+        if (this._bannerRequested || (this._hidden && this._fullscreen && !critical))
             return;
         if (this._mode && this._mode !== 'notification')
             return;
@@ -733,38 +863,163 @@ export default class DynamicIslandExtension extends Extension {
         notification.activate();
     }
 
-    // ---------- Fullscreen ----------
+    // ---------- Auto-hide ----------
 
-    _setupFullscreen() {
-        this._connect(global.display, 'in-fullscreen-changed', () => this._syncFullscreen());
-        this._syncFullscreen();
+    // The island slides up out of the way when it would cover something: a
+    // fullscreen window, or any window reaching up under it. Resting the pointer
+    // on the top edge brings it back; moving away hides it again.
+    _setupAutoHide() {
+        this._autoHide = false;
+        this._fullscreen = false;
+        this._windowIds = new Map();
+        for (const actor of global.get_window_actors())
+            this._watchWindow(actor.meta_window);
+
+        const queue = () => this._queueOverlapCheck();
+        this._connect(global.display, 'window-created', (_d, window) => {
+            this._watchWindow(window);
+            queue();
+        });
+        this._connect(global.display, 'restacked', queue);
+        this._connect(global.display, 'in-fullscreen-changed', queue);
+        this._connect(global.workspace_manager, 'active-workspace-changed', queue);
+        this._connect(Main.overview, 'showing', queue);
+        this._connect(Main.overview, 'hidden', queue);
+        this._checkOverlap();
     }
 
-    _syncFullscreen() {
-        const fullscreen = !!Main.layoutManager.primaryMonitor?.inFullscreen;
-        if (fullscreen && !this._pointerWatch) {
+    _releaseAutoHide() {
+        for (const [window, ids] of this._windowIds)
+            ids.forEach(id => window.disconnect(id));
+        this._windowIds.clear();
+        this._pointerWatch?.remove();
+        this._pointerWatch = null;
+    }
+
+    _watchWindow(window) {
+        if (!window || this._windowIds.has(window))
+            return;
+        const queue = () => this._queueOverlapCheck();
+        const ids = ['position-changed', 'size-changed', 'notify::minimized', 'workspace-changed']
+            .map(signal => window.connect(signal, queue));
+        ids.push(window.connect('unmanaged', () => {
+            this._windowIds.get(window)?.forEach(id => window.disconnect(id));
+            this._windowIds.delete(window);
+            queue();
+        }));
+        this._windowIds.set(window, ids);
+    }
+
+    // Window moves come in bursts while dragging; check once per burst.
+    _queueOverlapCheck() {
+        if (this._overlapIdle)
+            return;
+        this._overlapIdle = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._timeouts.delete(this._overlapIdle);
+            this._overlapIdle = 0;
+            this._checkOverlap();
+            return GLib.SOURCE_REMOVE;
+        });
+        this._timeouts.add(this._overlapIdle);
+    }
+
+    // Where the collapsed island and its bubbles sit, in screen coordinates.
+    _restingRect() {
+        const monitor = Main.layoutManager.primaryMonitor;
+        const [, compact] = this._compact.get_preferred_width(-1);
+        const width = compact + 2 * BORDER + 2 * (BUBBLE_GAP + PILL_HEIGHT);
+        const x = monitor.x + Math.round((monitor.width - width) / 2);
+        return {x, y: monitor.y, width, height: TOP_MARGIN + PILL_HEIGHT + 4};
+    }
+
+    _checkOverlap() {
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor || !this._island)
+            return;
+        const fullscreen = !!monitor.inFullscreen;
+        let covered = false;
+        if (!Main.overview.visible && !fullscreen) {
+            const rect = this._restingRect();
+            const workspace = global.workspace_manager.get_active_workspace();
+            const types = [Meta.WindowType.NORMAL, Meta.WindowType.DIALOG,
+                Meta.WindowType.MODAL_DIALOG, Meta.WindowType.UTILITY];
+            covered = global.get_window_actors().some(actor => {
+                const w = actor.meta_window;
+                if (!w || w.minimized || !types.includes(w.get_window_type()) ||
+                    w.is_skip_taskbar() || !w.located_on_workspace(workspace) ||
+                    !w.showing_on_its_workspace())
+                    return false;
+                const f = w.get_frame_rect();
+                return f.x < rect.x + rect.width && f.x + f.width > rect.x &&
+                    f.y < rect.y + rect.height && f.y + f.height > rect.y;
+            });
+        }
+        this._setAutoHide(fullscreen || covered, fullscreen);
+    }
+
+    _setAutoHide(on, fullscreen) {
+        const wasFullscreen = this._fullscreen;
+        this._fullscreen = fullscreen;
+        if (on && !this._pointerWatch)
             this._pointerWatch = getPointerWatcher().addWatch(100, (x, y) => this._onPointerMove(x, y));
-            this._setHidden(true);
-        } else if (!fullscreen && this._pointerWatch) {
+        else if (!on && this._pointerWatch) {
             this._pointerWatch.remove();
             this._pointerWatch = null;
+        }
+        const changed = this._autoHide !== on;
+        this._autoHide = on;
+        if (!on) {
+            this._revealTimeout = this._clearTimeout(this._revealTimeout);
             this._setHidden(false);
+        } else if (fullscreen && !wasFullscreen) {
+            // Fullscreen (a video, a game) takes the island away straight away.
+            this._setHidden(true);
+        } else if (changed) {
+            this._maybeHide();
         }
     }
 
-    // In fullscreen the island waits above the screen and slides in when the
-    // pointer touches the top edge.
+    _pointerNear(x, y) {
+        const rect = this._restingRect();
+        const [, islandHeight] = this._island.get_size();
+        const slack = REVEAL_SLACK / 2;
+        return x >= rect.x - slack && x <= rect.x + rect.width + slack &&
+            y <= rect.y + TOP_MARGIN + Math.max(islandHeight, PILL_HEIGHT) + slack;
+    }
+
+    // Hide unless the island is in use: open, a menu from it is open, or the
+    // pointer is on or near it.
+    _maybeHide() {
+        if (!this._autoHide || this._hidden || this._mode || this._anyMenuOpen())
+            return;
+        const [x, y] = global.get_pointer();
+        if (!this._pointerNear(x, y))
+            this._setHidden(true);
+    }
+
     _onPointerMove(x, y) {
         const monitor = Main.layoutManager.primaryMonitor;
         if (!monitor || x < monitor.x || x >= monitor.x + monitor.width)
             return;
-        if (this._hidden) {
-            if (y <= monitor.y + 1)
-                this._setHidden(false);
-        } else if (!this._mode && !this._anyMenuOpen() &&
-                   y > monitor.y + TOP_MARGIN + this._island.height + REVEAL_SLACK) {
-            this._setHidden(true);
+        if (!this._hidden) {
+            this._maybeHide();
+            return;
         }
+        // Only a rest on the top edge reveals it, so flicking the pointer up to a
+        // browser tab does not bring the island down over it.
+        if (y > monitor.y + 1) {
+            this._revealTimeout = this._clearTimeout(this._revealTimeout);
+            return;
+        }
+        if (this._revealTimeout)
+            return;
+        this._revealTimeout = this._timeout(REVEAL_DELAY, () => {
+            this._revealTimeout = 0;
+            const [, py] = global.get_pointer();
+            if (this._hidden && py <= monitor.y + 1)
+                this._setHidden(false);
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     _setHidden(hidden) {
@@ -783,6 +1038,38 @@ export default class DynamicIslandExtension extends Extension {
         } else {
             spring(this._strip, {translation_y: 0}, {response: 0.45, damping: 0.72});
         }
+    }
+
+    // ---------- Desktop icons ----------
+
+    // Windows may pass under the island, but desktop icons should not hide
+    // behind it: ask the desktop icons extension to keep the top row free.
+    _setupDesktopIcons() {
+        this._desktopAreas = new Set();
+        this._syncDesktopIcons();
+        this._connect(Main.extensionManager, 'extension-state-changed', () => this._syncDesktopIcons());
+        this._connect(Main.layoutManager, 'monitors-changed', () => this._syncDesktopIcons(true));
+    }
+
+    _syncDesktopIcons(force = false) {
+        const top = TOP_MARGIN + PILL_HEIGHT + 4;
+        for (const uuid of Main.extensionManager.getUuids()) {
+            const area = Main.extensionManager.lookup(uuid)?.stateObj?.DesktopIconsUsableArea;
+            if (area?._extensionUUID !== DESKTOP_ICONS_ID || (this._desktopAreas.has(area) && !force))
+                continue;
+            // Keyed by monitor index. Some versions also accept -1 for the
+            // primary monitor, but not all of them.
+            area.setMarginsForExtension(this.uuid, {
+                [Main.layoutManager.primaryIndex]: {top, bottom: 0, left: 0, right: 0},
+            });
+            this._desktopAreas.add(area);
+        }
+    }
+
+    _releaseDesktopIcons() {
+        for (const area of this._desktopAreas ?? [])
+            area.setMarginsForExtension(this.uuid, null);
+        this._desktopAreas = null;
     }
 
     // ---------- Clock ----------
@@ -1016,13 +1303,19 @@ export default class DynamicIslandExtension extends Extension {
         else
             this._artButton.add_style_class_name('dynada-art-empty');
 
+        // Rows fade instead of hiding, so the view keeps one height whatever is
+        // playing and the island does not resize when the track changes.
+        const show = (actor, visible) => {
+            actor.opacity = visible ? 255 : 0;
+            actor.reactive = visible;
+        };
         this._mediaTitle.text = info ? info.title || info.appName : _('Nothing is playing');
-        this._mediaArtist.text = info?.artist ?? '';
-        this._mediaArtist.visible = !!info?.artist;
-        this._mediaApp.text = info && info.title ? info.appName : '';
-        this._mediaApp.visible = !!this._mediaApp.text;
+        this._mediaArtist.text = info?.artist || ' ';
+        this._mediaApp.text = (info && info.title && info.appName) || ' ';
 
-        this._transport.visible = !!info;
+        // Nothing to control: the buttons stay, dimmed, so the view keeps its shape.
+        this._transport.opacity = info ? 255 : 90;
+        this._transport.reactive = !!info;
         this._prevButton.reactive = !!info?.canPrevious;
         this._nextButton.reactive = !!info?.canNext;
         this._prevButton.opacity = info?.canPrevious ? 255 : 90;
@@ -1030,7 +1323,7 @@ export default class DynamicIslandExtension extends Extension {
         this._playButton.child.icon_name = info?.playing
             ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
 
-        this._progressRow.visible = this._mediaLength > 0;
+        show(this._progressRow, this._mediaLength > 0);
         this._syncPosition();
     }
 
@@ -1051,7 +1344,7 @@ export default class DynamicIslandExtension extends Extension {
             if (!this._island || entry !== this._mediaEntry)
                 return;
             if (position < 0) {
-                this._progressRow.hide();
+                this._progressRow.opacity = 0;
                 return;
             }
             this._progress.value = Math.min(1, position / this._mediaLength);
@@ -1116,46 +1409,64 @@ export default class DynamicIslandExtension extends Extension {
 
     // index: position in the panel box, used to put it back in order on disable.
     _adopt(container, box, index) {
+        const [role, indicator] = Object.entries(Main.panel.statusArea)
+            .find(([, i]) => i?.container === container) ?? [];
+        if (SKIPPED_ROLES.includes(role))
+            return;
+
         // Adding an actor to a new parent shows it; keep hidden indicators hidden.
         const visible = container.visible;
         box.remove_child(container);
 
-        // The calendar and notifications button becomes the left bubble;
-        // everything else goes into the island's grid.
-        const isDateMenu = container === Main.panel.statusArea.dateMenu?.container;
-
-        // Naming the slot "panel" keeps the theme's #panel .panel-button styles.
-        const slot = new St.Bin({
-            name: 'panel',
-            style_class: isDateMenu ? 'dynada-bubble-slot' : 'dynada-slot',
-            // Inline style beats the theme's #panel background.
-            style: isDateMenu
-                ? 'background-color: transparent; box-shadow: none; border: none;'
-                : 'background-color: rgba(255, 255, 255, 0.07); border-radius: 14px; box-shadow: none; border: none;',
-            x_expand: isDateMenu,
-            y_expand: isDateMenu,
-            child: container,
-        });
+        // Naming the slot "panel" keeps the theme's #panel .panel-button icon and
+        // label styles. The tile look (background, hover, open menu) is the slot's;
+        // the button's own theme background is switched off with an inline style,
+        // which beats every theme rule, hover included.
+        const slot = new St.Bin({name: 'panel', style_class: 'dynada-slot', child: container});
         container.visible = visible;
-        const record = {container, box, index, slot};
+        const record = {container, box, index, slot, ids: []};
         this._slots.push(record);
-        (isDateMenu ? this._left : this._tray).add_child(slot);
+        this._tray.add_child(slot);
 
-        if (isDateMenu)
-            this._shrinkDateMenu(record);
+        const button = indicator ?? container.get_child?.();
+        if (button instanceof St.Widget) {
+            record.button = button;
+            record.buttonStyle = button.style;
+            button.style = `${button.style ?? ''} background-color: transparent; box-shadow: none; ` +
+                'border: none; border-radius: 14px; transition-duration: 0;';
+            const syncHover = () => {
+                if (button.hover)
+                    slot.add_style_pseudo_class('hover');
+                else
+                    slot.remove_style_pseudo_class('hover');
+            };
+            record.ids.push([button, button.connect('notify::hover', syncHover)]);
+        }
 
-        // Its menu, and any menu it swaps in later, gets the glass look.
-        const indicator = Object.values(Main.panel.statusArea).find(i => i?.container === container);
+        // Its menu, and any menu it swaps in later, gets the glass look, and the
+        // tile stays lit while the menu is open.
         if (indicator) {
-            if (indicator.menu)
-                this._glassMenus.add(indicator.menu);
+            const watchMenu = () => {
+                const menu = indicator.menu;
+                if (!menu?.connect)
+                    return;
+                this._glassMenus?.add(menu);
+                record.menu?.disconnect(record.menuOpenId);
+                record.menu = menu;
+                record.menuOpenId = menu.connect('open-state-changed', (_m, open) => {
+                    if (open)
+                        slot.add_style_pseudo_class('active');
+                    else
+                        slot.remove_style_pseudo_class('active');
+                });
+            };
+            watchMenu();
             record.indicator = indicator;
-            record.menuSetId = indicator.connect('menu-set', () => {
-                if (indicator.menu)
-                    this._glassMenus?.add(indicator.menu);
-            });
+            record.menuSetId = indicator.connect('menu-set', watchMenu);
             record.indicatorDestroyId = indicator.connect('destroy', () => {
                 record.indicator = null;
+                record.button = null;
+                record.menu = null;
             });
         }
 
@@ -1163,37 +1474,34 @@ export default class DynamicIslandExtension extends Extension {
         record.removedId = slot.connect('child-removed', () => {
             if (this._releasing)
                 return;
+            this._disconnectSlot(record);
             this._slots = this._slots.filter(r => r !== record);
             slot.destroy();
         });
     }
 
-    // The island already shows the time, so the calendar button shows a bell instead.
-    _shrinkDateMenu(record) {
-        const clock = Main.panel.statusArea.dateMenu._clockDisplay;
-        if (!clock)
-            return;
-        const icon = new St.Icon({
-            icon_name: 'preferences-system-notifications-symbolic',
-            style_class: 'system-status-icon',
-        });
-        clock.get_parent().insert_child_above(icon, clock);
-        clock.hide();
-        record.restore = () => {
-            icon.destroy();
-            clock.show();
-        };
+    _disconnectSlot(record) {
+        for (const [obj, id] of record.ids)
+            obj.disconnect(id);
+        record.ids = [];
+        if (record.button)
+            record.button.style = record.buttonStyle;
+        if (record.menu) {
+            record.menu.disconnect(record.menuOpenId);
+            record.menu = null;
+        }
+        if (record.indicator) {
+            record.indicator.disconnect(record.menuSetId);
+            record.indicator.disconnect(record.indicatorDestroyId);
+            record.indicator = null;
+        }
     }
 
     _releasePanel() {
         this._releasing = true;
         for (const r of this._slots) {
             r.slot.disconnect(r.removedId);
-            if (r.indicator) {
-                r.indicator.disconnect(r.menuSetId);
-                r.indicator.disconnect(r.indicatorDestroyId);
-            }
-            r.restore?.();
+            this._disconnectSlot(r);
             const visible = r.container.visible;
             r.slot.set_child(null);
             const index = Math.min(r.index, r.box.get_n_children());

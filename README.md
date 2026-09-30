@@ -4,11 +4,15 @@ A GNOME Shell extension that turns the top bar into a small black island in the 
 of the screen.
 
 - **Collapsed:** a small frosted-glass pill with the time, date and battery level.
-  Windows use the whole screen; the island floats over them.
+  Windows use the whole screen. When a window reaches up under the island, the island
+  slides away; rest the pointer on the top edge to bring it back. Desktop icons
+  (Desktop Icons NG) keep clear of it.
 - **Click it:** it springs open with a large clock, remaining battery time, a volume
-  slider and every panel icon (Quick Settings and your other extensions) laid out as
-  tidy chips.
-- **Left bubble:** notifications and the calendar.
+  slider and every panel icon (Quick Settings and your other extensions) laid out on a
+  tidy grid.
+- **Left bubble:** the island's own notification center, in place of GNOME's calendar
+  menu: this week, Do Not Disturb, and your notifications as cards you can open or
+  dismiss. A red dot means something arrived you have not seen. Super+V opens it too.
 - **Right bubble:** what is playing right now, from Spotify, a browser video or any
   MPRIS player. Click it for cover art, progress and play/pause/next/previous.
 - **Fullscreen:** the island slides away. Push the pointer to the top edge to bring it back.
@@ -38,8 +42,9 @@ gnome-extensions disable dynamic-island@himuraw
 
 - The top bar (`Main.panel`) is hidden, not removed, and reserves no space.
 - Icons from the panel's left, center and right boxes move into the island. Icons that
-  extensions add later move in on their own. Disabling the extension puts every icon
-  back where it was.
+  extensions add later move in on their own. The calendar menu and media-control
+  indicators stay behind, since the bubbles already cover them. Disabling the
+  extension puts every icon back where it was.
 - The glass is a blurred clone of the windows behind the island, clipped to a rounded
   shape by a small shader (`glass.js`). Motion uses a damped spring (`spring.js`).
 
