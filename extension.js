@@ -24,7 +24,7 @@ import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
-import {spring, stopAllSprings} from './spring.js';
+import {spring, stopAllSprings, stopSpring} from './spring.js';
 
 const TOP_MARGIN = 6;
 const PILL_HEIGHT = 38;
@@ -165,6 +165,8 @@ export default class DynamicIslandExtension extends Extension {
         // except on the island and its bubbles. It reserves no screen space.
         this._layout = new TopCenterLayout(TOP_MARGIN, BUBBLE_GAP);
         this._strip = new St.Widget({layout_manager: this._layout});
+        this._stripGone = false;
+        this._strip.connect('destroy', () => (this._stripGone = true));
         Main.layoutManager.addChrome(this._strip, {affectsStruts: false, trackFullscreen: false});
         // Below the panel menus, so menus opened from the island are not covered by it.
         Main.layoutManager.uiGroup.set_child_above_sibling(this._strip, Main.layoutManager.panelBox);
@@ -1139,13 +1141,23 @@ export default class DynamicIslandExtension extends Extension {
         if (hidden)
             this._close();
         const offset = -(TOP_MARGIN + PILL_HEIGHT + 12);
+        // The showing spring may still be running when the island has to go
+        // again (the pointer leaves right after revealing it); stop it, or it
+        // pulls the island back down.
+        stopSpring(this._strip);
         if (hidden) {
             this._strip.ease({
                 translation_y: offset,
                 duration: 260,
                 mode: Clutter.AnimationMode.EASE_IN_CUBIC,
+                // Out of sight it is not drawn at all: the glass costs nothing.
+                onComplete: () => {
+                    if (this._hidden)
+                        this._strip.hide();
+                },
             });
         } else {
+            this._strip.show();
             spring(this._strip, {translation_y: 0}, {response: 0.45, damping: 0.72});
         }
     }
@@ -1659,7 +1671,9 @@ export default class DynamicIslandExtension extends Extension {
 
         // Drop the empty slot if the indicator is moved elsewhere or destroyed.
         record.removedId = slot.connect('child-removed', () => {
-            if (this._releasing)
+            // At shell shutdown the island is destroyed with the indicators in
+            // it; they are gone too, so there is nothing to disconnect.
+            if (this._releasing || this._stripGone)
                 return;
             this._disconnectSlot(record);
             this._slots = this._slots.filter(r => r !== record);
