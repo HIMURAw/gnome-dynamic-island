@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 10:54+0300\n"
+"POT-Creation-Date: 2026-09-30 11:37+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,94 +17,98 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:230
+#: extension.js:241
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:273
+#: extension.js:284
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:301
+#: extension.js:312
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:307
+#: extension.js:318
 msgid "Volume"
 msgstr ""
 
-#: extension.js:374
-msgid "Previous"
-msgstr ""
-
-#: extension.js:375
-msgid "Play or pause"
-msgstr ""
-
-#: extension.js:376
-msgid "Next"
-msgstr ""
-
-#: extension.js:390
-msgid "Open notification"
-msgstr ""
-
-#: extension.js:467 center.js:176
-msgid "Notifications"
-msgstr ""
-
-#: extension.js:499
+#: extension.js:414 extension.js:644
 msgid "Now playing"
 msgstr ""
 
+#: extension.js:432 extension.js:519
+msgid "Previous"
+msgstr ""
+
+#: extension.js:433 extension.js:520
+msgid "Play or pause"
+msgstr ""
+
+#: extension.js:434 extension.js:521
+msgid "Next"
+msgstr ""
+
+#: extension.js:449
+msgid "Back"
+msgstr ""
+
+#: extension.js:535
+msgid "Open notification"
+msgstr ""
+
+#: extension.js:612 center.js:176
+msgid "Notifications"
+msgstr ""
+
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1141
+#: extension.js:1311
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1159
+#: extension.js:1329
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1162
+#: extension.js:1332
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1163
+#: extension.js:1333
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1166
+#: extension.js:1336
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1168
+#: extension.js:1338
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1169
+#: extension.js:1339
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1177 center.js:284
+#: extension.js:1347 center.js:284
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1178
+#: extension.js:1348
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1178
+#: extension.js:1348
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1312
+#: extension.js:1487 extension.js:1514
 msgid "Nothing is playing"
 msgstr ""
 

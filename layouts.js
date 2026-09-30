@@ -141,37 +141,3 @@ class TileGridLayout extends Clutter.LayoutManager {
         }
     }
 });
-
-// Stacks children on top of each other from the top edge, each as wide as the
-// container and as tall as it wants. (BinLayout centers children at their
-// natural size instead of filling.)
-export const StackLayout = GObject.registerClass(
-class StackLayout extends Clutter.LayoutManager {
-    vfunc_get_preferred_width(container, forHeight) {
-        let [min, nat] = [0, 0];
-        for (const child of container) {
-            const [cMin, cNat] = child.get_preferred_width(forHeight);
-            min = Math.max(min, cMin);
-            nat = Math.max(nat, cNat);
-        }
-        return [min, nat];
-    }
-
-    vfunc_get_preferred_height(container, forWidth) {
-        let [min, nat] = [0, 0];
-        for (const child of container) {
-            const [cMin, cNat] = child.get_preferred_height(forWidth);
-            min = Math.max(min, cMin);
-            nat = Math.max(nat, cNat);
-        }
-        return [min, nat];
-    }
-
-    vfunc_allocate(container, box) {
-        const width = box.get_width();
-        for (const child of container) {
-            const [, h] = child.get_preferred_height(width);
-            child.allocate(new Clutter.ActorBox({x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y1 + h}));
-        }
-    }
-});

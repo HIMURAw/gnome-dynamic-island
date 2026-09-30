@@ -19,16 +19,17 @@ import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
 import {Glass, RoundedMask} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
-import {StackLayout, TileGridLayout, TopCenterLayout} from './layouts.js';
+import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
 import {GlassMenus} from './menus.js';
+import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings} from './spring.js';
 
 const TOP_MARGIN = 6;
 const PILL_HEIGHT = 38;
 const BORDER = 1;
 const BUBBLE_GAP = 8;
-const EXPANDED_WIDTH = 560;
+const EXPANDED_WIDTH = 600;
 const EXPANDED_RADIUS = 34;
 const CONTENT_WIDTH = EXPANDED_WIDTH - 2 * BORDER;
 // How long to wait after the pointer leaves before collapsing (ms).
@@ -36,6 +37,12 @@ const COLLAPSE_DELAY = 700;
 // In fullscreen, hide again once the pointer is this far below the island (px).
 const REVEAL_SLACK = 60;
 const ART_SIZE = 72;
+// Cover art on the control center's now playing card.
+const CARD_ART_SIZE = 52;
+// Height of a toggle tile in the control center.
+const TILE_HEIGHT = 58;
+// How far pages slide when moving to and from a toggle's menu (px).
+const PAGE_SLIDE = 48;
 const NOTIFICATION_ICON = 44;
 // How long a notification stays in the island (ms). Critical ones stay until dismissed.
 const NOTIFICATION_DURATION = 5000;
@@ -172,6 +179,7 @@ export default class DynamicIslandExtension extends Extension {
         });
         this._compact = this._buildCompact();
         this._controls = this._buildControls();
+        this._detail = this._buildDetail();
         this._mediaView = this._buildMediaView();
         this._notificationView = this._buildNotificationView();
         this._center = new NotificationCenter({
@@ -179,7 +187,7 @@ export default class DynamicIslandExtension extends Extension {
             dir: this.dir,
             onActivated: () => this._close(),
         });
-        for (const view of [this._compact, this._controls, this._mediaView, this._notificationView, this._center.actor])
+        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor])
             this._island.add_child(view);
 
         this._left = this._buildCenterBubble();
@@ -314,15 +322,35 @@ export default class DynamicIslandExtension extends Extension {
         this._volumeRow.add_child(this._volumeLabel);
         view.add_child(this._volumeRow);
 
-        // GNOME's quick settings (Wi-Fi, Bluetooth, brightness...) are moved in
-        // here; see _adoptQuickSettings.
-        this._qsBox = new St.Widget({
-            style_class: 'dynada-qs quick-settings',
-            layout_manager: new StackLayout(),
+        // Control center: GNOME's quick settings, sorted into modules (see
+        // _adoptQuickSettings). Connectivity and what is playing share the top row.
+        this._ccTop = new St.BoxLayout({style_class: 'dynada-cc-top', x_expand: true});
+        this._ccTop.layout_manager.homogeneous = true;
+        this._ccConnect = new St.BoxLayout({
+            style_class: 'dynada-card dynada-cc-connect',
+            orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
             visible: false,
         });
-        view.add_child(this._qsBox);
+        this._ccTop.add_child(this._ccConnect);
+        this._ccTop.add_child(this._buildNowPlaying());
+        view.add_child(this._ccTop);
+
+        this._ccSliders = new St.BoxLayout({
+            style_class: 'dynada-cc-sliders',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            visible: false,
+        });
+        view.add_child(this._ccSliders);
+
+        this._ccTiles = new St.Widget({
+            style_class: 'dynada-cc-tiles',
+            x_expand: true,
+            layout_manager: new TileGridLayout(2, TILE_HEIGHT, 10),
+            visible: false,
+        });
+        view.add_child(this._ccTiles);
 
         // Panel indicators, including other extensions', are moved here.
         this._tray = new St.Widget({
@@ -332,9 +360,110 @@ export default class DynamicIslandExtension extends Extension {
             visible: false,
         });
         view.add_child(this._tray);
-        // A quick settings toggle left open would pop up again next time.
-        this._connect(view, 'hide', () => this._qs?.menu._activeMenu?.close(PopupAnimation.NONE));
 
+        this._ccExtra = new St.BoxLayout({
+            style_class: 'dynada-cc-extra',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            visible: false,
+        });
+        view.add_child(this._ccExtra);
+
+        this._ccSystem = new St.BoxLayout({style_class: 'dynada-cc-system', x_expand: true, visible: false});
+        view.add_child(this._ccSystem);
+
+        return view;
+    }
+
+    // Cover art, title and artist, with small transport buttons. Clicking the
+    // card opens the full media view.
+    _buildNowPlaying() {
+        const card = new St.BoxLayout({
+            style_class: 'dynada-card dynada-np',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+        });
+        const row = new St.BoxLayout({style_class: 'dynada-np-row', x_expand: true});
+        this._npArtBin = new St.Bin({
+            style_class: 'dynada-np-art',
+            width: CARD_ART_SIZE,
+            height: CARD_ART_SIZE,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        const mask = new RoundedMask();
+        mask.setGeometry(CARD_ART_SIZE, CARD_ART_SIZE, 12);
+        this._npArtBin.add_effect(mask);
+        this._npArt = new St.Icon({icon_size: CARD_ART_SIZE});
+        this._npArtBin.set_child(this._npArt);
+
+        const text = new St.BoxLayout({
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._npTitle = new St.Label({style_class: 'dynada-np-title'});
+        this._npArtist = new St.Label({style_class: 'dynada-np-artist'});
+        text.add_child(this._npTitle);
+        text.add_child(this._npArtist);
+        row.add_child(this._npArtBin);
+        row.add_child(text);
+
+        this._npOpen = new St.Button({
+            style_class: 'dynada-np-open',
+            can_focus: true,
+            accessible_name: _('Now playing'),
+            x_expand: true,
+            child: row,
+        });
+        card.add_child(this._npOpen);
+
+        this._npTransport = new St.BoxLayout({
+            style_class: 'dynada-np-transport',
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.END,
+            y_expand: true,
+        });
+        const button = (icon, name) => new St.Button({
+            style_class: 'dynada-round-button dynada-np-button',
+            can_focus: true,
+            accessible_name: name,
+            child: new St.Icon({icon_name: icon, style_class: 'dynada-np-icon'}),
+        });
+        this._npPrev = button('media-skip-backward-symbolic', _('Previous'));
+        this._npPlay = button('media-playback-start-symbolic', _('Play or pause'));
+        this._npNext = button('media-skip-forward-symbolic', _('Next'));
+        this._npTransport.add_child(this._npPrev);
+        this._npTransport.add_child(this._npPlay);
+        this._npTransport.add_child(this._npNext);
+        card.add_child(this._npTransport);
+        return card;
+    }
+
+    // A toggle's menu (Wi-Fi networks, power options) gets a page of its own,
+    // with a way back to the control center.
+    _buildDetail() {
+        const view = this._expandedView();
+        view.add_style_class_name('dynada-detail');
+        const content = new St.BoxLayout({style_class: 'dynada-back-content'});
+        content.add_child(new St.Icon({icon_name: 'go-previous-symbolic', style_class: 'dynada-back-icon'}));
+        content.add_child(new St.Label({text: _('Back'), y_align: Clutter.ActorAlign.CENTER}));
+        this._backButton = new St.Button({
+            style_class: 'dynada-back',
+            can_focus: true,
+            x_align: Clutter.ActorAlign.START,
+            child: content,
+        });
+        view.add_child(this._backButton);
+        this._detailBox = new St.BoxLayout({
+            style_class: 'dynada-detail-box',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+        });
+        view.add_child(this._detailBox);
+
+        this._connect(this._backButton, 'clicked', () => this._qsAdopter?.closeMenu());
+        // A menu left open would pop up again next time.
+        this._connect(view, 'hide', () => this._qsAdopter?.closeMenu(PopupAnimation.NONE));
         return view;
     }
 
@@ -531,6 +660,8 @@ export default class DynamicIslandExtension extends Extension {
 
     _viewFor(mode) {
         switch (mode) {
+        case 'detail':
+            return this._detail;
         case 'media':
             return this._mediaView;
         case 'notification':
@@ -574,13 +705,19 @@ export default class DynamicIslandExtension extends Extension {
         this._freezeSize();
         this._island.add_style_pseudo_class('expanded');
 
+        // Into a toggle's menu the pages slide sideways, like going one level
+        // deeper; everything else zooms in place.
+        const nav = mode === 'detail' ? 1 : previous === 'detail' ? -1 : 0;
+        const scale = nav ? 1 : 0.94;
         outgoing.ease({
             opacity: 0,
-            scale_x: 0.94,
-            scale_y: 0.94,
-            duration: 140,
+            scale_x: scale,
+            scale_y: scale,
+            translation_x: -nav * PAGE_SLIDE,
+            duration: nav ? 200 : 140,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
+                outgoing.translation_x = 0;
                 if (outgoing !== this._currentView())
                     outgoing.hide();
             },
@@ -588,7 +725,8 @@ export default class DynamicIslandExtension extends Extension {
 
         view.show();
         view.opacity = 0;
-        view.set_scale(0.94, 0.94);
+        view.set_scale(scale, scale);
+        view.translation_x = nav * PAGE_SLIDE;
         const [, height] = view.get_preferred_height(CONTENT_WIDTH);
 
         spring(this._island, {
@@ -607,10 +745,26 @@ export default class DynamicIslandExtension extends Extension {
             opacity: 255,
             scale_x: 1,
             scale_y: 1,
-            delay: 90,
-            duration: 320,
+            translation_x: 0,
+            delay: nav ? 60 : 90,
+            duration: nav ? 340 : 320,
             mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
         });
+
+        // The control center's modules drift up one after another.
+        if (mode === 'controls' && !nav) {
+            this._controls.get_children().filter(c => c.visible).forEach((child, i) => {
+                child.opacity = 0;
+                child.translation_y = 14;
+                child.ease({
+                    opacity: 255,
+                    translation_y: 0,
+                    delay: 80 + i * 45,
+                    duration: 420,
+                    mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+                });
+            });
+        }
     }
 
     _close() {
@@ -668,7 +822,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _anyMenuOpen() {
-        return Object.values(Main.panel.statusArea).some(i => i?.menu?.isOpen);
+        return !!this._qsAdopter?.openMenu || Object.values(Main.panel.statusArea).some(i => i?.menu?.isOpen);
     }
 
     _scheduleCollapse() {
@@ -1212,7 +1366,7 @@ export default class DynamicIslandExtension extends Extension {
         this._unbindSink();
         this._sink = this._control.get_default_sink();
         // Quick settings bring their own volume slider.
-        this._volumeRow.visible = !!this._sink && !this._qs;
+        this._volumeRow.visible = !!this._sink && !this._qsAdopter;
         if (!this._sink)
             return;
         this._sinkIds = [
@@ -1275,6 +1429,10 @@ export default class DynamicIslandExtension extends Extension {
         this._connect(this._nextButton, 'clicked', withPlayer(e => this._media.next(e)));
         this._connect(this._prevButton, 'clicked', withPlayer(e => this._media.previous(e)));
         this._connect(this._artButton, 'clicked', withPlayer(e => this._media.raise(e)));
+        this._connect(this._npPlay, 'clicked', withPlayer(e => this._media.playPause(e)));
+        this._connect(this._npNext, 'clicked', withPlayer(e => this._media.next(e)));
+        this._connect(this._npPrev, 'clicked', withPlayer(e => this._media.previous(e)));
+        this._connect(this._npOpen, 'clicked', () => this._open('media'));
         this._syncMedia();
     }
 
@@ -1331,14 +1489,30 @@ export default class DynamicIslandExtension extends Extension {
         this._mediaApp.text = (info && info.title && info.appName) || ' ';
 
         // Nothing to control: the buttons stay, dimmed, so the view keeps its shape.
-        this._transport.opacity = info ? 255 : 90;
-        this._transport.reactive = !!info;
-        this._prevButton.reactive = !!info?.canPrevious;
-        this._nextButton.reactive = !!info?.canNext;
-        this._prevButton.opacity = info?.canPrevious ? 255 : 90;
-        this._nextButton.opacity = info?.canNext ? 255 : 90;
-        this._playButton.child.icon_name = info?.playing
-            ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
+        const playIcon = info?.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
+        for (const [transport, prev, play, next] of [
+            [this._transport, this._prevButton, this._playButton, this._nextButton],
+            [this._npTransport, this._npPrev, this._npPlay, this._npNext],
+        ]) {
+            transport.opacity = info ? 255 : 90;
+            transport.reactive = !!info;
+            prev.reactive = !!info?.canPrevious;
+            next.reactive = !!info?.canNext;
+            prev.opacity = info?.canPrevious ? 255 : 90;
+            next.opacity = info?.canNext ? 255 : 90;
+            play.child.icon_name = playIcon;
+        }
+
+        // Control center card.
+        this._npArt.gicon = artIcon ?? info?.app?.get_icon() ??
+            new Gio.ThemedIcon({name: 'audio-x-generic-symbolic'});
+        this._npArt.icon_size = artIcon ? CARD_ART_SIZE : 24;
+        if (artIcon)
+            this._npArtBin.remove_style_class_name('dynada-art-empty');
+        else
+            this._npArtBin.add_style_class_name('dynada-art-empty');
+        this._npTitle.text = info ? info.title || info.appName : _('Nothing is playing');
+        this._npArtist.text = (info?.title && (info.artist || info.appName)) || ' ';
 
         show(this._progressRow, this._mediaLength > 0);
         this._syncPosition();
@@ -1372,92 +1546,76 @@ export default class DynamicIslandExtension extends Extension {
 
     // ---------- Quick settings ----------
 
-    // GNOME's quick settings live in the island instead of a menu. The toggle
-    // grid and the layer its menus open in move in whole, so toggles that
-    // other extensions add later land here too, and a toggle's menu (the Wi-Fi
-    // networks, the power options) opens inline under its row, as in GNOME.
+    // GNOME's quick settings become the island's control center: every item
+    // (GNOME's and other extensions') is sorted into a module, and a toggle's
+    // menu opens as a page of its own. See quicksettings.js.
     _adoptQuickSettings() {
-        const menu = Main.panel.statusArea.quickSettings?.menu;
-        const grid = menu?._grid;
-        const overlay = menu?._overlay;
-        if (!grid || !overlay || grid.get_parent() !== menu.box || overlay.get_parent() !== menu.actor)
-            return;
-
-        // The menu layer follows the menu's box pointer; here it sits right on the grid.
-        const constraints = overlay.get_constraints().filter(c =>
-            c instanceof Clutter.BindConstraint &&
-            (c.coordinate === Clutter.BindCoordinate.X || c.coordinate === Clutter.BindCoordinate.Y));
-        constraints.forEach(c => overlay.remove_constraint(c));
-
-        this._qs = {
-            menu, grid, overlay, constraints,
-            index: menu.box.get_children().indexOf(grid),
-            gridGone: false,
-        };
-        this._qs.gridDestroyId = grid.connect('destroy', () => {
-            this._qs.gridGone = true;
+        const adopter = new QuickSettingsAdopter({
+            containers: {
+                system: this._ccSystem,
+                sliders: this._ccSliders,
+                connectivity: this._ccConnect,
+                tiles: this._ccTiles,
+                extra: this._ccExtra,
+            },
+            detail: this._detailBox,
+            onMenuOpened: () => {
+                if (this._hidden)
+                    this._setHidden(false);
+                this._open('detail');
+            },
+            onMenuClosed: () => {
+                if (this._mode !== 'detail')
+                    return;
+                this._open('controls');
+                if (!this._anyHover())
+                    this._scheduleCollapse();
+            },
+            onChanged: () => this._syncModules(),
         });
-        menu.box.remove_child(grid);
-        menu.actor.remove_child(overlay);
-        this._qsBox.add_child(grid);
-        this._qsBox.add_child(overlay);
-        this._qsBox.show();
+        if (!adopter.available)
+            return;
+        this._qsAdopter = adopter;
         this._volumeRow.hide();
 
         // Anything that opens or closes quick settings (Super+S, the settings
         // and lock buttons) opens or closes the island instead. The indicator
         // stays in the hidden panel, so the panel's own calls would do nothing.
+        const menu = adopter.menu;
         const open = () => {
             if (this._hidden)
                 this._setHidden(false);
             this._open('controls');
         };
         menu.open = open;
-        menu.toggle = () => (this._mode === 'controls' ? this._close() : open());
+        menu.toggle = () => (this._mode === 'controls' || this._mode === 'detail' ? this._close() : open());
         menu.close = animate => {
-            menu._activeMenu?.close(animate);
-            if (this._mode === 'controls')
+            adopter.closeMenu(animate);
+            if (this._mode === 'controls' || this._mode === 'detail')
                 this._close();
         };
         Main.panel.toggleQuickSettings = () => menu.toggle();
         Main.panel.closeQuickSettings = () => menu.close();
+    }
 
-        // The header already shows the battery, so GNOME's battery button goes;
-        // its row keeps screenshot, settings, lock and power.
-        const system = grid.get_children().find(c => c.has_style_class_name?.('quick-settings-system-item'));
-        const power = system?.powerToggle;
-        if (power) {
-            this._qs.power = power;
-            this._qs.powerId = power.connect('notify::visible', () => power.visible && power.hide());
-            power.hide();
-        }
+    // Empty modules take no room.
+    _syncModules() {
+        const used = box => box.get_children().some(c => c.visible);
+        for (const box of [this._ccConnect, this._ccSliders, this._ccTiles, this._ccExtra, this._ccSystem])
+            box.visible = used(box);
     }
 
     _releaseQuickSettings() {
-        const qs = this._qs;
-        if (!qs)
+        const adopter = this._qsAdopter;
+        if (!adopter)
             return;
-        this._qs = null;
-        const {menu, grid, overlay} = qs;
-        menu._activeMenu?.close(PopupAnimation.NONE);
-        delete menu.open;
-        delete menu.toggle;
-        delete menu.close;
+        this._qsAdopter = null;
+        adopter.destroy();
+        delete adopter.menu.open;
+        delete adopter.menu.toggle;
+        delete adopter.menu.close;
         delete Main.panel.toggleQuickSettings;
         delete Main.panel.closeQuickSettings;
-
-        if (qs.power) {
-            qs.power.disconnect(qs.powerId);
-            qs.power._sync?.();
-        }
-        if (qs.gridGone)
-            return;
-        grid.disconnect(qs.gridDestroyId);
-        this._qsBox.remove_child(grid);
-        this._qsBox.remove_child(overlay);
-        menu.box.insert_child_at_index(grid, Math.min(qs.index, menu.box.get_n_children()));
-        menu.actor.add_child(overlay);
-        qs.constraints.forEach(c => overlay.add_constraint(c));
     }
 
     // ---------- Panel indicators ----------
@@ -1518,7 +1676,7 @@ export default class DynamicIslandExtension extends Extension {
     _adopt(container, box, index) {
         const [role, indicator] = Object.entries(Main.panel.statusArea)
             .find(([, i]) => i?.container === container) ?? [];
-        if (SKIPPED_ROLES.includes(role) || (role === 'quickSettings' && this._qs))
+        if (SKIPPED_ROLES.includes(role) || (role === 'quickSettings' && this._qsAdopter))
             return;
 
         // Adding an actor to a new parent shows it; keep hidden indicators hidden.

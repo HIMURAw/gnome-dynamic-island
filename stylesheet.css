@@ -173,178 +173,320 @@
   color: rgba(245, 245, 247, 0.62);
 }
 
-/* Quick settings: GNOME's own toggles and sliders, in the island's look.
-   Off is a faint chip, on is a white pill with dark text, like the island's
-   other selected items. Some shell themes (MacTahoe) mark their toggle styles
-   !important, so these do too; the extra class makes them win either way.
-   A toggle with a menu is one pill: the outer box carries the colour, the
-   toggle and the arrow inside stay clear. */
-.dynada-qs.quick-settings {
-  padding: 0 !important;
-  margin: 0 !important;
-  border-radius: 0 !important;
-  background-color: transparent;
+/* Control center. GNOME's quick settings items, sorted into modules and drawn
+   like the island: translucent cards, round icons that fill with the accent
+   colour when on, thick sliders without a knob. Some shell themes (MacTahoe)
+   mark their quick settings styles !important, so these do too; the extra
+   class makes them win either way. */
+.dynada-card {
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 22px;
 }
 
-.dynada-qs .quick-settings-grid {
-  spacing-rows: 10px;
-  spacing-columns: 10px;
+.dynada-cc-top {
+  spacing: 12px;
 }
 
-.dynada-qs .quick-toggle.button,
-.dynada-qs .quick-toggle-has-menu {
+.dynada-cc-connect {
+  padding: 8px;
+  spacing: 2px;
+}
+
+.dynada-cc-sliders,
+.dynada-cc-extra {
+  spacing: 10px;
+}
+
+/* Every toggle: no pill of its own, just a round icon, a title and a subtitle. */
+.dynada-expanded .quick-toggle.button,
+.dynada-expanded .quick-toggle.button:hover,
+.dynada-expanded .quick-toggle.button:active,
+.dynada-expanded .quick-toggle.button:checked,
+.dynada-expanded .quick-toggle.button:checked:hover,
+.dynada-expanded .quick-toggle.button:checked:active,
+.dynada-expanded .quick-toggle-has-menu,
+.dynada-expanded .quick-toggle-has-menu:checked {
   color: #f5f5f7 !important;
-  background-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: transparent !important;
   box-shadow: none !important;
   border: none !important;
-  transition-duration: 120ms;
+  border-radius: 16px !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  transition-duration: 160ms;
 }
 
-.dynada-qs .quick-toggle.button:hover,
-.dynada-qs .quick-toggle-has-menu:hover {
+.dynada-expanded .quick-toggle-has-menu:hover,
+.dynada-expanded .quick-toggle-has-menu:checked:hover,
+.dynada-cc-connect .quick-toggle.button:hover,
+.dynada-cc-connect .quick-toggle.button:checked:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dynada-expanded .quick-toggle-has-menu .quick-toggle.button,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle.button:hover,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle.button:active,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle.button:checked,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle.button:checked:hover {
+  background-color: transparent !important;
+}
+
+.dynada-expanded .quick-toggle > StBoxLayout {
+  padding: 7px 8px !important;
+  spacing: 11px;
+}
+
+.dynada-expanded .quick-toggle .quick-toggle-icon,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle .quick-toggle-icon {
+  icon-size: 16px !important;
+  padding: 9px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  border-radius: 99px !important;
+  color: #f5f5f7 !important;
   background-color: rgba(255, 255, 255, 0.14) !important;
+  transition-duration: 180ms;
 }
 
-.dynada-qs .quick-toggle.button:active,
-.dynada-qs .quick-toggle-has-menu:active {
-  background-color: rgba(255, 255, 255, 0.2) !important;
+.dynada-expanded .quick-toggle:checked .quick-toggle-icon,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle:checked .quick-toggle-icon {
+  color: -st-accent-fg-color !important;
+  background-color: -st-accent-color !important;
 }
 
-.dynada-qs .quick-toggle.button:checked,
-.dynada-qs .quick-toggle-has-menu:checked {
-  color: #1c1c1e !important;
-  background-color: #f5f5f7 !important;
+.dynada-expanded .quick-toggle .quick-toggle-title {
+  font-size: 10pt;
+  font-weight: bold;
 }
 
-.dynada-qs .quick-toggle.button:checked:hover,
-.dynada-qs .quick-toggle-has-menu:checked:hover {
-  color: #1c1c1e !important;
-  background-color: #ffffff !important;
+.dynada-expanded .quick-toggle .quick-toggle-subtitle,
+.dynada-expanded .quick-toggle:checked .quick-toggle-subtitle {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.55) !important;
 }
 
-.dynada-qs .quick-toggle.button:checked:active,
-.dynada-qs .quick-toggle-has-menu:checked:active {
-  color: #1c1c1e !important;
-  background-color: rgba(245, 245, 247, 0.82) !important;
-}
-
-.dynada-qs .quick-toggle-has-menu .quick-toggle.button,
-.dynada-qs .quick-toggle-has-menu .quick-toggle.button:hover,
-.dynada-qs .quick-toggle-has-menu .quick-toggle.button:active,
-.dynada-qs .quick-toggle-has-menu .quick-toggle.button:checked {
-  color: inherit !important;
+.dynada-expanded .quick-toggle-has-menu .quick-toggle-menu-button,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle-menu-button:checked {
+  color: rgba(245, 245, 247, 0.5) !important;
   background-color: transparent !important;
-}
-
-.dynada-qs .quick-toggle .quick-toggle-icon,
-.dynada-qs .quick-toggle-has-menu .quick-toggle .quick-toggle-icon {
-  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 99px !important;
+  padding: 6px !important;
+  margin: 0 8px 0 0 !important;
   min-width: 0 !important;
   min-height: 0 !important;
 }
 
-.dynada-qs .quick-toggle:checked .quick-toggle-icon,
-.dynada-qs .quick-toggle-has-menu .quick-toggle:checked .quick-toggle-icon {
-  color: -st-accent-color !important;
-}
-
-.dynada-qs .quick-toggle-has-menu .quick-toggle-menu-button {
-  color: inherit !important;
-  background-color: transparent !important;
-  box-shadow: none !important;
-}
-
-.dynada-qs .quick-toggle-has-menu .quick-toggle-menu-button:hover {
+.dynada-expanded .quick-toggle-has-menu .quick-toggle-menu-button:hover,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover {
+  color: #f5f5f7 !important;
   background-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-.dynada-qs .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover {
-  background-color: rgba(28, 28, 30, 0.08) !important;
-}
-
-.dynada-qs .quick-toggle-has-menu .quick-toggle-separator,
-.dynada-qs .quick-toggle-has-menu:checked .quick-toggle-separator {
+.dynada-expanded .quick-toggle-has-menu .quick-toggle-separator {
+  width: 0;
   background-color: transparent;
 }
 
-.dynada-qs .quick-toggle .quick-toggle-subtitle {
+/* Toggles outside the connectivity card are tiles: a card each. */
+.dynada-cc-tiles > .quick-toggle.button,
+.dynada-cc-tiles > .quick-toggle.button:checked,
+.dynada-cc-tiles > .quick-toggle-has-menu,
+.dynada-cc-tiles > .quick-toggle-has-menu:checked,
+.dynada-cc-extra > .quick-toggle.button,
+.dynada-cc-extra > .quick-toggle.button:checked,
+.dynada-cc-extra > .quick-toggle-has-menu,
+.dynada-cc-extra > .quick-toggle-has-menu:checked {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-radius: 20px !important;
+}
+
+.dynada-cc-tiles > .quick-toggle.button:hover,
+.dynada-cc-tiles > .quick-toggle.button:checked:hover,
+.dynada-cc-tiles > .quick-toggle-has-menu:hover,
+.dynada-cc-tiles > .quick-toggle-has-menu:checked:hover,
+.dynada-cc-extra > .quick-toggle.button:hover,
+.dynada-cc-extra > .quick-toggle.button:checked:hover,
+.dynada-cc-extra > .quick-toggle-has-menu:hover,
+.dynada-cc-extra > .quick-toggle-has-menu:checked:hover {
+  background-color: rgba(255, 255, 255, 0.11) !important;
+}
+
+/* Sliders: a card with a thick bar, filled in white, no knob. */
+.dynada-expanded .quick-slider {
+  color: #f5f5f7 !important;
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 22px !important;
+  box-shadow: none !important;
+  padding: 8px 8px 8px 12px !important;
+  min-height: 0 !important;
+}
+
+.dynada-expanded .quick-slider > StBoxLayout {
+  spacing: 8px;
+}
+
+.dynada-expanded .quick-slider .icon-button {
+  color: #f5f5f7 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  padding: 6px !important;
+  margin: 0 !important;
+}
+
+.dynada-expanded .quick-slider .icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.dynada-expanded .quick-slider .slider-bin {
+  padding: 0 !important;
+  min-height: 0 !important;
+  border-radius: 99px;
+}
+
+.dynada-expanded .quick-slider .slider {
+  height: 26px;
+  color: #f5f5f7;
+  -barlevel-height: 26px;
+  -barlevel-background-color: rgba(255, 255, 255, 0.12);
+  -barlevel-active-background-color: #f5f5f7;
+  -barlevel-overdrive-color: #ff9f0a;
+  -slider-handle-radius: 0px;
+}
+
+/* Screenshot, settings, lock and power, along the bottom. */
+.dynada-cc-extra .background-apps-quick-toggle > StBoxLayout {
+  padding: 10px 14px !important;
+}
+
+.dynada-cc-system .quick-settings-system-item > StBoxLayout {
+  spacing: 10px;
+}
+
+.dynada-cc-system .icon-button {
+  color: #f5f5f7 !important;
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 11px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.dynada-cc-system .icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.dynada-cc-system .icon-button:active {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Now playing card */
+.dynada-np {
+  padding: 12px 12px 8px 12px;
+  spacing: 8px;
+}
+
+.dynada-np-open {
+  border-radius: 14px;
+  color: #f5f5f7;
+}
+
+.dynada-np-row {
+  spacing: 12px;
+}
+
+.dynada-np-art {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-np-title {
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.dynada-np-artist {
+  font-size: 9pt;
   color: rgba(245, 245, 247, 0.6);
 }
 
-.dynada-qs .quick-toggle:checked .quick-toggle-subtitle {
-  color: rgba(28, 28, 30, 0.6);
+.dynada-np-transport {
+  spacing: 14px;
 }
 
-.dynada-qs .quick-settings-system-item .icon-button {
+.dynada-np-button {
+  padding: 7px;
+}
+
+.dynada-np-icon {
+  icon-size: 18px;
+}
+
+/* A toggle's menu, on its own page. The island is its card. */
+.dynada-detail {
+  spacing: 12px;
+}
+
+.dynada-back {
+  padding: 6px 14px 6px 8px;
+  border-radius: 99px;
+  color: rgba(245, 245, 247, 0.8);
+  background-color: rgba(255, 255, 255, 0.07);
+  font-size: 9.5pt;
+  font-weight: bold;
+}
+
+.dynada-back:hover {
   color: #f5f5f7;
-  background-color: rgba(255, 255, 255, 0.08);
-  box-shadow: none !important;
+  background-color: rgba(255, 255, 255, 0.13);
 }
 
-.dynada-qs .quick-settings-system-item .icon-button:hover {
+.dynada-back-content {
+  spacing: 4px;
+}
+
+.dynada-back-icon {
+  icon-size: 14px;
+}
+
+.dynada-detail .quick-toggle-menu {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f5f5f7 !important;
+  background-color: transparent !important;
+}
+
+.dynada-detail .quick-toggle-menu .header {
+  padding: 0 4px 12px 4px;
+}
+
+.dynada-detail .quick-toggle-menu .header .icon {
+  color: #f5f5f7;
   background-color: rgba(255, 255, 255, 0.14);
 }
 
-.dynada-qs .quick-settings-system-item .icon-button:active {
-  background-color: rgba(255, 255, 255, 0.2);
+.dynada-detail .quick-toggle-menu .header .icon.active {
+  color: -st-accent-fg-color;
+  background-color: -st-accent-color;
 }
 
-/* Sliders sit on a chip, like the rest of the island's rows. */
-.dynada-qs .quick-slider {
-  border-radius: 22px;
-  background-color: rgba(255, 255, 255, 0.07);
-  box-shadow: none !important;
-}
-
-.dynada-qs .quick-slider .icon-button {
-  color: #f5f5f7;
-  background-color: transparent;
-}
-
-.dynada-qs .quick-slider .icon-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.dynada-qs .slider {
-  height: 22px;
-  color: #ffffff;
-  -barlevel-height: 6px;
-  -barlevel-background-color: rgba(255, 255, 255, 0.16);
-  -barlevel-active-background-color: #ffffff;
-  -slider-handle-radius: 9px;
-}
-
-/* A toggle's menu (networks, devices, power options) opens under its row. */
-.dynada-qs .quick-toggle-menu {
-  margin: 10px 0 0 0;
-  padding: 12px;
-  border-radius: 22px;
-  border: none !important;
-  box-shadow: none;
-  color: #f5f5f7 !important;
-  background-color: rgba(255, 255, 255, 0.07) !important;
-}
-
-.dynada-qs .quick-toggle-menu .header .icon {
-  background-color: rgba(255, 255, 255, 0.12);
-}
-
-.dynada-qs .quick-toggle-menu .header .icon.active {
-  color: #1c1c1e;
-  background-color: #f5f5f7;
-}
-
-.dynada-qs .quick-toggle-menu .popup-menu-item {
+.dynada-detail .popup-menu-item {
   border-radius: 12px;
+  color: #f5f5f7;
 }
 
-.dynada-qs .quick-toggle-menu .popup-menu-item:hover,
-.dynada-qs .quick-toggle-menu .popup-menu-item:focus {
-  background-color: rgba(255, 255, 255, 0.1);
+.dynada-detail .popup-menu-item:hover,
+.dynada-detail .popup-menu-item:focus {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.dynada-qs .quick-toggle-menu .popup-separator-menu-item .popup-separator-menu-item-separator {
-  background-color: rgba(255, 255, 255, 0.1);
+.dynada-detail .popup-separator-menu-item .popup-separator-menu-item-separator {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Media view */
