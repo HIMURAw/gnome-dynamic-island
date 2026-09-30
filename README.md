@@ -9,7 +9,7 @@ of the screen.
   (Desktop Icons NG) keep clear of it.
 - **Click it:** it springs open into a control center, its modules drifting in one
   after another: a large clock and battery time; a connectivity card (Wi-Fi, Bluetooth,
-  tethering, VPN, airplane mode) beside a now-playing card; thick knobless sliders for
+  tethering, VPN, airplane mode) beside the apps that are open right now; thick knobless sliders for
   volume, microphone and brightness; every other toggle as a tile (power mode, dark
   style, night light, Do Not Disturb, and the ones extensions add, such as Caffeine or
   GSConnect); your other extensions' panel icons; and screenshot, settings, lock and

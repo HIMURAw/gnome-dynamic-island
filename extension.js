@@ -17,6 +17,7 @@ import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.j
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
+import {AppsCard} from './apps.js';
 import {Glass, RoundedMask} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
@@ -37,8 +38,6 @@ const COLLAPSE_DELAY = 700;
 // In fullscreen, hide again once the pointer is this far below the island (px).
 const REVEAL_SLACK = 60;
 const ART_SIZE = 72;
-// Cover art on the control center's now playing card.
-const CARD_ART_SIZE = 52;
 // Height of a toggle tile in the control center.
 const TILE_HEIGHT = 58;
 // How far pages slide when moving to and from a toggle's menu (px).
@@ -120,6 +119,8 @@ export default class DynamicIslandExtension extends Extension {
 
         this._media.destroy();
         this._media = null;
+        this._apps.destroy();
+        this._apps = null;
         this._center.destroy();
         this._center = null;
 
@@ -333,7 +334,8 @@ export default class DynamicIslandExtension extends Extension {
             visible: false,
         });
         this._ccTop.add_child(this._ccConnect);
-        this._ccTop.add_child(this._buildNowPlaying());
+        this._apps = new AppsCard({onActivated: () => this._close()});
+        this._ccTop.add_child(this._apps.actor);
         view.add_child(this._ccTop);
 
         this._ccSliders = new St.BoxLayout({
@@ -361,6 +363,8 @@ export default class DynamicIslandExtension extends Extension {
         });
         view.add_child(this._tray);
 
+        // GNOME's background apps list is left out; it only holds its place so it
+        // goes back to GNOME on disable.
         this._ccExtra = new St.BoxLayout({
             style_class: 'dynada-cc-extra',
             orientation: Clutter.Orientation.VERTICAL,
@@ -373,70 +377,6 @@ export default class DynamicIslandExtension extends Extension {
         view.add_child(this._ccSystem);
 
         return view;
-    }
-
-    // Cover art, title and artist, with small transport buttons. Clicking the
-    // card opens the full media view.
-    _buildNowPlaying() {
-        const card = new St.BoxLayout({
-            style_class: 'dynada-card dynada-np',
-            orientation: Clutter.Orientation.VERTICAL,
-            x_expand: true,
-        });
-        const row = new St.BoxLayout({style_class: 'dynada-np-row', x_expand: true});
-        this._npArtBin = new St.Bin({
-            style_class: 'dynada-np-art',
-            width: CARD_ART_SIZE,
-            height: CARD_ART_SIZE,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        const mask = new RoundedMask();
-        mask.setGeometry(CARD_ART_SIZE, CARD_ART_SIZE, 12);
-        this._npArtBin.add_effect(mask);
-        this._npArt = new St.Icon({icon_size: CARD_ART_SIZE});
-        this._npArtBin.set_child(this._npArt);
-
-        const text = new St.BoxLayout({
-            orientation: Clutter.Orientation.VERTICAL,
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._npTitle = new St.Label({style_class: 'dynada-np-title'});
-        this._npArtist = new St.Label({style_class: 'dynada-np-artist'});
-        text.add_child(this._npTitle);
-        text.add_child(this._npArtist);
-        row.add_child(this._npArtBin);
-        row.add_child(text);
-
-        this._npOpen = new St.Button({
-            style_class: 'dynada-np-open',
-            can_focus: true,
-            accessible_name: _('Now playing'),
-            x_expand: true,
-            child: row,
-        });
-        card.add_child(this._npOpen);
-
-        this._npTransport = new St.BoxLayout({
-            style_class: 'dynada-np-transport',
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.END,
-            y_expand: true,
-        });
-        const button = (icon, name) => new St.Button({
-            style_class: 'dynada-round-button dynada-np-button',
-            can_focus: true,
-            accessible_name: name,
-            child: new St.Icon({icon_name: icon, style_class: 'dynada-np-icon'}),
-        });
-        this._npPrev = button('media-skip-backward-symbolic', _('Previous'));
-        this._npPlay = button('media-playback-start-symbolic', _('Play or pause'));
-        this._npNext = button('media-skip-forward-symbolic', _('Next'));
-        this._npTransport.add_child(this._npPrev);
-        this._npTransport.add_child(this._npPlay);
-        this._npTransport.add_child(this._npNext);
-        card.add_child(this._npTransport);
-        return card;
     }
 
     // A toggle's menu (Wi-Fi networks, power options) gets a page of its own,
@@ -1429,10 +1369,6 @@ export default class DynamicIslandExtension extends Extension {
         this._connect(this._nextButton, 'clicked', withPlayer(e => this._media.next(e)));
         this._connect(this._prevButton, 'clicked', withPlayer(e => this._media.previous(e)));
         this._connect(this._artButton, 'clicked', withPlayer(e => this._media.raise(e)));
-        this._connect(this._npPlay, 'clicked', withPlayer(e => this._media.playPause(e)));
-        this._connect(this._npNext, 'clicked', withPlayer(e => this._media.next(e)));
-        this._connect(this._npPrev, 'clicked', withPlayer(e => this._media.previous(e)));
-        this._connect(this._npOpen, 'clicked', () => this._open('media'));
         this._syncMedia();
     }
 
@@ -1489,30 +1425,14 @@ export default class DynamicIslandExtension extends Extension {
         this._mediaApp.text = (info && info.title && info.appName) || ' ';
 
         // Nothing to control: the buttons stay, dimmed, so the view keeps its shape.
-        const playIcon = info?.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
-        for (const [transport, prev, play, next] of [
-            [this._transport, this._prevButton, this._playButton, this._nextButton],
-            [this._npTransport, this._npPrev, this._npPlay, this._npNext],
-        ]) {
-            transport.opacity = info ? 255 : 90;
-            transport.reactive = !!info;
-            prev.reactive = !!info?.canPrevious;
-            next.reactive = !!info?.canNext;
-            prev.opacity = info?.canPrevious ? 255 : 90;
-            next.opacity = info?.canNext ? 255 : 90;
-            play.child.icon_name = playIcon;
-        }
-
-        // Control center card.
-        this._npArt.gicon = artIcon ?? info?.app?.get_icon() ??
-            new Gio.ThemedIcon({name: 'audio-x-generic-symbolic'});
-        this._npArt.icon_size = artIcon ? CARD_ART_SIZE : 24;
-        if (artIcon)
-            this._npArtBin.remove_style_class_name('dynada-art-empty');
-        else
-            this._npArtBin.add_style_class_name('dynada-art-empty');
-        this._npTitle.text = info ? info.title || info.appName : _('Nothing is playing');
-        this._npArtist.text = (info?.title && (info.artist || info.appName)) || ' ';
+        this._transport.opacity = info ? 255 : 90;
+        this._transport.reactive = !!info;
+        this._prevButton.reactive = !!info?.canPrevious;
+        this._nextButton.reactive = !!info?.canNext;
+        this._prevButton.opacity = info?.canPrevious ? 255 : 90;
+        this._nextButton.opacity = info?.canNext ? 255 : 90;
+        this._playButton.child.icon_name = info?.playing
+            ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
 
         show(this._progressRow, this._mediaLength > 0);
         this._syncPosition();
@@ -1601,7 +1521,7 @@ export default class DynamicIslandExtension extends Extension {
     // Empty modules take no room.
     _syncModules() {
         const used = box => box.get_children().some(c => c.visible);
-        for (const box of [this._ccConnect, this._ccSliders, this._ccTiles, this._ccExtra, this._ccSystem])
+        for (const box of [this._ccConnect, this._ccSliders, this._ccTiles, this._ccSystem])
             box.visible = used(box);
     }
 

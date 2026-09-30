@@ -6,7 +6,7 @@ import {Glass} from './glass.js';
 // The menu itself stays untouched apart from a transparent background; a Glass
 // actor sits right below it and follows its position, size and fade.
 const MENU_STYLE = 'background-color: transparent; box-shadow: none; ' +
-    'border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 22px;';
+    'border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 22px;';
 
 export class GlassMenus {
     constructor() {
