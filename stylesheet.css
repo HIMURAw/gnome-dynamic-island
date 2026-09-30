@@ -63,9 +63,34 @@
   color: #f5f5f7;
 }
 
-.dynada-bubble-button:hover,
-.dynada-bubble-slot .panel-button:hover {
+.dynada-bubble-button:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-badge {
+  width: 7px;
+  height: 7px;
+  margin: 9px 10px 0 0;
+  border-radius: 4px;
+  background-color: #ff453a;
+}
+
+/* Panel icons in the island. Every tile has the same height and fills its
+   grid cell; hover and open menu light the tile, not the button inside. */
+#panel.dynada-slot {
+  background-color: rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  box-shadow: none;
+  border: none;
+  transition-duration: 120ms;
+}
+
+#panel.dynada-slot:hover {
+  background-color: rgba(255, 255, 255, 0.13);
+}
+
+#panel.dynada-slot:active {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 /* Expanded, shared */
@@ -274,4 +299,143 @@
 .popup-menu .dynada-glass-menu .popup-menu-item:hover,
 .popup-menu .dynada-glass-menu .popup-menu-item:focus {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Notification center */
+.dynada-center {
+  spacing: 14px;
+}
+
+.dynada-center-month {
+  font-size: 15pt;
+  font-weight: bold;
+  padding-left: 4px;
+}
+
+.dynada-pill-button {
+  border-radius: 99px;
+  padding: 6px 14px;
+  color: rgba(245, 245, 247, 0.8);
+  background-color: rgba(255, 255, 255, 0.07);
+  font-size: 9.5pt;
+}
+
+.dynada-pill-button:hover {
+  background-color: rgba(255, 255, 255, 0.13);
+}
+
+.dynada-pill-button:checked {
+  color: #1c1c1e;
+  background-color: #f5f5f7;
+}
+
+.dynada-pill-content {
+  spacing: 7px;
+}
+
+.dynada-week {
+  padding: 8px;
+}
+
+.dynada-day {
+  padding: 6px 0;
+  spacing: 2px;
+  border-radius: 12px;
+}
+
+.dynada-day-name {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.dynada-day-number {
+  font-size: 12pt;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+}
+
+.dynada-day:today {
+  background-color: #f5f5f7;
+}
+
+.dynada-day:today .dynada-day-name,
+.dynada-day:today .dynada-day-number {
+  color: #1c1c1e;
+}
+
+.dynada-center-header {
+  padding: 0 4px;
+}
+
+.dynada-center-heading {
+  font-size: 10pt;
+  font-weight: bold;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.dynada-clear {
+  padding: 4px 12px;
+}
+
+.dynada-center-scroll {
+  max-height: 340px;
+  -st-vfade-offset: 32px;
+}
+
+.dynada-center-list {
+  spacing: 8px;
+}
+
+.dynada-card {
+  padding: 12px 12px 12px 12px;
+  border-radius: 18px;
+  color: #f5f5f7;
+  background-color: rgba(255, 255, 255, 0.07);
+  text-align: left;
+}
+
+.dynada-card:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynada-card-row {
+  spacing: 12px;
+}
+
+.dynada-card-icon {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-card-app,
+.dynada-card-time {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.dynada-card-title {
+  font-size: 10.5pt;
+  font-weight: bold;
+}
+
+.dynada-card-body {
+  font-size: 9.5pt;
+  color: rgba(245, 245, 247, 0.78);
+}
+
+.dynada-card-close {
+  border-radius: 99px;
+  padding: 5px;
+  color: rgba(245, 245, 247, 0.6);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-card-close:hover {
+  color: #f5f5f7;
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.dynada-center-empty {
+  padding: 18px 0 10px 0;
+  spacing: 8px;
+  color: rgba(245, 245, 247, 0.45);
 }

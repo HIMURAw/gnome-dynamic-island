@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-29 22:50+0300\n"
+"POT-Creation-Date: 2026-09-30 10:54+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,89 +13,118 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:212
+#: extension.js:230
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:255
+#: extension.js:273
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:283
+#: extension.js:301
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:289
+#: extension.js:307
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:356
+#: extension.js:374
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:357
+#: extension.js:375
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:358
+#: extension.js:376
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:372
+#: extension.js:390
 msgid "Open notification"
 msgstr "Bildirimi aç"
 
-#: extension.js:425
+#: extension.js:467 center.js:176
+msgid "Notifications"
+msgstr "Bildirimler"
+
+#: extension.js:499
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:849
+#: extension.js:1141
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:867
+#: extension.js:1159
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:870
+#: extension.js:1162
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:871
+#: extension.js:1163
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:874
+#: extension.js:1166
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:876
+#: extension.js:1168
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:877
+#: extension.js:1169
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:885
+#: extension.js:1177 center.js:284
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:886
+#: extension.js:1178
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:886
+#: extension.js:1178
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1014
+#: extension.js:1312
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
+
+#: center.js:61 center.js:66
+msgid "Do Not Disturb"
+msgstr "Rahatsız Etme"
+
+#: center.js:105
+msgid "Clear"
+msgstr "Temizle"
+
+#: center.js:138
+msgid "No notifications"
+msgstr "Bildirim yok"
+
+#: center.js:176
+#, javascript-format
+msgid "Notifications · %d"
+msgstr "Bildirimler · %d"
+
+#: center.js:263
+msgid "Dismiss"
+msgstr "Kapat"
+
+#: center.js:282
+msgid "now"
+msgstr "şimdi"
