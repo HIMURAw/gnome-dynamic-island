@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 10:54+0300\n"
+"POT-Creation-Date: 2026-09-30 11:37+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,94 +13,98 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:230
+#: extension.js:241
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:273
+#: extension.js:284
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:301
+#: extension.js:312
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:307
+#: extension.js:318
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:374
-msgid "Previous"
-msgstr "Önceki"
-
-#: extension.js:375
-msgid "Play or pause"
-msgstr "Oynat/duraklat"
-
-#: extension.js:376
-msgid "Next"
-msgstr "Sonraki"
-
-#: extension.js:390
-msgid "Open notification"
-msgstr "Bildirimi aç"
-
-#: extension.js:467 center.js:176
-msgid "Notifications"
-msgstr "Bildirimler"
-
-#: extension.js:499
+#: extension.js:414 extension.js:644
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
+#: extension.js:432 extension.js:519
+msgid "Previous"
+msgstr "Önceki"
+
+#: extension.js:433 extension.js:520
+msgid "Play or pause"
+msgstr "Oynat/duraklat"
+
+#: extension.js:434 extension.js:521
+msgid "Next"
+msgstr "Sonraki"
+
+#: extension.js:449
+msgid "Back"
+msgstr "Geri"
+
+#: extension.js:535
+msgid "Open notification"
+msgstr "Bildirimi aç"
+
+#: extension.js:612 center.js:176
+msgid "Notifications"
+msgstr "Bildirimler"
+
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1141
+#: extension.js:1311
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:1159
+#: extension.js:1329
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:1162
+#: extension.js:1332
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:1163
+#: extension.js:1333
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:1166
+#: extension.js:1336
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:1168
+#: extension.js:1338
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:1169
+#: extension.js:1339
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:1177 center.js:284
+#: extension.js:1347 center.js:284
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:1178
+#: extension.js:1348
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:1178
+#: extension.js:1348
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1312
+#: extension.js:1487 extension.js:1514
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
 

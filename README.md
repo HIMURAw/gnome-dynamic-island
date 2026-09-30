@@ -7,11 +7,14 @@ of the screen.
   Windows use the whole screen. When a window reaches up under the island, the island
   slides away; rest the pointer on the top edge to bring it back. Desktop icons
   (Desktop Icons NG) keep clear of it.
-- **Click it:** it springs open with a large clock, remaining battery time and GNOME's
-  Quick Settings right inside the island: Wi-Fi, Bluetooth, volume, brightness, power
-  mode, dark style and the toggles other extensions add. A toggle's menu (the Wi-Fi
-  network list, the power options) opens inline under its row. Your other extensions'
-  panel icons sit on a tidy grid below. Super+S opens it too.
+- **Click it:** it springs open into a control center, its modules drifting in one
+  after another: a large clock and battery time; a connectivity card (Wi-Fi, Bluetooth,
+  tethering, VPN, airplane mode) beside a now-playing card; thick knobless sliders for
+  volume, microphone and brightness; every other toggle as a tile (power mode, dark
+  style, night light, Do Not Disturb, and the ones extensions add, such as Caffeine or
+  GSConnect); your other extensions' panel icons; and screenshot, settings, lock and
+  power along the bottom. A toggle's arrow slides over to a page of its own (the Wi-Fi
+  networks, the power options) with a way back. Super+S opens it too.
 - **Left bubble:** the island's own notification center, in place of GNOME's calendar
   menu: this week, Do Not Disturb, and your notifications as cards you can open or
   dismiss. A red dot means something arrived you have not seen. Super+V opens it too.
@@ -43,9 +46,9 @@ gnome-extensions disable dynamic-island@himuraw
 ## How it works
 
 - The top bar (`Main.panel`) is hidden, not removed, and reserves no space.
-- GNOME's Quick Settings grid, with the layer its toggle menus open in, moves into the
-  island as it is, so it keeps working exactly like GNOME's and picks up toggles other
-  extensions add. Its colours are restyled to the island's glass.
+- GNOME's own Quick Settings items move into the island's modules (`quicksettings.js`),
+  so they keep working exactly like GNOME's, and toggles other extensions add later are
+  picked up too. Disabling the extension puts each one back in its place.
 - Icons from the panel's left, center and right boxes move into the island. Icons that
   extensions add later move in on their own. The calendar menu and media-control
   indicators stay behind, since the bubbles already cover them. Disabling the
