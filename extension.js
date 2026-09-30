@@ -11,6 +11,7 @@ import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/ex
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {BarLevel} from 'resource:///org/gnome/shell/ui/barLevel.js';
 import {Urgency} from 'resource:///org/gnome/shell/ui/messageTray.js';
+import {PopupAnimation} from 'resource:///org/gnome/shell/ui/boxpointer.js';
 import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
 import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.js';
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
@@ -18,7 +19,7 @@ import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
 import {Glass, RoundedMask} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
-import {TileGridLayout, TopCenterLayout} from './layouts.js';
+import {StackLayout, TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
 import {GlassMenus} from './menus.js';
 import {spring, stopAllSprings} from './spring.js';
@@ -27,7 +28,7 @@ const TOP_MARGIN = 6;
 const PILL_HEIGHT = 38;
 const BORDER = 1;
 const BUBBLE_GAP = 8;
-const EXPANDED_WIDTH = 520;
+const EXPANDED_WIDTH = 560;
 const EXPANDED_RADIUS = 34;
 const CONTENT_WIDTH = EXPANDED_WIDTH - 2 * BORDER;
 // How long to wait after the pointer leaves before collapsing (ms).
@@ -79,6 +80,7 @@ export default class DynamicIslandExtension extends Extension {
         this._setupVolume();
         this._setupMedia();
         this._glassMenus = new GlassMenus();
+        this._adoptQuickSettings();
         this._adoptPanel();
         this._takeOverDateMenu();
         this._setupNotifications();
@@ -99,6 +101,7 @@ export default class DynamicIslandExtension extends Extension {
         this._releaseAutoHide();
         this._releaseDateMenu();
         this._releaseNotifications();
+        this._releaseQuickSettings();
 
         this._pointerWatch?.remove();
         this._pointerWatch = null;
@@ -311,13 +314,26 @@ export default class DynamicIslandExtension extends Extension {
         this._volumeRow.add_child(this._volumeLabel);
         view.add_child(this._volumeRow);
 
+        // GNOME's quick settings (Wi-Fi, Bluetooth, brightness...) are moved in
+        // here; see _adoptQuickSettings.
+        this._qsBox = new St.Widget({
+            style_class: 'dynada-qs quick-settings',
+            layout_manager: new StackLayout(),
+            x_expand: true,
+            visible: false,
+        });
+        view.add_child(this._qsBox);
+
         // Panel indicators, including other extensions', are moved here.
         this._tray = new St.Widget({
             style_class: 'dynada-tray',
             x_expand: true,
             layout_manager: new TileGridLayout(6, 44, 8),
+            visible: false,
         });
         view.add_child(this._tray);
+        // A quick settings toggle left open would pop up again next time.
+        this._connect(view, 'hide', () => this._qs?.menu._activeMenu?.close(PopupAnimation.NONE));
 
         return view;
     }
@@ -1195,7 +1211,8 @@ export default class DynamicIslandExtension extends Extension {
     _bindSink() {
         this._unbindSink();
         this._sink = this._control.get_default_sink();
-        this._volumeRow.visible = !!this._sink;
+        // Quick settings bring their own volume slider.
+        this._volumeRow.visible = !!this._sink && !this._qs;
         if (!this._sink)
             return;
         this._sinkIds = [
@@ -1353,6 +1370,96 @@ export default class DynamicIslandExtension extends Extension {
         });
     }
 
+    // ---------- Quick settings ----------
+
+    // GNOME's quick settings live in the island instead of a menu. The toggle
+    // grid and the layer its menus open in move in whole, so toggles that
+    // other extensions add later land here too, and a toggle's menu (the Wi-Fi
+    // networks, the power options) opens inline under its row, as in GNOME.
+    _adoptQuickSettings() {
+        const menu = Main.panel.statusArea.quickSettings?.menu;
+        const grid = menu?._grid;
+        const overlay = menu?._overlay;
+        if (!grid || !overlay || grid.get_parent() !== menu.box || overlay.get_parent() !== menu.actor)
+            return;
+
+        // The menu layer follows the menu's box pointer; here it sits right on the grid.
+        const constraints = overlay.get_constraints().filter(c =>
+            c instanceof Clutter.BindConstraint &&
+            (c.coordinate === Clutter.BindCoordinate.X || c.coordinate === Clutter.BindCoordinate.Y));
+        constraints.forEach(c => overlay.remove_constraint(c));
+
+        this._qs = {
+            menu, grid, overlay, constraints,
+            index: menu.box.get_children().indexOf(grid),
+            gridGone: false,
+        };
+        this._qs.gridDestroyId = grid.connect('destroy', () => {
+            this._qs.gridGone = true;
+        });
+        menu.box.remove_child(grid);
+        menu.actor.remove_child(overlay);
+        this._qsBox.add_child(grid);
+        this._qsBox.add_child(overlay);
+        this._qsBox.show();
+        this._volumeRow.hide();
+
+        // Anything that opens or closes quick settings (Super+S, the settings
+        // and lock buttons) opens or closes the island instead. The indicator
+        // stays in the hidden panel, so the panel's own calls would do nothing.
+        const open = () => {
+            if (this._hidden)
+                this._setHidden(false);
+            this._open('controls');
+        };
+        menu.open = open;
+        menu.toggle = () => (this._mode === 'controls' ? this._close() : open());
+        menu.close = animate => {
+            menu._activeMenu?.close(animate);
+            if (this._mode === 'controls')
+                this._close();
+        };
+        Main.panel.toggleQuickSettings = () => menu.toggle();
+        Main.panel.closeQuickSettings = () => menu.close();
+
+        // The header already shows the battery, so GNOME's battery button goes;
+        // its row keeps screenshot, settings, lock and power.
+        const system = grid.get_children().find(c => c.has_style_class_name?.('quick-settings-system-item'));
+        const power = system?.powerToggle;
+        if (power) {
+            this._qs.power = power;
+            this._qs.powerId = power.connect('notify::visible', () => power.visible && power.hide());
+            power.hide();
+        }
+    }
+
+    _releaseQuickSettings() {
+        const qs = this._qs;
+        if (!qs)
+            return;
+        this._qs = null;
+        const {menu, grid, overlay} = qs;
+        menu._activeMenu?.close(PopupAnimation.NONE);
+        delete menu.open;
+        delete menu.toggle;
+        delete menu.close;
+        delete Main.panel.toggleQuickSettings;
+        delete Main.panel.closeQuickSettings;
+
+        if (qs.power) {
+            qs.power.disconnect(qs.powerId);
+            qs.power._sync?.();
+        }
+        if (qs.gridGone)
+            return;
+        grid.disconnect(qs.gridDestroyId);
+        this._qsBox.remove_child(grid);
+        this._qsBox.remove_child(overlay);
+        menu.box.insert_child_at_index(grid, Math.min(qs.index, menu.box.get_n_children()));
+        menu.actor.add_child(overlay);
+        qs.constraints.forEach(c => overlay.add_constraint(c));
+    }
+
     // ---------- Panel indicators ----------
 
     _panelBoxes() {
@@ -1411,7 +1518,7 @@ export default class DynamicIslandExtension extends Extension {
     _adopt(container, box, index) {
         const [role, indicator] = Object.entries(Main.panel.statusArea)
             .find(([, i]) => i?.container === container) ?? [];
-        if (SKIPPED_ROLES.includes(role))
+        if (SKIPPED_ROLES.includes(role) || (role === 'quickSettings' && this._qs))
             return;
 
         // Adding an actor to a new parent shows it; keep hidden indicators hidden.
@@ -1427,6 +1534,8 @@ export default class DynamicIslandExtension extends Extension {
         const record = {container, box, index, slot, ids: []};
         this._slots.push(record);
         this._tray.add_child(slot);
+        record.ids.push([container, container.connect('notify::visible', () => this._syncTray())]);
+        this._syncTray();
 
         const button = indicator ?? container.get_child?.();
         if (button instanceof St.Widget) {
@@ -1477,7 +1586,13 @@ export default class DynamicIslandExtension extends Extension {
             this._disconnectSlot(record);
             this._slots = this._slots.filter(r => r !== record);
             slot.destroy();
+            this._syncTray();
         });
+    }
+
+    // An empty tray would still leave a gap in the view.
+    _syncTray() {
+        this._tray.visible = this._slots.some(r => r.container.visible);
     }
 
     _disconnectSlot(record) {
