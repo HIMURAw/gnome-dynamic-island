@@ -173,6 +173,180 @@
   color: rgba(245, 245, 247, 0.62);
 }
 
+/* Quick settings: GNOME's own toggles and sliders, in the island's look.
+   Off is a faint chip, on is a white pill with dark text, like the island's
+   other selected items. Some shell themes (MacTahoe) mark their toggle styles
+   !important, so these do too; the extra class makes them win either way.
+   A toggle with a menu is one pill: the outer box carries the colour, the
+   toggle and the arrow inside stay clear. */
+.dynada-qs.quick-settings {
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent;
+}
+
+.dynada-qs .quick-settings-grid {
+  spacing-rows: 10px;
+  spacing-columns: 10px;
+}
+
+.dynada-qs .quick-toggle.button,
+.dynada-qs .quick-toggle-has-menu {
+  color: #f5f5f7 !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+  border: none !important;
+  transition-duration: 120ms;
+}
+
+.dynada-qs .quick-toggle.button:hover,
+.dynada-qs .quick-toggle-has-menu:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.dynada-qs .quick-toggle.button:active,
+.dynada-qs .quick-toggle-has-menu:active {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.dynada-qs .quick-toggle.button:checked,
+.dynada-qs .quick-toggle-has-menu:checked {
+  color: #1c1c1e !important;
+  background-color: #f5f5f7 !important;
+}
+
+.dynada-qs .quick-toggle.button:checked:hover,
+.dynada-qs .quick-toggle-has-menu:checked:hover {
+  color: #1c1c1e !important;
+  background-color: #ffffff !important;
+}
+
+.dynada-qs .quick-toggle.button:checked:active,
+.dynada-qs .quick-toggle-has-menu:checked:active {
+  color: #1c1c1e !important;
+  background-color: rgba(245, 245, 247, 0.82) !important;
+}
+
+.dynada-qs .quick-toggle-has-menu .quick-toggle.button,
+.dynada-qs .quick-toggle-has-menu .quick-toggle.button:hover,
+.dynada-qs .quick-toggle-has-menu .quick-toggle.button:active,
+.dynada-qs .quick-toggle-has-menu .quick-toggle.button:checked {
+  color: inherit !important;
+  background-color: transparent !important;
+}
+
+.dynada-qs .quick-toggle .quick-toggle-icon,
+.dynada-qs .quick-toggle-has-menu .quick-toggle .quick-toggle-icon {
+  background-color: transparent !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.dynada-qs .quick-toggle:checked .quick-toggle-icon,
+.dynada-qs .quick-toggle-has-menu .quick-toggle:checked .quick-toggle-icon {
+  color: -st-accent-color !important;
+}
+
+.dynada-qs .quick-toggle-has-menu .quick-toggle-menu-button {
+  color: inherit !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.dynada-qs .quick-toggle-has-menu .quick-toggle-menu-button:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.dynada-qs .quick-toggle-has-menu .quick-toggle-menu-button:checked:hover {
+  background-color: rgba(28, 28, 30, 0.08) !important;
+}
+
+.dynada-qs .quick-toggle-has-menu .quick-toggle-separator,
+.dynada-qs .quick-toggle-has-menu:checked .quick-toggle-separator {
+  background-color: transparent;
+}
+
+.dynada-qs .quick-toggle .quick-toggle-subtitle {
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.dynada-qs .quick-toggle:checked .quick-toggle-subtitle {
+  color: rgba(28, 28, 30, 0.6);
+}
+
+.dynada-qs .quick-settings-system-item .icon-button {
+  color: #f5f5f7;
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none !important;
+}
+
+.dynada-qs .quick-settings-system-item .icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+.dynada-qs .quick-settings-system-item .icon-button:active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Sliders sit on a chip, like the rest of the island's rows. */
+.dynada-qs .quick-slider {
+  border-radius: 22px;
+  background-color: rgba(255, 255, 255, 0.07);
+  box-shadow: none !important;
+}
+
+.dynada-qs .quick-slider .icon-button {
+  color: #f5f5f7;
+  background-color: transparent;
+}
+
+.dynada-qs .quick-slider .icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-qs .slider {
+  height: 22px;
+  color: #ffffff;
+  -barlevel-height: 6px;
+  -barlevel-background-color: rgba(255, 255, 255, 0.16);
+  -barlevel-active-background-color: #ffffff;
+  -slider-handle-radius: 9px;
+}
+
+/* A toggle's menu (networks, devices, power options) opens under its row. */
+.dynada-qs .quick-toggle-menu {
+  margin: 10px 0 0 0;
+  padding: 12px;
+  border-radius: 22px;
+  border: none !important;
+  box-shadow: none;
+  color: #f5f5f7 !important;
+  background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+.dynada-qs .quick-toggle-menu .header .icon {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynada-qs .quick-toggle-menu .header .icon.active {
+  color: #1c1c1e;
+  background-color: #f5f5f7;
+}
+
+.dynada-qs .quick-toggle-menu .popup-menu-item {
+  border-radius: 12px;
+}
+
+.dynada-qs .quick-toggle-menu .popup-menu-item:hover,
+.dynada-qs .quick-toggle-menu .popup-menu-item:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-qs .quick-toggle-menu .popup-separator-menu-item .popup-separator-menu-item-separator {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Media view */
 .dynada-media-top {
   spacing: 16px;
