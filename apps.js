@@ -43,13 +43,16 @@ export class AppsCard {
         this._ids = [
             [this._appSystem, this._appSystem.connect('app-state-changed', () => this._queueSync())],
             [this._tracker, this._tracker.connect('notify::focus-app', () => this._queueSync())],
+            [this.actor, this.actor.connect('notify::mapped', () => this._dirty && this._queueSync())],
         ];
-        this._sync();
+        this._dirty = true;
     }
 
-    // Apps start and stop in bursts (logging in, closing a window group).
+    // Focus changes all the time; the icons are only rebuilt while the card is
+    // on screen, and once for a burst of changes.
     _queueSync() {
-        if (this._idle)
+        this._dirty = true;
+        if (this._idle || !this.actor.mapped)
             return;
         this._idle = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._idle = 0;
@@ -63,6 +66,7 @@ export class AppsCard {
     }
 
     _sync() {
+        this._dirty = false;
         this._grid.destroy_all_children();
         const apps = this._appSystem.get_running()
             .sort((a, b) => this._lastUsed(b) - this._lastUsed(a));

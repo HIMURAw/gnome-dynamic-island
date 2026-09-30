@@ -16,20 +16,10 @@ export class GlassMenus {
     add(menu) {
         const actor = menu?.actor;
         const box = menu?.box;
-        const parent = actor?.get_parent();
-        if (!box || !parent || this._items.has(menu))
+        if (!box || !actor?.get_parent() || this._items.has(menu))
             return;
 
-        // Kept visible and faded instead of hidden: showing an actor in the middle of
-        // a frame leaves it without an allocation for that frame.
-        const glass = new Glass({radius: 22, opacity: 0});
-        parent.insert_child_below(glass, actor);
-
-        const item = {menu, glass, boxStyle: box.style, ids: [], glassGone: false};
-        // At shell shutdown the glass can be destroyed together with its parent first.
-        glass.connect('destroy', () => {
-            item.glassGone = true;
-        });
+        const item = {menu, glass: null, boxStyle: box.style, ids: []};
         box.style = `${box.style ?? ''} ${MENU_STYLE}`;
         box.add_style_class_name('dynada-glass-menu');
 
@@ -50,16 +40,31 @@ export class GlassMenus {
         sync();
     }
 
-    _sync({menu, glass, glassGone}) {
-        if (glassGone)
-            return;
+    // The glass exists only while its menu is on screen: a blurred copy of the
+    // screen per menu, kept around for every panel icon, costs memory and time.
+    // It is made while the menu is still fully transparent, so the frame it
+    // misses before its first allocation does not show.
+    _sync(item) {
+        const {menu} = item;
         const actor = menu.actor;
         const box = menu.box;
         const [w, h] = box.get_transformed_size();
         if (!actor.visible || !box.mapped || !(w > 0 && h > 0)) {
-            glass.opacity = 0;
+            this._dropGlass(item);
             return;
         }
+        if (!item.glass) {
+            const parent = actor.get_parent();
+            if (!parent)
+                return;
+            item.glass = new Glass({radius: 22, opacity: 0});
+            // At shell shutdown the glass can be destroyed together with its parent first.
+            item.glass.connect('destroy', () => {
+                item.glass = null;
+            });
+            parent.insert_child_below(item.glass, actor);
+        }
+        const glass = item.glass;
         const [x, y] = box.get_transformed_position();
         const [px, py] = glass.get_parent().get_transformed_position();
         glass.set_position(Math.round(x - px), Math.round(y - py));
@@ -67,6 +72,11 @@ export class GlassMenus {
         glass.opacity = Math.round(actor.opacity * box.opacity / 255);
         glass.setRadius(box.get_theme_node().get_border_radius(St.Corner.TOPLEFT));
         glass.syncBackdrop();
+    }
+
+    _dropGlass(item) {
+        item.glass?.destroy();
+        item.glass = null;
     }
 
     // destroyed: the menu is going away, so there is nothing to restore on it.
@@ -81,8 +91,7 @@ export class GlassMenus {
             menu.box.style = item.boxStyle;
             menu.box.remove_style_class_name('dynada-glass-menu');
         }
-        if (!item.glassGone)
-            item.glass.destroy();
+        this._dropGlass(item);
     }
 
     destroy() {

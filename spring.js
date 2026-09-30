@@ -7,7 +7,11 @@ const active = new Set();
 // Dynamic Island: fast start, a small overshoot, then settle.
 // response: seconds for one oscillation. damping: 1 = no overshoot, lower = bouncier.
 export function spring(actor, props, {response = 0.5, damping = 0.78, onComplete} = {}) {
-    actor._dynadaSpring?.stop();
+    // Only one animation may drive a property: a spring or an ease left running
+    // would fight this one frame by frame and the actor would jitter.
+    stopSpring(actor);
+    for (const key in props)
+        actor.remove_transition(key.replaceAll('_', '-'));
 
     if (!St.Settings.get().enable_animations) {
         Object.assign(actor, props);
@@ -58,6 +62,10 @@ export function spring(actor, props, {response = 0.5, damping = 0.78, onComplete
     actor._dynadaSpring = handle;
     active.add(handle);
     timeline.start();
+}
+
+export function stopSpring(actor) {
+    actor._dynadaSpring?.stop();
 }
 
 export function stopAllSprings() {

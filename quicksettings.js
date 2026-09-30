@@ -24,10 +24,17 @@ export class QuickSettingsAdopter {
         this._detail = detail;
         this._onMenuOpened = onMenuOpened;
         this._onMenuClosed = onMenuClosed;
-        this._onChanged = onChanged;
         this._records = new Map();
         this._order = 0;
         this.openMenu = null;
+
+        // At shell shutdown the island goes before the items in it; after that
+        // there is nothing left to update.
+        this._gone = false;
+        const changed = onChanged;
+        this._onChanged = () => !this._gone && changed();
+        for (const box of Object.values(containers))
+            box.connect('destroy', () => (this._gone = true));
 
         this.menu = Main.panel.statusArea.quickSettings?.menu ?? null;
         this._grid = this.menu?._grid ?? null;
