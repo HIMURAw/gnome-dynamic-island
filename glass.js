@@ -5,6 +5,14 @@ import St from 'gi://St';
 
 const BLUR_RADIUS = 36;
 
+// Blur is the costly part; with it off every glass is a plain dark surface.
+// Set before building any glass (the extension rebuilds when it changes).
+let blurEnabled = true;
+
+export function setBlurEnabled(enabled) {
+    blurEnabled = enabled;
+}
+
 // GJS turns whole numbers into int GValues, which float uniforms ignore.
 const asFloat = v => (Number.isInteger(v) ? v + 1e-4 : v);
 
@@ -54,9 +62,15 @@ class Backdrop extends St.Widget {
             x_expand: true,
             y_expand: true,
         });
+        this._tint = new St.Widget({
+            style_class: blurEnabled ? 'dynada-glass-tint' : 'dynada-glass-tint dynada-glass-solid',
+        });
+        if (!blurEnabled) {
+            this.add_child(this._tint);
+            return;
+        }
         this._clone = new Clutter.Clone({source: global.window_group});
         this.add_child(this._clone);
-        this._tint = new St.Widget({style_class: 'dynada-glass-tint'});
         this.add_child(this._tint);
         this._blur = new Shell.BlurEffect({
             mode: Shell.BlurMode.ACTOR,
@@ -76,12 +90,14 @@ class Backdrop extends St.Widget {
 
     vfunc_allocate(box) {
         this.set_allocation(box);
+        this._tint.allocate(new Clutter.ActorBox({x1: 0, y1: 0, x2: box.get_width(), y2: box.get_height()}));
+        if (!this._clone)
+            return;
         const [px, py] = this.get_parent().get_transformed_position();
         const x = px + box.x1;
         const y = py + box.y1;
         const [w, h] = global.window_group.get_size();
         this._clone.allocate(new Clutter.ActorBox({x1: -x, y1: -y, x2: -x + w, y2: -y + h}));
-        this._tint.allocate(new Clutter.ActorBox({x1: 0, y1: 0, x2: box.get_width(), y2: box.get_height()}));
 
         // The blur downscales by its radius; on a small actor a large radius would
         // shrink the texture to nothing.
