@@ -83,7 +83,7 @@ export default class DynamicIslandExtension extends Extension {
         this._activities = new Activities({
             onChanged: () => this._syncActivities(),
             onAnswer: (question, answer) => this._showAnswer(question, answer),
-            onScreenshot: () => this._flashShot(),
+            onScreenshot: phase => this._flashShot(phase),
         });
         // Any change rebuilds the island: disable() puts everything back, so
         // building again with the new settings is the simplest safe way.
@@ -1200,9 +1200,14 @@ export default class DynamicIslandExtension extends Extension {
 
     // The assistant looked at the screen: a quick shutter-white pulse on the island,
     // so it never happens unseen.
-    _flashShot() {
+    _flashShot(phase) {
         if (!this._island || this._stripGone)
             return;
+        if (phase === 'before') {
+            this._strip.opacity = 0;
+            return;
+        }
+        this._strip.opacity = 255;
         this._island.add_style_pseudo_class('shot');
         this._timeout(450, () => {
             this._island?.remove_style_pseudo_class('shot');

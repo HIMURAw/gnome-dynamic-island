@@ -147,9 +147,15 @@ export class Activities {
             GLib.mkdir_with_parents(SHOTS, 0o700);
             const file = Gio.File.new_for_path(path);
             const stream = file.replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-            await new Shell.Screenshot().screenshot(true, stream);
+            // The island itself ("Harvis · Listening…") is not part of what is on screen:
+            // out of the picture while it is taken, then a flash to say it was.
+            this._onScreenshot?.('before');
+            try {
+                await new Shell.Screenshot().screenshot(true, stream);
+            } finally {
+                this._onScreenshot?.('after');
+            }
             stream.close(null);
-            this._onScreenshot?.();
             invocation.return_value(new GLib.Variant('(bs)', [true, path]));
         } catch (e) {
             console.error('Dynamic Island: screenshot failed', e);
