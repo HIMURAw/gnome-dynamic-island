@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-03 15:21+0300\n"
+"POT-Creation-Date: 2026-10-03 15:58+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,98 +13,98 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:314
+#: extension.js:333
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:357
+#: extension.js:387
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:385
+#: extension.js:418
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:391
+#: extension.js:424
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:461
+#: extension.js:494
 msgid "Back"
 msgstr "Geri"
 
-#: extension.js:531
+#: extension.js:564
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:532
+#: extension.js:565
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:533
+#: extension.js:566
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:547
+#: extension.js:580
 msgid "Open notification"
 msgstr "Bildirimi aç"
 
-#: extension.js:614 center.js:183
+#: extension.js:647 center.js:183
 msgid "Notifications"
 msgstr "Bildirimler"
 
-#: extension.js:646 prefs.js:96
+#: extension.js:679 prefs.js:96
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1338
+#: extension.js:1464
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:1356
+#: extension.js:1482
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:1359
+#: extension.js:1485
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:1360
+#: extension.js:1486
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:1363
+#: extension.js:1489
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:1365
+#: extension.js:1491
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:1366
+#: extension.js:1492
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:1374 center.js:291
+#: extension.js:1500 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:1375
+#: extension.js:1501
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:1375
+#: extension.js:1501
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1510
+#: extension.js:1636
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
 
@@ -248,19 +248,39 @@ msgstr "Güç modu, karanlık stil, Rahatsız Etme ve diğer eklentilerin düğm
 msgid "Other extensions' icons"
 msgstr "Diğer eklentilerin simgeleri"
 
-#: prefs.js:119
+#: prefs.js:108
+msgid "Command palette"
+msgstr "Komut paleti"
+
+#: prefs.js:109
+msgid ""
+"Super+Space: apps, calculator, timers, notes, Claude. Type ? to ask Claude, "
+"n to take a note."
+msgstr ""
+"Super+Space: uygulamalar, hesap makinesi, zamanlayıcı, notlar, Claude. "
+"Claude'a sormak için ?, not almak için n yaz."
+
+#: prefs.js:112
+msgid "Notes folder (searched, empty for none)"
+msgstr "Not klasörü (aranır, boşsa arama yok)"
+
+#: prefs.js:115
+msgid "Quick notes go to (a path, or a folder inside the notes folder)"
+msgstr "Hızlı notların yeri (bir yol ya da not klasörü içinde bir klasör)"
+
+#: prefs.js:131
 msgid "Compatibility"
 msgstr "Uyumluluk"
 
-#: prefs.js:120
+#: prefs.js:132
 msgid "These extensions also change the top bar"
 msgstr "Bu eklentiler de üst çubuğu değiştiriyor"
 
-#: prefs.js:134
+#: prefs.js:146
 msgid "About"
 msgstr "Hakkında"
 
-#: prefs.js:138
+#: prefs.js:150
 msgid "Report a problem or suggest an idea"
 msgstr "Sorun bildir ya da fikir öner"
 
@@ -281,7 +301,7 @@ msgstr "Bildirim yok"
 msgid "Notifications · %d"
 msgstr "Bildirimler · %d"
 
-#: center.js:270
+#: center.js:270 activities.js:232
 msgid "Dismiss"
 msgstr "Kapat"
 
@@ -328,3 +348,120 @@ msgstr "Sağlık %{n}"
 #: charge.js:110
 msgid "{n} cycles"
 msgstr "{n} döngü"
+
+#: palette.js:34
+msgid "Note"
+msgstr "Not"
+
+#: palette.js:69
+msgid "Search, calculate, ? ask Claude, n take a note"
+msgstr "Ara, hesapla, ? Claude'a sor, n not al"
+
+#: palette.js:177
+msgid "? question"
+msgstr "? soru"
+
+#: palette.js:177
+msgid "Ask Claude"
+msgstr "Claude'a sor"
+
+#: palette.js:178
+msgid "n text"
+msgstr "n metin"
+
+#: palette.js:178
+msgid "Save a quick note"
+msgstr "Hızlı not kaydet"
+
+#: palette.js:179
+msgid "25 min"
+msgstr "25 dk"
+
+#: palette.js:179
+msgid "Start a timer"
+msgstr "Zamanlayıcı başlat"
+
+#: palette.js:180
+msgid "12*7 or 5 km mi"
+msgstr "12*7 ya da 5 km mi"
+
+#: palette.js:180
+msgid "Calculate and convert"
+msgstr "Hesapla ve çevir"
+
+#: palette.js:198 palette.js:208
+msgid "Copy the result"
+msgstr "Sonucu kopyala"
+
+#: palette.js:217
+#, javascript-format
+msgid "Start a %s timer"
+msgstr "%s zamanlayıcı başlat"
+
+#: palette.js:218
+msgid "Shown in the island while it runs"
+msgstr "Çalışırken adada görünür"
+
+#: palette.js:235
+#, javascript-format
+msgid "Search the web for “%s”"
+msgstr "Web'de ara: “%s”"
+
+#: palette.js:348
+#, javascript-format
+msgid "Save as a note: %s"
+msgstr "Not olarak kaydet: %s"
+
+#: palette.js:364
+msgid "Note saved"
+msgstr "Not kaydedildi"
+
+#: palette.js:367
+msgid "Could not save the note"
+msgstr "Not kaydedilemedi"
+
+#: palette.js:384
+msgid "Copied"
+msgstr "Kopyalandı"
+
+#: palette.js:462
+#, javascript-format
+msgid "Ask Claude: %s"
+msgstr "Claude'a sor: %s"
+
+#: palette.js:463
+msgid "The answer appears here"
+msgstr "Cevap burada çıkar"
+
+#: palette.js:494
+msgid "Copy"
+msgstr "Kopyala"
+
+#: palette.js:496
+msgid "Save as a note"
+msgstr "Not olarak kaydet"
+
+#: palette.js:510
+msgid "Thinking…"
+msgstr "Düşünüyor…"
+
+#: palette.js:533
+msgid "No answer came back."
+msgstr "Cevap gelmedi."
+
+#: palette.js:535
+msgid "Claude could not answer."
+msgstr "Claude cevap veremedi."
+
+#: palette.js:539
+#, javascript-format
+msgid "Claude could not be started: %s"
+msgstr "Claude başlatılamadı: %s"
+
+#: activities.js:114
+msgid "Timer"
+msgstr "Zamanlayıcı"
+
+#: activities.js:160
+msgid "Time is up"
+msgstr "Süre doldu"

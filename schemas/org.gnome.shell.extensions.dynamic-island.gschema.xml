@@ -66,5 +66,17 @@
       <default>80</default>
       <summary>Battery charge limit the Charge Limit toggle turns on</summary>
     </key>
+    <key name="palette-shortcut" type="as">
+      <default><![CDATA[['<Super>space']]]></default>
+      <summary>Shortcut that opens the command palette</summary>
+    </key>
+    <key name="notes-folder" type="s">
+      <default>''</default>
+      <summary>Folder of Markdown notes the palette searches (empty: no notes search)</summary>
+    </key>
+    <key name="inbox-folder" type="s">
+      <default>''</default>
+      <summary>Where quick notes are saved: a path, or a folder inside the notes folder (empty: the notes folder)</summary>
+    </key>
   </schema>
 </schemalist>

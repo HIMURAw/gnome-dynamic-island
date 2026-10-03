@@ -104,6 +104,18 @@ export default class DynamicIslandPreferences extends ExtensionPreferences {
             _('Power mode, dark style, Do Not Disturb and toggles from other extensions')));
         parts.add(switchRow('show-tray', _("Other extensions' icons")));
 
+        const palette = new Adw.PreferencesGroup({
+            title: _('Command palette'),
+            description: _('Super+Space: apps, calculator, timers, notes, Claude. Type ? to ask Claude, n to take a note.'),
+        });
+        page.add(palette);
+        const notes = new Adw.EntryRow({title: _('Notes folder (searched, empty for none)')});
+        settings.bind('notes-folder', notes, 'text', Gio.SettingsBindFlags.DEFAULT);
+        palette.add(notes);
+        const inbox = new Adw.EntryRow({title: _('Quick notes go to (a path, or a folder inside the notes folder)')});
+        settings.bind('inbox-folder', inbox, 'text', Gio.SettingsBindFlags.DEFAULT);
+        palette.add(inbox);
+
         this._addCompatibility(page);
         this._addAbout(page);
     }

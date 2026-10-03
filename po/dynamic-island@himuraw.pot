@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-03 15:21+0300\n"
+"POT-Creation-Date: 2026-10-03 15:58+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,98 +17,98 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:314
+#: extension.js:333
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:357
+#: extension.js:387
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:385
+#: extension.js:418
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:391
+#: extension.js:424
 msgid "Volume"
 msgstr ""
 
-#: extension.js:461
+#: extension.js:494
 msgid "Back"
 msgstr ""
 
-#: extension.js:531
+#: extension.js:564
 msgid "Previous"
 msgstr ""
 
-#: extension.js:532
+#: extension.js:565
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:533
+#: extension.js:566
 msgid "Next"
 msgstr ""
 
-#: extension.js:547
+#: extension.js:580
 msgid "Open notification"
 msgstr ""
 
-#: extension.js:614 center.js:183
+#: extension.js:647 center.js:183
 msgid "Notifications"
 msgstr ""
 
-#: extension.js:646 prefs.js:96
+#: extension.js:679 prefs.js:96
 msgid "Now playing"
 msgstr ""
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1338
+#: extension.js:1464
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1356
+#: extension.js:1482
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1359
+#: extension.js:1485
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1360
+#: extension.js:1486
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1363
+#: extension.js:1489
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1365
+#: extension.js:1491
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1366
+#: extension.js:1492
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1374 center.js:291
+#: extension.js:1500 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1375
+#: extension.js:1501
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1375
+#: extension.js:1501
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1510
+#: extension.js:1636
 msgid "Nothing is playing"
 msgstr ""
 
@@ -247,19 +247,37 @@ msgstr ""
 msgid "Other extensions' icons"
 msgstr ""
 
-#: prefs.js:119
+#: prefs.js:108
+msgid "Command palette"
+msgstr ""
+
+#: prefs.js:109
+msgid ""
+"Super+Space: apps, calculator, timers, notes, Claude. Type ? to ask Claude, "
+"n to take a note."
+msgstr ""
+
+#: prefs.js:112
+msgid "Notes folder (searched, empty for none)"
+msgstr ""
+
+#: prefs.js:115
+msgid "Quick notes go to (a path, or a folder inside the notes folder)"
+msgstr ""
+
+#: prefs.js:131
 msgid "Compatibility"
 msgstr ""
 
-#: prefs.js:120
+#: prefs.js:132
 msgid "These extensions also change the top bar"
 msgstr ""
 
-#: prefs.js:134
+#: prefs.js:146
 msgid "About"
 msgstr ""
 
-#: prefs.js:138
+#: prefs.js:150
 msgid "Report a problem or suggest an idea"
 msgstr ""
 
@@ -280,7 +298,7 @@ msgstr ""
 msgid "Notifications · %d"
 msgstr ""
 
-#: center.js:270
+#: center.js:270 activities.js:232
 msgid "Dismiss"
 msgstr ""
 
@@ -326,4 +344,121 @@ msgstr ""
 
 #: charge.js:110
 msgid "{n} cycles"
+msgstr ""
+
+#: palette.js:34
+msgid "Note"
+msgstr ""
+
+#: palette.js:69
+msgid "Search, calculate, ? ask Claude, n take a note"
+msgstr ""
+
+#: palette.js:177
+msgid "? question"
+msgstr ""
+
+#: palette.js:177
+msgid "Ask Claude"
+msgstr ""
+
+#: palette.js:178
+msgid "n text"
+msgstr ""
+
+#: palette.js:178
+msgid "Save a quick note"
+msgstr ""
+
+#: palette.js:179
+msgid "25 min"
+msgstr ""
+
+#: palette.js:179
+msgid "Start a timer"
+msgstr ""
+
+#: palette.js:180
+msgid "12*7 or 5 km mi"
+msgstr ""
+
+#: palette.js:180
+msgid "Calculate and convert"
+msgstr ""
+
+#: palette.js:198 palette.js:208
+msgid "Copy the result"
+msgstr ""
+
+#: palette.js:217
+#, javascript-format
+msgid "Start a %s timer"
+msgstr ""
+
+#: palette.js:218
+msgid "Shown in the island while it runs"
+msgstr ""
+
+#: palette.js:235
+#, javascript-format
+msgid "Search the web for “%s”"
+msgstr ""
+
+#: palette.js:348
+#, javascript-format
+msgid "Save as a note: %s"
+msgstr ""
+
+#: palette.js:364
+msgid "Note saved"
+msgstr ""
+
+#: palette.js:367
+msgid "Could not save the note"
+msgstr ""
+
+#: palette.js:384
+msgid "Copied"
+msgstr ""
+
+#: palette.js:462
+#, javascript-format
+msgid "Ask Claude: %s"
+msgstr ""
+
+#: palette.js:463
+msgid "The answer appears here"
+msgstr ""
+
+#: palette.js:494
+msgid "Copy"
+msgstr ""
+
+#: palette.js:496
+msgid "Save as a note"
+msgstr ""
+
+#: palette.js:510
+msgid "Thinking…"
+msgstr ""
+
+#: palette.js:533
+msgid "No answer came back."
+msgstr ""
+
+#: palette.js:535
+msgid "Claude could not answer."
+msgstr ""
+
+#: palette.js:539
+#, javascript-format
+msgid "Claude could not be started: %s"
+msgstr ""
+
+#: activities.js:114
+msgid "Timer"
+msgstr ""
+
+#: activities.js:160
+msgid "Time is up"
 msgstr ""

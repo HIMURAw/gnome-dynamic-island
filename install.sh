@@ -10,6 +10,10 @@ DEST="$HOME/.local/share/gnome-shell/extensions/$UUID"
 mkdir -p "$(dirname "$DEST")"
 ln -sfn "$PWD" "$DEST"
 
+# The `dynada` command for live activities from scripts and the terminal.
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$PWD/bin/dynada" "$HOME/.local/bin/dynada"
+
 # The shell only sees new extensions after a restart, so enable through GSettings too.
 enabled=$(gsettings get org.gnome.shell enabled-extensions)
 if [[ "$enabled" != *"'$UUID'"* ]]; then

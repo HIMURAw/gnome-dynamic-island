@@ -4,6 +4,7 @@ import GLib from 'gi://GLib';
 import GnomeDesktop from 'gi://GnomeDesktop';
 import Graphene from 'gi://Graphene';
 import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 import UPower from 'gi://UPowerGlib';
 
@@ -17,12 +18,14 @@ import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.j
 import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
+import {Activities, ActivitiesCard} from './activities.js';
 import {AppsCard} from './apps.js';
 import {ChargeIndicator} from './charge.js';
 import {Glass, RoundedMask, setBlurEnabled} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
+import {Palette} from './palette.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
@@ -74,10 +77,12 @@ function formatTime(microseconds) {
 export default class DynamicIslandExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
+        this._activities = new Activities({onChanged: () => this._syncActivities()});
         // Any change rebuilds the island: disable() puts everything back, so
         // building again with the new settings is the simplest safe way.
-        this._settingsId = this._settings.connect('changed', () => {
-            if (this._rebuildId)
+        this._settingsId = this._settings.connect('changed', (_s, key) => {
+            // Remembered values that change nothing on screen.
+            if (key === 'charge-limit' || this._rebuildId)
                 return;
             this._rebuildId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
                 this._rebuildId = 0;
@@ -106,6 +111,8 @@ export default class DynamicIslandExtension extends Extension {
         this._rebuildId = 0;
         this._settings.disconnect(this._settingsId);
         this._teardown();
+        this._activities.destroy();
+        this._activities = null;
         this._settings = null;
     }
 
@@ -145,7 +152,9 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('notifications', () => this._setupNotifications());
         this._safely('auto-hide', () => this._setupAutoHide());
         this._safely('desktop icons', () => this._setupDesktopIcons());
+        this._safely('palette shortcut', () => this._setupPaletteShortcut());
         this._syncModules();
+        this._syncActivities();
     }
 
     _teardown() {
@@ -157,6 +166,7 @@ export default class DynamicIslandExtension extends Extension {
         this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
         this._centerIdle = 0;
 
+        this._safely('releasing palette', () => this._releasePalette());
         this._safely('releasing desktop icons', () => this._releaseDesktopIcons());
         this._safely('releasing auto-hide', () => this._releaseAutoHide());
         this._safely('releasing calendar menu', () => this._releaseDateMenu());
@@ -179,6 +189,9 @@ export default class DynamicIslandExtension extends Extension {
         this._apps = null;
         this._center?.destroy();
         this._center = null;
+        this._palette?.destroy();
+        this._palette = null;
+        this._activitiesCard = null;
 
         this._glassMenus?.destroy();
         this._glassMenus = null;
@@ -248,7 +261,13 @@ export default class DynamicIslandExtension extends Extension {
             dir: this.dir,
             onActivated: () => this._close(),
         });
-        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor])
+        this._palette = new Palette({
+            settings: this._settings,
+            activities: this._activities,
+            width: this._contentWidth,
+            onClose: () => this._close(),
+        });
+        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor])
             this._island.add_child(view);
 
         this._left = this._buildCenterBubble();
@@ -327,6 +346,17 @@ export default class DynamicIslandExtension extends Extension {
         this._compactBattery.add_child(this._compactBatteryIcon);
         this._compactBattery.add_child(this._compactBatteryLabel);
 
+        this._compactActivity = new St.BoxLayout({
+            style_class: 'dynada-compact-activity',
+            y_align: Clutter.ActorAlign.CENTER,
+            visible: false,
+        });
+        this._compactActivityIcon = new St.Icon({style_class: 'dynada-compact-activity-icon'});
+        this._compactActivityLabel = new St.Label({y_align: Clutter.ActorAlign.CENTER});
+        this._compactActivity.add_child(this._compactActivityIcon);
+        this._compactActivity.add_child(this._compactActivityLabel);
+
+        box.add_child(this._compactActivity);
         box.add_child(this._compactTime);
         box.add_child(this._compactDate);
         box.add_child(this._compactBattery);
@@ -376,6 +406,9 @@ export default class DynamicIslandExtension extends Extension {
         header.add_child(left);
         header.add_child(this._batteryColumn);
         view.add_child(this._controlsHeader);
+
+        this._activitiesCard = new ActivitiesCard(this._activities);
+        view.add_child(this._activitiesCard.actor);
 
         // Volume
         this._volumeRow = new St.BoxLayout({style_class: 'dynada-volume dynada-chip', x_expand: true});
@@ -670,6 +703,8 @@ export default class DynamicIslandExtension extends Extension {
             return this._notificationView;
         case 'center':
             return this._center.actor;
+        case 'palette':
+            return this._palette.actor;
         default:
             return this._controls;
         }
@@ -686,11 +721,21 @@ export default class DynamicIslandExtension extends Extension {
         const previous = this._mode;
         this._mode = mode;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
+        if (previous === 'palette')
+            this._releaseKeyboard();
+        if (mode === 'controls')
+            this._activitiesCard?.sync();
         if (previous === 'notification')
             this._finishNotification();
 
         const view = this._viewFor(mode);
         const outgoing = previous ? this._viewFor(previous) : this._compact;
+        // A view still fading out from an earlier close would keep its height.
+        for (const other of [this._controls, this._detail, this._mediaView, this._notificationView,
+            this._center.actor, this._palette.actor]) {
+            if (other !== view && other !== outgoing)
+                other.hide();
+        }
 
         if (mode === 'media') {
             this._syncMedia();
@@ -775,6 +820,8 @@ export default class DynamicIslandExtension extends Extension {
         const view = this._viewFor(this._mode);
         if (this._mode === 'notification')
             this._finishNotification();
+        if (this._mode === 'palette')
+            this._releaseKeyboard();
         this._mode = null;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
         this._positionTimeout = this._clearTimeout(this._positionTimeout);
@@ -828,7 +875,8 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _scheduleCollapse() {
-        if (this._collapseTimeout)
+        // The palette stays until Escape or a click elsewhere.
+        if (this._collapseTimeout || this._mode === 'palette')
             return;
         // Collapse once the pointer is outside and no menu is open.
         // While a menu is open keep waiting and check again when it closes.
@@ -843,6 +891,84 @@ export default class DynamicIslandExtension extends Extension {
             this._close();
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    // ---------- Command palette ----------
+
+    _setupPaletteShortcut() {
+        Main.wm.addKeybinding('palette-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._togglePalette());
+        this._paletteBound = true;
+    }
+
+    _releasePalette() {
+        this._releaseKeyboard();
+        if (this._paletteBound)
+            Main.wm.removeKeybinding('palette-shortcut');
+        this._paletteBound = false;
+    }
+
+    _togglePalette() {
+        if (this._mode === 'palette') {
+            this._close();
+            return;
+        }
+        if (Main.overview.visible)
+            Main.overview.hide();
+        if (this._hidden)
+            this._setHidden(false);
+        this._palette.reset();
+        this._open('palette');
+        this._grabKeyboard();
+        this._palette.focus();
+    }
+
+    // While the palette is open, keys go to it, and a click anywhere else closes it.
+    _grabKeyboard() {
+        if (this._grab)
+            return;
+        this._grab = Main.pushModal(this._island, {actionMode: Shell.ActionMode.POPUP});
+        this._stageEventId = global.stage.connect('captured-event', (_stage, event) => {
+            const type = event.type();
+            if (type !== Clutter.EventType.BUTTON_PRESS && type !== Clutter.EventType.TOUCH_BEGIN)
+                return Clutter.EVENT_PROPAGATE;
+            const source = global.stage.get_event_actor(event);
+            if (source && this._island.contains(source))
+                return Clutter.EVENT_PROPAGATE;
+            this._close();
+            return Clutter.EVENT_STOP;
+        });
+    }
+
+    _releaseKeyboard() {
+        if (this._stageEventId)
+            global.stage.disconnect(this._stageEventId);
+        this._stageEventId = 0;
+        if (this._grab)
+            Main.popModal(this._grab);
+        this._grab = null;
+    }
+
+    // ---------- Live activities ----------
+
+    // The first activity shows in the collapsed island; all of them on the
+    // control center's card.
+    _syncActivities() {
+        // Also called by the activities' clock, which outlives a torn-down island.
+        if (!this._compactActivity || this._stripGone)
+            return;
+        const [first] = this._activities.items;
+        this._compactActivity.visible = !!first;
+        if (first) {
+            this._compactActivityIcon.icon_name = first.icon;
+            this._compactActivityLabel.text = Activities.short(first);
+            if (first.timer)
+                this._compactActivity.add_style_class_name('dynada-timer');
+            else
+                this._compactActivity.remove_style_class_name('dynada-timer');
+        }
+        if (this._mode === 'controls')
+            this._activitiesCard?.sync();
     }
 
     // ---------- Notifications ----------
