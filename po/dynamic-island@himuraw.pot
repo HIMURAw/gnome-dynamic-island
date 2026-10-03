@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-03 21:53+0300\n"
+"POT-Creation-Date: 2026-10-03 22:28+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,102 +17,102 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:359
+#: extension.js:362
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:413
+#: extension.js:419
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:444
+#: extension.js:450
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:450
+#: extension.js:456
 msgid "Volume"
 msgstr ""
 
-#: extension.js:520
+#: extension.js:526
 msgid "Back"
 msgstr ""
 
-#: extension.js:590
+#: extension.js:596
 msgid "Previous"
 msgstr ""
 
-#: extension.js:591
+#: extension.js:597
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:592
+#: extension.js:598
 msgid "Next"
 msgstr ""
 
-#: extension.js:606
+#: extension.js:612
 msgid "Open notification"
 msgstr ""
 
-#: extension.js:673 center.js:183
+#: extension.js:679 center.js:183
 msgid "Notifications"
 msgstr ""
 
-#: extension.js:705 prefs.js:96
+#: extension.js:711 prefs.js:96
 msgid "Now playing"
 msgstr ""
 
-#: extension.js:1028
+#: extension.js:1051
 msgid "Chat with Harvis"
 msgstr ""
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1609
+#: extension.js:1696
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1627
+#: extension.js:1714
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1630
+#: extension.js:1717
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1631
+#: extension.js:1718
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1634
+#: extension.js:1721
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1636
+#: extension.js:1723
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1637
+#: extension.js:1724
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1645 center.js:291
+#: extension.js:1732 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1646
+#: extension.js:1733
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1646
+#: extension.js:1733
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1781
+#: extension.js:1868
 msgid "Nothing is playing"
 msgstr ""
 
@@ -458,11 +458,11 @@ msgstr ""
 msgid "Save as a note"
 msgstr ""
 
-#: palette.js:522 chat.js:277
+#: palette.js:522
 msgid "Thinking…"
 msgstr ""
 
-#: palette.js:545 chat.js:307
+#: palette.js:545 chat.js:418
 msgid "No answer came back."
 msgstr ""
 
@@ -483,43 +483,39 @@ msgstr ""
 msgid "Time is up"
 msgstr ""
 
-#: chat.js:50
+#: chat.js:80
 msgid "Harvis"
 msgstr ""
 
-#: chat.js:59
+#: chat.js:94
 msgid "New chat"
 msgstr ""
 
-#: chat.js:80
+#: chat.js:115
 msgid ""
 "Write, or press the microphone and talk. “Hey Harvis” works from anywhere."
 msgstr ""
 
-#: chat.js:89
+#: chat.js:124
 msgid "Message Harvis"
 msgstr ""
 
-#: chat.js:103
+#: chat.js:135
 msgid "Talk"
 msgstr ""
 
-#: chat.js:110
+#: chat.js:137
 msgid "Send"
 msgstr ""
 
-#: chat.js:241
-msgid "Listening…"
-msgstr ""
-
-#: chat.js:243
+#: chat.js:332
 msgid "The Harvis service is not running (systemctl --user start harvis)."
 msgstr ""
 
-#: chat.js:274
-msgid "Neither Dikte nor the claude command is installed."
+#: chat.js:358
+msgid "Neither Harvis nor the claude command is installed."
 msgstr ""
 
-#: chat.js:301 chat.js:317
+#: chat.js:402 chat.js:412
 msgid "Could not get an answer"
 msgstr ""
