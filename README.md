@@ -43,6 +43,9 @@ the middle of the screen, with a control center, notifications and what is playi
 - **Out of the way:** in fullscreen, or when a window reaches up under it, the island
   slides up. Rest the pointer on the top edge to bring it back. Desktop icons (Desktop
   Icons NG) keep clear of it.
+- **Charge limit** (ASUS laptops with `asusctl`): stop charging at 60 or 80 % to keep the
+  battery healthy, charge to full once before a trip, and see battery health and cycles.
+  Hidden on other machines.
 
 The text follows your system language.
 
