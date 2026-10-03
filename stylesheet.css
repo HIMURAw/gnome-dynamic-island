@@ -1061,3 +1061,10 @@
 .dynada-chat-header .dynada-chat-wave {
   padding: 0 8px;
 }
+
+/* The assistant took a screenshot */
+.dynada-island:shot {
+  border-color: rgba(255, 255, 255, 0.95);
+  background-color: rgba(255, 255, 255, 0.25);
+  transition-duration: 120ms;
+}
