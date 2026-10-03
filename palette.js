@@ -502,6 +502,18 @@ export class Palette {
         return box;
     }
 
+    // An answer that came from elsewhere (a voice assistant), shown the same way.
+    showAnswer(question, answer) {
+        this.reset(`? ${question}`);
+        this._question = question;
+        this._list.hide();
+        this._answer.show();
+        this._answerText.remove_style_pseudo_class('pending');
+        this._answerText.text = answer;
+        this._copyButton.show();
+        this._saveButton.visible = !!this._inboxFolder();
+    }
+
     async _ask(question) {
         this._cancel();
         this._question = question;
