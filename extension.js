@@ -180,6 +180,7 @@ export default class DynamicIslandExtension extends Extension {
         this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
         this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
         this._centerIdle = this._answerTimeout = this._breathId = 0;
+        this._safely('compositing', () => this._keepComposited(false));
         this._listening = false;
         this._unwatchOutside();
 
@@ -1123,6 +1124,22 @@ export default class DynamicIslandExtension extends Extension {
         if (this._grab)
             return;
         this._grab = Main.pushModal(this._island, {actionMode: Shell.ActionMode.POPUP});
+        // While the island holds the grab, every click comes to it, even one far
+        // outside; the actor really under the pointer tells which (GNOME's
+        // GrabHelper does the same).
+        this._grabEventId = this._island.connect('captured-event', (_actor, event) => {
+            const type = event.type();
+            if (type !== Clutter.EventType.BUTTON_PRESS && type !== Clutter.EventType.TOUCH_BEGIN)
+                return Clutter.EVENT_PROPAGATE;
+            const source = global.stage.get_event_actor(event);
+            if (source && this._island.contains(source) && source !== this._island)
+                return Clutter.EVENT_PROPAGATE;
+            // On the island's own glass, outside its content, also counts as outside.
+            if (source === this._island && this._pointerOnContent(event))
+                return Clutter.EVENT_PROPAGATE;
+            this._close();
+            return Clutter.EVENT_STOP;
+        });
         this._stageEventId = global.stage.connect('captured-event', (_stage, event) => {
             const type = event.type();
             if (type !== Clutter.EventType.BUTTON_PRESS && type !== Clutter.EventType.TOUCH_BEGIN)
@@ -1135,7 +1152,17 @@ export default class DynamicIslandExtension extends Extension {
         });
     }
 
+    _pointerOnContent(event) {
+        const [x, y] = event.get_coords();
+        const [ix, iy] = this._island.get_transformed_position();
+        const [w, h] = this._island.get_transformed_size();
+        return x >= ix && x <= ix + w && y >= iy && y <= iy + h;
+    }
+
     _releaseKeyboard() {
+        if (this._grabEventId)
+            this._island?.disconnect(this._grabEventId);
+        this._grabEventId = 0;
         if (this._stageEventId)
             global.stage.disconnect(this._stageEventId);
         this._stageEventId = 0;
@@ -1518,6 +1545,11 @@ export default class DynamicIslandExtension extends Extension {
     _setAutoHide(on, fullscreen) {
         const wasFullscreen = this._fullscreen;
         this._fullscreen = fullscreen;
+        // Out of fullscreen, let full-screen windows scan out directly again.
+        if (!fullscreen)
+            this._keepComposited(false);
+        else if (!this._hidden)
+            this._keepComposited(true);
         if (on && !this._pointerWatch)
             this._pointerWatch = getPointerWatcher().addWatch(100, (x, y) => this._onPointerMove(x, y));
         else if (!on && this._pointerWatch) {
@@ -1591,6 +1623,11 @@ export default class DynamicIslandExtension extends Extension {
         // again (the pointer leaves right after revealing it); stop it, or it
         // pulls the island back down.
         stopSpring(this._strip);
+        // A fullscreen video or game is scanned out straight to the screen,
+        // bypassing the shell: anything drawn over it stays invisible. While the
+        // island shows over one, keep the compositor in the way (as GNOME's own
+        // menus do).
+        this._keepComposited(!hidden && !!this._fullscreen);
         if (hidden) {
             this._strip.ease({
                 translation_y: offset,
@@ -1606,6 +1643,16 @@ export default class DynamicIslandExtension extends Extension {
             this._strip.show();
             spring(this._strip, {translation_y: 0}, {response: 0.45, damping: 0.72});
         }
+    }
+
+    _keepComposited(on) {
+        if (on === !!this._unredirectOff)
+            return;
+        this._unredirectOff = on;
+        if (on)
+            global.compositor.disable_unredirect();
+        else
+            global.compositor.enable_unredirect();
     }
 
     // ---------- Desktop icons ----------
