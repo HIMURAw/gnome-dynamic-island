@@ -47,6 +47,8 @@ const PAGE_SLIDE = 48;
 const NOTIFICATION_ICON = 44;
 // How long a notification stays in the island (ms). Critical ones stay until dismissed.
 const NOTIFICATION_DURATION = 5000;
+// How long a voice assistant's answer stays in the island (ms), longer while hovered.
+const ANSWER_DURATION = 30000;
 // Panel indicators that are not moved into the island: GNOME's calendar menu is
 // replaced by the island's own notification center, and media controls would
 // only repeat the right bubble.
@@ -77,7 +79,10 @@ function formatTime(microseconds) {
 export default class DynamicIslandExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
-        this._activities = new Activities({onChanged: () => this._syncActivities()});
+        this._activities = new Activities({
+            onChanged: () => this._syncActivities(),
+            onAnswer: (question, answer) => this._showAnswer(question, answer),
+        });
         // Any change rebuilds the island: disable() puts everything back, so
         // building again with the new settings is the simplest safe way.
         this._settingsId = this._settings.connect('changed', (_s, key) => {
@@ -164,7 +169,7 @@ export default class DynamicIslandExtension extends Extension {
         this._timeouts.clear();
         this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
         this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
-        this._centerIdle = 0;
+        this._centerIdle = this._answerTimeout = 0;
 
         this._safely('releasing palette', () => this._releasePalette());
         this._safely('releasing desktop icons', () => this._releaseDesktopIcons());
@@ -921,6 +926,29 @@ export default class DynamicIslandExtension extends Extension {
         this._open('palette');
         this._grabKeyboard();
         this._palette.focus();
+    }
+
+    // A voice assistant's answer: the palette's answer card, without taking the
+    // keyboard from whatever the person is doing. It stays while hovered and
+    // goes away on its own after a while.
+    _showAnswer(question, answer) {
+        if (!this._palette || this._stripGone)
+            return;
+        if (this._mode === 'palette' && this._grab)
+            this._releaseKeyboard();
+        if (this._hidden)
+            this._setHidden(false);
+        this._palette.showAnswer(question, answer);
+        this._open('palette');
+        this._answerTimeout = this._clearTimeout(this._answerTimeout);
+        this._answerTimeout = this._timeout(ANSWER_DURATION, () => {
+            if (this._mode === 'palette' && !this._grab && this._anyHover())
+                return GLib.SOURCE_CONTINUE;
+            this._answerTimeout = 0;
+            if (this._mode === 'palette' && !this._grab)
+                this._close();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     // While the palette is open, keys go to it, and a click anywhere else closes it.

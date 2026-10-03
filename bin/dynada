@@ -6,6 +6,8 @@
 #   dynada ci [dir]                       follow the GitHub Actions run of HEAD (needs gh)
 #   dynada update ID TITLE [SUBTITLE] [ICON] [PROGRESS 0..1, -1 = none]
 #   dynada end ID [MESSAGE] [ok|fail]
+#   dynada clear ID                       remove an activity without a notification
+#   dynada answer QUESTION ANSWER         show an answer card (e.g. from a voice assistant)
 set -uo pipefail
 
 call() {
@@ -33,6 +35,8 @@ shift || true
 case $cmd in
 update) update "$@" ;;
 end) finish "$@" ;;
+clear) call Clear "$1" ;;
+answer) call ShowAnswer "$1" "$2" ;;
 timer)
     secs=$(seconds_of "${1:-}") || { echo "dynada timer: give a length like 25m, 1h30m, 90s or 10" >&2; exit 2; }
     call Timer "$secs" "${2:-}"
@@ -78,6 +82,6 @@ ci)
     done
     ;;
 *)
-    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

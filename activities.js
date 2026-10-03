@@ -30,6 +30,13 @@ const IFACE = `
       <arg type="s" direction="in" name="message"/>
       <arg type="b" direction="in" name="success"/>
     </method>
+    <method name="Clear">
+      <arg type="s" direction="in" name="id"/>
+    </method>
+    <method name="ShowAnswer">
+      <arg type="s" direction="in" name="question"/>
+      <arg type="s" direction="in" name="answer"/>
+    </method>
     <method name="Timer">
       <arg type="u" direction="in" name="seconds"/>
       <arg type="s" direction="in" name="label"/>
@@ -53,8 +60,10 @@ function clock(seconds) {
 
 export class Activities {
     // onChanged(): the list or a countdown changed.
-    constructor({onChanged}) {
+    // onAnswer(question, answer): a voice assistant has an answer to show.
+    constructor({onChanged, onAnswer}) {
         this._onChanged = onChanged;
+        this._onAnswer = onAnswer;
         this._items = new Map();
         this._timerCount = 0;
         this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
@@ -104,6 +113,16 @@ export class Activities {
         const body = [message, seconds >= 5 ? clock(seconds) : ''].filter(Boolean).join(' · ');
         Main.notify(`${success ? '✓' : '✕'} ${title}`, body);
         this._playSound(success ? 'complete' : 'dialog-warning');
+    }
+
+    // Gone without a notification, e.g. "listening" once the speaker stops.
+    Clear(id) {
+        if (this._items.delete(id))
+            this._onChanged();
+    }
+
+    ShowAnswer(question, answer) {
+        this._onAnswer?.(question, answer);
     }
 
     Timer(seconds, label) {
