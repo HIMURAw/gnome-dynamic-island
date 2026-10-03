@@ -50,8 +50,6 @@ const PAGE_SLIDE = 48;
 const NOTIFICATION_ICON = 44;
 // How long a notification stays in the island (ms). Critical ones stay until dismissed.
 const NOTIFICATION_DURATION = 5000;
-// How long a voice assistant's answer stays in the island (ms), longer while hovered.
-const ANSWER_DURATION = 30000;
 // Panel indicators that are not moved into the island: GNOME's calendar menu is
 // replaced by the island's own notification center, and media controls would
 // only repeat the right bubble.
@@ -1030,6 +1028,8 @@ export default class DynamicIslandExtension extends Extension {
             this._close();
             return;
         }
+        if (this._chatBadge)
+            this._chatBadge.visible = false;
         if (Main.overview.visible)
             Main.overview.hide();
         // Shown by a voice answer without the keyboard: take it now.
@@ -1050,46 +1050,40 @@ export default class DynamicIslandExtension extends Extension {
     // Left of the bell: opens the chat with the assistant.
     _buildChatBubble() {
         const bubble = this._bubble();
+        // Placed by hand like the bell: a dot for an answer not seen yet.
+        const size = PILL_HEIGHT - 2 * BORDER;
+        const content = new St.Widget({width: size, height: size});
+        const icon = new St.Icon({
+            gicon: new Gio.FileIcon({file: this.dir.get_child('icons').get_child('dynada-chat-symbolic.svg')}),
+            icon_size: 16,
+        });
+        icon.set_position((size - 16) / 2, (size - 16) / 2);
+        this._chatBadge = new St.Widget({style_class: 'dynada-badge', visible: false});
+        this._chatBadge.set_position(size - 7 - 10, 9);
+        content.add_child(icon);
+        content.add_child(this._chatBadge);
         const button = new St.Button({
             style_class: 'dynada-bubble-button',
             can_focus: true,
             accessible_name: _('Chat with Harvis'),
             x_expand: true,
             y_expand: true,
-            child: new St.Icon({
-                gicon: new Gio.FileIcon({file: this.dir.get_child('icons').get_child('dynada-chat-symbolic.svg')}),
-                icon_size: 16,
-            }),
+            child: content,
         });
         bubble.add_child(button);
         this._connect(button, 'clicked', () => this._toggleChat());
         return bubble;
     }
 
-    // A spoken exchange from the voice assistant: into the chat, which opens
-    // without taking the keyboard from whatever the person is doing. It stays
-    // while hovered and goes away on its own after a while.
+    // A spoken exchange from the voice assistant goes into the chat, which does not
+    // open by itself (Umut: "chat açılmasın, ben istersem açıp göreyim"): the
+    // answer is spoken, and a dot on the chat bubble says there is one to read.
     _showAnswer(question, answer) {
         if (!this._chat || this._stripGone)
             return;
         this._chat.addExchange(question, answer);
-        if (this._mode === 'chat')
-            return;
-        if (this._typing(this._mode) && this._grab)
-            this._releaseKeyboard();
-        if (this._hidden)
-            this._setHidden(false);
-        this._open('chat');
-        this._watchOutside();
-        this._answerTimeout = this._clearTimeout(this._answerTimeout);
-        this._answerTimeout = this._timeout(ANSWER_DURATION, () => {
-            if (this._mode === 'chat' && !this._grab && this._anyHover())
-                return GLib.SOURCE_CONTINUE;
-            this._answerTimeout = 0;
-            if (this._mode === 'chat' && !this._grab)
-                this._close();
-            return GLib.SOURCE_REMOVE;
-        });
+        if (this._mode !== 'chat' && this._chatBadge)
+            this._chatBadge.visible = true;
     }
 
     // The chat opened by a voice answer holds no keyboard, so a click elsewhere
