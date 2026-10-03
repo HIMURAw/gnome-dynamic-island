@@ -319,7 +319,7 @@ export class ChatView {
     _fill(message) {
         const box = message.actor;
         box.destroy_all_children();
-        if (message.pending) {
+        if (message.pending && !message.text) {
             box.add_child(new TypingDots().actor);
             if (message.status)
                 box.add_child(new St.Label({style_class: 'dynada-chat-working', text: message.status}));
@@ -344,6 +344,18 @@ export class ChatView {
             play.connect('clicked', () => this._run(['say', message.text]));
             box.add_child(play);
         }
+    }
+
+    // Grows the bubble's text in place (no rebuild, so it does not flicker).
+    _updateText(message) {
+        const label = message.actor.get_first_child();
+        if (label instanceof St.Label && !message.status) {
+            label.text = message.text.trimStart();
+        } else {
+            delete message.status;
+            this._fill(message);
+        }
+        this._scrollToEnd();
     }
 
     _scrollToEnd() {
@@ -438,6 +450,11 @@ export class ChatView {
                     // Claude is working: say what with, under the dots.
                     pending.status = event.status;
                     this._fill(pending);
+                } else if (event.delta !== undefined) {
+                    // The answer as it is written, word by word.
+                    pending.text = (pending.text ?? '') + event.delta;
+                    if (pending.text.trim())
+                        this._updateText(pending);
                 } else if (event.answer !== undefined) {
                     answer = event.answer;
                 } else if (event.error) {
