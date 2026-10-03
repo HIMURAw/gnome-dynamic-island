@@ -1013,3 +1013,51 @@
 .dynada-chat-send:hover {
   background-color: #3399ff;
 }
+
+/* Listening: waveform bars and a breathing green edge */
+.dynada-wave {
+  spacing: 3px;
+  height: 18px;
+}
+
+.dynada-compact-wave {
+  padding-right: 10px;
+  height: 14px;
+}
+
+.dynada-wave-bar {
+  background-color: #30d158;
+  border-radius: 2px;
+}
+
+.dynada-island.dynada-listening {
+  border-color: rgba(48, 209, 88, 0.35);
+  transition-duration: 900ms;
+}
+
+.dynada-island.dynada-listening:breath {
+  border-color: rgba(48, 209, 88, 0.85);
+}
+
+/* Chat: typing dots and what Claude is doing */
+.dynada-typing {
+  spacing: 5px;
+  padding: 4px 2px;
+}
+
+.dynada-typing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background-color: rgba(245, 245, 247, 0.8);
+}
+
+.dynada-chat-working {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.55);
+  padding-top: 4px;
+}
+
+.dynada-chat-header .dynada-chat-wave {
+  padding: 0 8px;
+}

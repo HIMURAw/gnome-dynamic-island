@@ -10,7 +10,7 @@ UUID="dynamic-island@himuraw"
 case "${1:-locale}" in
 pot)
     xgettext --from-code=UTF-8 --language=JavaScript --add-comments=Translators \
-        --package-name="Dynamic Island" -o "po/$UUID.pot" extension.js prefs.js center.js quicksettings.js apps.js charge.js palette.js activities.js privacy.js chat.js
+        --package-name="Dynamic Island" -o "po/$UUID.pot" extension.js prefs.js center.js quicksettings.js apps.js charge.js palette.js activities.js privacy.js chat.js wave.js
     for po in po/*.po; do msgmerge -q -U --backup=none "$po" "po/$UUID.pot"; done
     ;;
 locale)

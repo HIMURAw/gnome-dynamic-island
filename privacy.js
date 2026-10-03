@@ -32,6 +32,9 @@ export class PrivacyWatcher {
         this.mic = 'off';
         this.speaking = false;
         this.camera = false;
+        // 0..1, how far the voice rises above the room; for the listening animation.
+        this.level = 0;
+        this._forced = false;
 
         this._control = getMixerControl();
         this._controlIds = ['stream-added', 'stream-removed', 'stream-changed', 'state-changed']
@@ -68,12 +71,22 @@ export class PrivacyWatcher {
             return;
         this.mic = mic;
         this.camera = camera;
-        // Only measure the voice while something other than a wake word listener records.
-        if (mic === 'on')
+        this._meterNeeded();
+        this._onChanged?.();
+    }
+
+    // Measure the voice while something other than a wake word listener records,
+    // or while the assistant is listening to a command (the island animates).
+    listen(on) {
+        this._forced = on;
+        this._meterNeeded();
+    }
+
+    _meterNeeded() {
+        if (this.mic === 'on' || this._forced)
             this._startMeter();
         else
             this._stopMeter();
-        this._onChanged?.();
     }
 
     // A small parec stream at 8 kHz gives the level GNOME's mixer does not.
@@ -119,6 +132,7 @@ export class PrivacyWatcher {
             const sorted = [...this._levels].sort((a, b) => a - b);
             const floor = sorted[Math.floor(sorted.length * 0.2)];
             const voice = db > MIN_SPEECH_DB && db > floor + ABOVE_FLOOR_DB;
+            this.level = Math.max(0, Math.min(1, (db - floor - 4) / 26));
             this._hold = voice ? SPEAKING_HOLD : Math.max(0, this._hold - 1);
             const speaking = this._hold > 0;
             if (speaking !== this.speaking) {
@@ -134,6 +148,7 @@ export class PrivacyWatcher {
         this._meterCancel = null;
         this._meter?.force_exit();
         this._meter = null;
+        this.level = 0;
         if (this.speaking) {
             this.speaking = false;
             this._onChanged?.();

@@ -28,6 +28,7 @@ import {MediaWatcher} from './media.js';
 import {ChatView} from './chat.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
+import {Waveform} from './wave.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
@@ -177,7 +178,9 @@ export default class DynamicIslandExtension extends Extension {
         this._timeouts.clear();
         this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
         this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
-        this._centerIdle = this._answerTimeout = 0;
+        this._centerIdle = this._answerTimeout = this._breathId = 0;
+        this._listening = false;
+        this._unwatchOutside();
 
         this._safely('releasing palette', () => this._releasePalette());
         this._safely('releasing privacy bubble', () => this._privacyWatcher?.destroy());
@@ -382,6 +385,9 @@ export default class DynamicIslandExtension extends Extension {
         this._compactActivity.add_child(this._compactActivityIcon);
         this._compactActivity.add_child(this._compactActivityLabel);
 
+        // While the assistant listens, bars that move with your voice.
+        this._compactWave = new Waveform({height: 14, styleClass: 'dynada-wave dynada-compact-wave'});
+        box.add_child(this._compactWave.actor);
         box.add_child(this._compactActivity);
         box.add_child(this._compactTime);
         box.add_child(this._compactDate);
@@ -901,6 +907,7 @@ export default class DynamicIslandExtension extends Extension {
             this._finishNotification();
         if (this._typing(this._mode))
             this._releaseKeyboard();
+        this._unwatchOutside();
         this._mode = null;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
         this._positionTimeout = this._clearTimeout(this._positionTimeout);
@@ -978,13 +985,19 @@ export default class DynamicIslandExtension extends Extension {
         Main.wm.addKeybinding('palette-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._togglePalette());
         this._paletteBound = true;
+        // The Copilot key on laptops that have one sends Super+Shift+F23.
+        Main.wm.addKeybinding('chat-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._toggleChat());
+        this._chatBound = true;
     }
 
     _releasePalette() {
         this._releaseKeyboard();
         if (this._paletteBound)
             Main.wm.removeKeybinding('palette-shortcut');
-        this._paletteBound = false;
+        if (this._chatBound)
+            Main.wm.removeKeybinding('chat-shortcut');
+        this._paletteBound = this._chatBound = false;
     }
 
     _togglePalette() {
@@ -1008,8 +1021,18 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _toggleChat() {
-        if (this._mode === 'chat') {
+        if (this._mode === 'chat' && this._grab) {
             this._close();
+            return;
+        }
+        if (Main.overview.visible)
+            Main.overview.hide();
+        // Shown by a voice answer without the keyboard: take it now.
+        if (this._mode === 'chat') {
+            this._unwatchOutside();
+            this._answerTimeout = this._clearTimeout(this._answerTimeout);
+            this._grabKeyboard();
+            this._chat.focus();
             return;
         }
         if (this._hidden)
@@ -1052,6 +1075,7 @@ export default class DynamicIslandExtension extends Extension {
         if (this._hidden)
             this._setHidden(false);
         this._open('chat');
+        this._watchOutside();
         this._answerTimeout = this._clearTimeout(this._answerTimeout);
         this._answerTimeout = this._timeout(ANSWER_DURATION, () => {
             if (this._mode === 'chat' && !this._grab && this._anyHover())
@@ -1061,6 +1085,36 @@ export default class DynamicIslandExtension extends Extension {
                 this._close();
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    // The chat opened by a voice answer holds no keyboard, so a click elsewhere
+    // (another window, the desktop) or switching windows closes it instead.
+    _watchOutside() {
+        this._unwatchOutside();
+        this._outsideId = global.stage.connect('captured-event', (_stage, event) => {
+            const type = event.type();
+            if (type !== Clutter.EventType.BUTTON_PRESS && type !== Clutter.EventType.TOUCH_BEGIN)
+                return Clutter.EVENT_PROPAGATE;
+            const source = global.stage.get_event_actor(event);
+            if (!source || !this._island?.contains(source))
+                this._closeOutside();
+            return Clutter.EVENT_PROPAGATE;
+        });
+        this._focusId = global.display.connect('notify::focus-window', () => this._closeOutside());
+    }
+
+    _closeOutside() {
+        this._unwatchOutside();
+        if (this._mode === 'chat' && !this._grab)
+            this._close();
+    }
+
+    _unwatchOutside() {
+        if (this._outsideId)
+            global.stage.disconnect(this._outsideId);
+        if (this._focusId)
+            global.display.disconnect(this._focusId);
+        this._outsideId = this._focusId = 0;
     }
 
     // While the palette is open, keys go to it, and a click anywhere else closes it.
@@ -1097,7 +1151,11 @@ export default class DynamicIslandExtension extends Extension {
         // Also called by the activities' clock, which outlives a torn-down island.
         if (!this._compactActivity || this._stripGone)
             return;
-        const [first] = this._activities.items;
+        const harvis = this._activities.items.find(item => item.id === 'harvis');
+        // The service marks listening with the microphone icon.
+        const listening = harvis?.icon === 'audio-input-microphone-symbolic';
+        this._setListening(listening);
+        const [first] = this._activities.items.filter(item => !(listening && item === harvis));
         this._compactActivity.visible = !!first;
         if (first) {
             this._compactActivityIcon.icon_name = first.icon;
@@ -1109,11 +1167,40 @@ export default class DynamicIslandExtension extends Extension {
         }
         if (this._mode === 'controls')
             this._activitiesCard?.sync();
-        // The voice assistant's progress ("Listening…", "Thinking…") shows in the chat.
-        const harvis = this._activities.items.find(item => item.id === 'harvis');
+        // The voice assistant's progress ("Listening…", "Reading files…") shows in the chat.
         if (harvis || this._harvisShown)
-            this._chat?.setStatus(harvis?.subtitle ?? '');
+            this._chat?.setStatus(harvis?.subtitle ?? '', listening ? this._voiceLevel : null);
         this._harvisShown = !!harvis;
+    }
+
+    // Listening: the voice meter runs, the collapsed island shows a waveform and its
+    // edge breathes green.
+    _setListening(on) {
+        if (on === !!this._listening)
+            return;
+        this._listening = on;
+        this._voiceLevel ??= () => this._privacyWatcher?.level ?? 0;
+        this._privacyWatcher?.listen(on);
+        if (on) {
+            this._compactWave.start(this._voiceLevel);
+            this._island.add_style_class_name('dynada-listening');
+            let bright = false;
+            this._breathId = this._timeout(900, () => {
+                bright = !bright;
+                (bright ? this._island.add_style_pseudo_class : this._island.remove_style_pseudo_class)
+                    .call(this._island, 'breath');
+                return GLib.SOURCE_CONTINUE;
+            });
+            // A small bounce, so the eye goes to it.
+            this._island.ease({scale_x: 1.06, scale_y: 1.06, duration: 140, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => this._island?.ease({scale_x: 1, scale_y: 1, duration: 420,
+                    mode: Clutter.AnimationMode.EASE_OUT_BACK})});
+        } else {
+            this._compactWave.stop();
+            this._breathId = this._clearTimeout(this._breathId);
+            this._island.remove_style_class_name('dynada-listening');
+            this._island.remove_style_pseudo_class('breath');
+        }
     }
 
     // ---------- Notifications ----------
