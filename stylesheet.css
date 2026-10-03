@@ -943,3 +943,73 @@
 .dynada-privacy-icon.dynada-camera-on {
   color: #30d158;
 }
+
+/* Chat with the assistant */
+.dynada-chat {
+  spacing: 12px;
+}
+
+.dynada-chat-header {
+  spacing: 10px;
+}
+
+.dynada-chat-status {
+  font-size: 9pt;
+  color: #30d158;
+}
+
+.dynada-chat-scroll {
+  max-height: 420px;
+}
+
+.dynada-chat-list {
+  spacing: 8px;
+  padding: 2px 0;
+}
+
+.dynada-chat-bubble {
+  max-width: 440px;
+  padding: 9px 13px;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.09);
+  font-size: 10.5pt;
+  line-height: 1.35;
+}
+
+.dynada-chat-bubble.dynada-chat-mine {
+  background-color: #0a84ff;
+  color: #ffffff;
+}
+
+.dynada-chat-bubble:pending {
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.dynada-chat-empty {
+  padding: 18px 10px;
+  color: rgba(245, 245, 247, 0.5);
+  text-align: center;
+}
+
+.dynada-chat-bar {
+  padding: 3px 6px 3px 14px;
+  spacing: 4px;
+}
+
+.dynada-chat-mic:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynada-chat-mic:listening {
+  color: #30d158;
+  background-color: rgba(48, 209, 88, 0.16);
+}
+
+.dynada-chat-send {
+  background-color: #0a84ff;
+  color: #ffffff;
+}
+
+.dynada-chat-send:hover {
+  background-color: #3399ff;
+}

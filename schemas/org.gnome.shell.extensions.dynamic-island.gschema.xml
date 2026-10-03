@@ -82,5 +82,9 @@
       <default>true</default>
       <summary>Show the microphone and camera bubble while they are in use</summary>
     </key>
+    <key name="show-chat-bubble" type="b">
+      <default>true</default>
+      <summary>Show the chat bubble next to the bell</summary>
+    </key>
   </schema>
 </schemalist>

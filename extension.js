@@ -25,6 +25,7 @@ import {Glass, RoundedMask, setBlurEnabled} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
+import {ChatView} from './chat.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
 import {GlassMenus} from './menus.js';
@@ -205,6 +206,8 @@ export default class DynamicIslandExtension extends Extension {
         this._center = null;
         this._palette?.destroy();
         this._palette = null;
+        this._chat?.destroy();
+        this._chat = null;
         this._activitiesCard = null;
 
         this._glassMenus?.destroy();
@@ -215,7 +218,7 @@ export default class DynamicIslandExtension extends Extension {
             Main.layoutManager.removeChrome(this._strip);
             this._strip.destroy();
         }
-        this._strip = this._island = this._left = this._right = this._privacy = null;
+        this._strip = this._island = this._left = this._right = this._privacy = this._chatBubble = null;
 
         this._power = null;
         this._clock = null;
@@ -281,13 +284,16 @@ export default class DynamicIslandExtension extends Extension {
             width: this._contentWidth,
             onClose: () => this._close(),
         });
-        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor])
+        this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close()});
+        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor, this._chat.actor])
             this._island.add_child(view);
 
         this._left = this._buildCenterBubble();
         this._right = this._buildMediaBubble();
 
         this._privacy = this._buildPrivacyBubble();
+        this._chatBubble = this._buildChatBubble();
+        this._chatBubble.visible = this._settings.get_boolean('show-chat-bubble');
 
         this._left.visible = this._settings.get_boolean('show-notification-bubble');
         this._right.visible = this._settings.get_boolean('show-media-bubble');
@@ -295,10 +301,12 @@ export default class DynamicIslandExtension extends Extension {
         this._strip.add_child(this._island);
         this._strip.add_child(this._right);
         this._strip.add_child(this._privacy);
+        this._strip.add_child(this._chatBubble);
         this._layout.left = this._left;
         this._layout.center = this._island;
         this._layout.right = this._right;
         this._layout.extraRight = [this._privacy];
+        this._layout.extraLeft = [this._chatBubble];
 
         this._connect(this._compact, 'clicked', () => this._open('controls'));
         this._connect(this._controlsHeader, 'clicked', () => this._close());
@@ -312,7 +320,7 @@ export default class DynamicIslandExtension extends Extension {
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         });
-        for (const actor of [this._island, this._left, this._right, this._privacy]) {
+        for (const actor of [this._island, this._left, this._right, this._privacy, this._chatBubble]) {
             this._connect(actor, 'notify::hover', () => {
                 if (this._mode && !this._anyHover())
                     this._scheduleCollapse();
@@ -320,7 +328,7 @@ export default class DynamicIslandExtension extends Extension {
         }
         // The blur behind the glass follows layout; moving the whole layer needs a nudge.
         this._connect(this._strip, 'notify::translation-y', () => {
-            for (const glass of [this._island, this._left, this._right, this._privacy])
+            for (const glass of [this._island, this._left, this._right, this._privacy, this._chatBubble])
                 glass.syncBackdrop();
         });
     }
@@ -774,6 +782,8 @@ export default class DynamicIslandExtension extends Extension {
             return this._center.actor;
         case 'palette':
             return this._palette.actor;
+        case 'chat':
+            return this._chat.actor;
         default:
             return this._controls;
         }
@@ -790,7 +800,7 @@ export default class DynamicIslandExtension extends Extension {
         const previous = this._mode;
         this._mode = mode;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
-        if (previous === 'palette')
+        if (this._typing(previous))
             this._releaseKeyboard();
         if (mode === 'controls')
             this._activitiesCard?.sync();
@@ -801,7 +811,7 @@ export default class DynamicIslandExtension extends Extension {
         const outgoing = previous ? this._viewFor(previous) : this._compact;
         // A view still fading out from an earlier close would keep its height.
         for (const other of [this._controls, this._detail, this._mediaView, this._notificationView,
-            this._center.actor, this._palette.actor]) {
+            this._center.actor, this._palette.actor, this._chat.actor]) {
             if (other !== view && other !== outgoing)
                 other.hide();
         }
@@ -889,7 +899,7 @@ export default class DynamicIslandExtension extends Extension {
         const view = this._viewFor(this._mode);
         if (this._mode === 'notification')
             this._finishNotification();
-        if (this._mode === 'palette')
+        if (this._typing(this._mode))
             this._releaseKeyboard();
         this._mode = null;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
@@ -936,7 +946,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _anyHover() {
-        return [this._island, this._left, this._right, this._privacy].some(a => a?.hover);
+        return [this._island, this._left, this._right, this._privacy, this._chatBubble].some(a => a?.hover);
     }
 
     _anyMenuOpen() {
@@ -944,8 +954,8 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _scheduleCollapse() {
-        // The palette stays until Escape or a click elsewhere.
-        if (this._collapseTimeout || this._mode === 'palette')
+        // The palette and the chat stay until Escape or a click elsewhere.
+        if (this._collapseTimeout || this._typing(this._mode))
             return;
         // Collapse once the pointer is outside and no menu is open.
         // While a menu is open keep waiting and check again when it closes.
@@ -992,24 +1002,62 @@ export default class DynamicIslandExtension extends Extension {
         this._palette.focus();
     }
 
-    // A voice assistant's answer: the palette's answer card, without taking the
-    // keyboard from whatever the person is doing. It stays while hovered and
-    // goes away on its own after a while.
-    _showAnswer(question, answer) {
-        if (!this._palette || this._stripGone)
+    // Views that take the keyboard while open.
+    _typing(mode) {
+        return mode === 'palette' || mode === 'chat';
+    }
+
+    _toggleChat() {
+        if (this._mode === 'chat') {
+            this._close();
             return;
-        if (this._mode === 'palette' && this._grab)
+        }
+        if (this._hidden)
+            this._setHidden(false);
+        this._open('chat');
+        this._grabKeyboard();
+        this._chat.focus();
+    }
+
+    // Left of the bell: opens the chat with the assistant.
+    _buildChatBubble() {
+        const bubble = this._bubble();
+        const button = new St.Button({
+            style_class: 'dynada-bubble-button',
+            can_focus: true,
+            accessible_name: _('Chat with Harvis'),
+            x_expand: true,
+            y_expand: true,
+            child: new St.Icon({
+                gicon: new Gio.FileIcon({file: this.dir.get_child('icons').get_child('dynada-chat-symbolic.svg')}),
+                icon_size: 16,
+            }),
+        });
+        bubble.add_child(button);
+        this._connect(button, 'clicked', () => this._toggleChat());
+        return bubble;
+    }
+
+    // A spoken exchange from the voice assistant: into the chat, which opens
+    // without taking the keyboard from whatever the person is doing. It stays
+    // while hovered and goes away on its own after a while.
+    _showAnswer(question, answer) {
+        if (!this._chat || this._stripGone)
+            return;
+        this._chat.addExchange(question, answer);
+        if (this._mode === 'chat')
+            return;
+        if (this._typing(this._mode) && this._grab)
             this._releaseKeyboard();
         if (this._hidden)
             this._setHidden(false);
-        this._palette.showAnswer(question, answer);
-        this._open('palette');
+        this._open('chat');
         this._answerTimeout = this._clearTimeout(this._answerTimeout);
         this._answerTimeout = this._timeout(ANSWER_DURATION, () => {
-            if (this._mode === 'palette' && !this._grab && this._anyHover())
+            if (this._mode === 'chat' && !this._grab && this._anyHover())
                 return GLib.SOURCE_CONTINUE;
             this._answerTimeout = 0;
-            if (this._mode === 'palette' && !this._grab)
+            if (this._mode === 'chat' && !this._grab)
                 this._close();
             return GLib.SOURCE_REMOVE;
         });
@@ -1061,6 +1109,11 @@ export default class DynamicIslandExtension extends Extension {
         }
         if (this._mode === 'controls')
             this._activitiesCard?.sync();
+        // The voice assistant's progress ("Listening…", "Thinking…") shows in the chat.
+        const harvis = this._activities.items.find(item => item.id === 'harvis');
+        if (harvis || this._harvisShown)
+            this._chat?.setStatus(harvis?.subtitle ?? '');
+        this._harvisShown = !!harvis;
     }
 
     // ---------- Notifications ----------

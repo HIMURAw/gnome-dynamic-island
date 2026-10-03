@@ -57,6 +57,11 @@ the middle of the screen, with a control center, notifications and what is playi
   dynada ci                                   # follows the GitHub Actions run of HEAD (gh)
   dynada update deploy "Deploy" "Uploading" "" 0.4 ; dynada end deploy "Live" ok
   ```
+- **Chat:** the bubble left of the bell opens a chat with the assistant. Type, or press the
+  microphone and talk (through the [Harvis](https://github.com/HIMURAw/Harvis) wake word
+  service, which also drops its spoken exchanges here). Typed messages go to `dikte ask` when
+  Dikte is installed, so typed and spoken turns share one conversation, or else to `claude -p`.
+  The history is kept across sessions.
 - **Microphone and camera:** a bubble next to now playing shows while something records or a
   camera is on: an orange microphone that turns green while you talk, a green camera. An
   always-listening wake word (Harvis) shows as a dim microphone instead.
