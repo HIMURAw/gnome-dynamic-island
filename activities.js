@@ -1,6 +1,7 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -37,6 +38,11 @@ const IFACE = `
       <arg type="s" direction="in" name="question"/>
       <arg type="s" direction="in" name="answer"/>
     </method>
+    <method name="Screenshot">
+      <arg type="s" direction="in" name="name"/>
+      <arg type="b" direction="out" name="ok"/>
+      <arg type="s" direction="out" name="path"/>
+    </method>
     <method name="Timer">
       <arg type="u" direction="in" name="seconds"/>
       <arg type="s" direction="in" name="label"/>
@@ -45,6 +51,10 @@ const IFACE = `
   </interface>
 </node>`;
 const OBJECT_PATH = '/io/github/himuraw/DynamicIsland';
+// Screenshots for the assistant only ever land here, under a plain file name.
+const SHOTS = GLib.build_filenamev([GLib.get_user_cache_dir(), 'harvis', 'screen']);
+
+Gio._promisify(Shell.Screenshot.prototype, 'screenshot');
 // An activity nobody has updated for this long has lost its reporter (ms).
 const STALE_AFTER = 30 * 60 * 1000;
 
@@ -61,9 +71,11 @@ function clock(seconds) {
 export class Activities {
     // onChanged(): the list or a countdown changed.
     // onAnswer(question, answer): a voice assistant has an answer to show.
-    constructor({onChanged, onAnswer}) {
+    // onScreenshot(): a screenshot was taken for the assistant (the island flashes).
+    constructor({onChanged, onAnswer, onScreenshot}) {
         this._onChanged = onChanged;
         this._onAnswer = onAnswer;
+        this._onScreenshot = onScreenshot;
         this._items = new Map();
         this._timerCount = 0;
         this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
@@ -123,6 +135,26 @@ export class Activities {
 
     ShowAnswer(question, answer) {
         this._onAnswer?.(question, answer);
+    }
+
+    // The whole screen with the pointer in it, so "this green thing" can be found.
+    // GNOME keeps its own screenshot API to a few programs; the island lives in the
+    // shell, so the voice assistant asks here. Files go to SHOTS only.
+    async ScreenshotAsync([name], invocation) {
+        const base = GLib.path_get_basename(name || 'screen').replace(/[^\w.-]/g, '_');
+        const path = GLib.build_filenamev([SHOTS, base.endsWith('.png') ? base : `${base}.png`]);
+        try {
+            GLib.mkdir_with_parents(SHOTS, 0o700);
+            const file = Gio.File.new_for_path(path);
+            const stream = file.replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            await new Shell.Screenshot().screenshot(true, stream);
+            stream.close(null);
+            this._onScreenshot?.();
+            invocation.return_value(new GLib.Variant('(bs)', [true, path]));
+        } catch (e) {
+            console.error('Dynamic Island: screenshot failed', e);
+            invocation.return_value(new GLib.Variant('(bs)', [false, '']));
+        }
     }
 
     Timer(seconds, label) {

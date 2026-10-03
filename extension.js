@@ -85,6 +85,7 @@ export default class DynamicIslandExtension extends Extension {
         this._activities = new Activities({
             onChanged: () => this._syncActivities(),
             onAnswer: (question, answer) => this._showAnswer(question, answer),
+            onScreenshot: () => this._flashShot(),
         });
         // Any change rebuilds the island: disable() puts everything back, so
         // building again with the new settings is the simplest safe way.
@@ -1171,6 +1172,18 @@ export default class DynamicIslandExtension extends Extension {
         if (harvis || this._harvisShown)
             this._chat?.setStatus(harvis?.subtitle ?? '', listening ? this._voiceLevel : null);
         this._harvisShown = !!harvis;
+    }
+
+    // The assistant looked at the screen: a quick shutter-white pulse on the island,
+    // so it never happens unseen.
+    _flashShot() {
+        if (!this._island || this._stripGone)
+            return;
+        this._island.add_style_pseudo_class('shot');
+        this._timeout(450, () => {
+            this._island?.remove_style_pseudo_class('shot');
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     // Listening: the voice meter runs, the collapsed island shows a waveform and its
