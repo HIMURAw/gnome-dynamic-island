@@ -963,8 +963,11 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _scheduleCollapse() {
-        // The palette and the chat stay until Escape or a click elsewhere.
-        if (this._collapseTimeout || this._typing(this._mode))
+        // The palette and the chat stay until Escape or a click elsewhere while they
+        // hold the keyboard. A chat opened by a voice answer holds nothing, and on
+        // Wayland a click into another window never reaches the shell: it goes once
+        // the pointer has been on it and left (or after its own timer).
+        if (this._collapseTimeout || (this._typing(this._mode) && this._grab))
             return;
         // Collapse once the pointer is outside and no menu is open.
         // While a menu is open keep waiting and check again when it closes.
