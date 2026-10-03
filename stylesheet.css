@@ -767,3 +767,148 @@
   spacing: 8px;
   color: rgba(245, 245, 247, 0.45);
 }
+
+/* Live activities. Timers are orange, like the iPhone's. */
+.dynada-compact-activity {
+  spacing: 5px;
+  padding-right: 10px;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+}
+
+.dynada-compact-activity-icon {
+  icon-size: 14px;
+}
+
+.dynada-compact-activity.dynada-timer,
+.dynada-activity-icon.dynada-timer {
+  color: #ff9f0a;
+}
+
+.dynada-activities {
+  padding: 10px 14px;
+  spacing: 10px;
+}
+
+.dynada-activity {
+  spacing: 6px;
+}
+
+.dynada-activity > StBoxLayout {
+  spacing: 10px;
+}
+
+.dynada-activity-icon {
+  icon-size: 18px;
+}
+
+.dynada-activity-title {
+  font-weight: bold;
+  font-size: 10pt;
+}
+
+.dynada-activity-detail,
+.dynada-activity-percent {
+  font-size: 9pt;
+  color: rgba(245, 245, 247, 0.6);
+  font-feature-settings: "tnum";
+}
+
+.dynada-activity-bar {
+  height: 10px;
+  -barlevel-height: 4px;
+  -slider-handle-radius: 0;
+}
+
+/* Command palette */
+.dynada-palette {
+  spacing: 10px;
+}
+
+.dynada-palette-bar {
+  padding: 4px 14px;
+  spacing: 10px;
+}
+
+.dynada-palette-search-icon {
+  icon-size: 16px;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.dynada-palette-entry,
+.dynada-palette-entry:focus,
+.dynada-palette-entry:hover {
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 8px 0;
+  color: #f5f5f7;
+  caret-color: #f5f5f7;
+  selection-background-color: rgba(10, 132, 255, 0.6);
+  font-size: 13pt;
+}
+
+.dynada-palette-entry StLabel.hint-text {
+  color: rgba(245, 245, 247, 0.38);
+}
+
+.dynada-palette-list {
+  spacing: 2px;
+}
+
+.dynada-palette-row {
+  border-radius: 14px;
+  padding: 6px 10px;
+  color: #f5f5f7;
+}
+
+.dynada-palette-row:selected {
+  background-color: rgba(255, 255, 255, 0.11);
+}
+
+.dynada-palette-hint {
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.dynada-palette-row-box {
+  spacing: 12px;
+}
+
+.dynada-palette-icon-bin {
+  min-width: 28px;
+}
+
+.dynada-palette-title {
+  font-size: 10.5pt;
+}
+
+.dynada-palette-subtitle {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.dynada-palette-enter {
+  color: rgba(245, 245, 247, 0.45);
+}
+
+.dynada-answer {
+  padding: 14px 16px 12px 16px;
+  spacing: 10px;
+}
+
+.dynada-answer-scroll {
+  max-height: 360px;
+}
+
+.dynada-answer-text {
+  font-size: 10.5pt;
+  line-height: 1.4;
+}
+
+.dynada-answer-text:pending {
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.dynada-answer-actions {
+  spacing: 8px;
+}

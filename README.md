@@ -43,6 +43,20 @@ the middle of the screen, with a control center, notifications and what is playi
 - **Out of the way:** in fullscreen, or when a window reaches up under it, the island
   slides up. Rest the pointer on the top edge to bring it back. Desktop icons (Desktop
   Icons NG) keep clear of it.
+- **Command palette** (<kbd>Super</kbd>+<kbd>Space</kbd>): the island opens into a search line.
+  Apps, a calculator (`12*7+1`), unit conversions (`5 km mi`, `100 f c`), timers (`25 min`),
+  your Markdown notes (opens Obsidian vaults in Obsidian), `n …` saves a quick note, `? …` asks
+  Claude (if the `claude` CLI is installed) and shows the answer in the island, and a web search.
+- **Live activities:** timers and anything in progress stay in the island, like on an iPhone:
+  a countdown in the collapsed pill, a card with progress in the control center, a notification
+  when it ends. Scripts report through D-Bus or the bundled `dynada` command:
+
+  ```
+  dynada timer 25m Tea
+  dynada run -t "Build" -- npm run build      # shows while it runs, ✓ or ✕ when done
+  dynada ci                                   # follows the GitHub Actions run of HEAD (gh)
+  dynada update deploy "Deploy" "Uploading" "" 0.4 ; dynada end deploy "Live" ok
+  ```
 - **Charge limit** (ASUS laptops with `asusctl`): stop charging at 60 or 80 % to keep the
   battery healthy, charge to full once before a trip, and see battery health and cycles.
   Hidden on other machines.
@@ -140,6 +154,7 @@ After closing a nested session that was killed rather than quit, delete
 `/run/user/$UID/gnome-shell-disable-extensions` if it is there. GNOME takes it as a sign
 of a crash and starts your next session with extensions off.
 
+- `./install.sh` also links `bin/dynada` into `~/.local/bin`.
 - `npm install && npx eslint .` lints the code; CI runs the same on every push.
 - `./build.sh pack` builds the zip for extensions.gnome.org.
 - `./build.sh pot` refreshes the translation template after changing strings.
