@@ -15,6 +15,8 @@ Gio._promisify(Gio.Subprocess.prototype, 'wait_async');
 const KEEP = 60; // messages kept across sessions
 const TIMEOUT = 300; // s for one answer
 const HISTORY = GLib.build_filenamev([GLib.get_user_data_dir(), 'dynamic-island', 'chat.json']);
+// Harvis reads voice answers aloud unless this file exists (harvis speak off).
+const SPEAK_OFF = GLib.build_filenamev([GLib.get_user_data_dir(), 'harvis', 'speak-off']);
 
 function expandPath(path) {
     if (!path)
@@ -88,6 +90,12 @@ export class ChatView {
             y_align: Clutter.ActorAlign.CENTER,
         });
         header.add_child(this._status);
+        if (this._harvis) {
+            this._speaker = this._roundButton('dynada-chat-speaker', 'audio-volume-high-symbolic',
+                _('Read voice answers aloud'), () => this._toggleSpeaking());
+            header.add_child(this._speaker);
+            this._syncSpeaker();
+        }
         const fresh = new St.Button({
             style_class: 'dynada-pill-button',
             can_focus: true,
@@ -171,6 +179,28 @@ export class ChatView {
             mode: button.pressed ? Clutter.AnimationMode.EASE_OUT_QUAD : Clutter.AnimationMode.EASE_OUT_BACK,
         }));
         return button;
+    }
+
+    _syncSpeaker() {
+        const on = !GLib.file_test(SPEAK_OFF, GLib.FileTest.EXISTS);
+        this._speaker.child.icon_name = on ? 'audio-volume-high-symbolic' : 'audio-volume-muted-symbolic';
+        (on ? this._speaker.add_style_pseudo_class : this._speaker.remove_style_pseudo_class)
+            .call(this._speaker, 'checked');
+    }
+
+    _toggleSpeaking() {
+        this._run(['speak', 'toggle'], () => this._syncSpeaker());
+    }
+
+    // harvis <args>, then done() when it exits.
+    _run(args, done) {
+        try {
+            const proc = Gio.Subprocess.new([this._harvis, ...args],
+                Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
+            proc.wait_async(null).then(() => done?.()).catch(() => {});
+        } catch (e) {
+            console.error('Dynamic Island: could not run harvis', e);
+        }
     }
 
     // A spoken exchange from the wake word service.
@@ -302,6 +332,18 @@ export class ChatView {
         text.ellipsize = Pango.EllipsizeMode.NONE;
         text.selectable = true;
         box.add_child(label);
+        // Harvis's answers can be read aloud.
+        if (message.role === 'assistant' && this._harvis) {
+            const play = new St.Button({
+                style_class: 'dynada-chat-play',
+                can_focus: true,
+                accessible_name: _('Read aloud'),
+                x_align: Clutter.ActorAlign.START,
+                child: new St.Icon({icon_name: 'media-playback-start-symbolic', icon_size: 11}),
+            });
+            play.connect('clicked', () => this._run(['say', message.text]));
+            box.add_child(play);
+        }
     }
 
     _scrollToEnd() {

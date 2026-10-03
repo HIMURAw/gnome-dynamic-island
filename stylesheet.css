@@ -1068,3 +1068,20 @@
   background-color: rgba(255, 255, 255, 0.25);
   transition-duration: 120ms;
 }
+
+.dynada-chat-speaker:checked {
+  color: #30d158;
+}
+
+.dynada-chat-play {
+  margin-top: 4px;
+  padding: 3px 7px;
+  border-radius: 99px;
+  color: rgba(245, 245, 247, 0.55);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dynada-chat-play:hover {
+  color: #f5f5f7;
+  background-color: rgba(255, 255, 255, 0.14);
+}
