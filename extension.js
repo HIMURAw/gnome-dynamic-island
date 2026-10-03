@@ -18,6 +18,7 @@ import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 
 import {AppsCard} from './apps.js';
+import {ChargeIndicator} from './charge.js';
 import {Glass, RoundedMask, setBlurEnabled} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
@@ -137,6 +138,7 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('volume', () => this._setupVolume());
         this._safely('media', () => this._setupMedia());
         this._glassMenus = new GlassMenus();
+        this._safely('charge limit', () => (this._charge = new ChargeIndicator(this._settings)));
         this._safely('quick settings', () => this._adoptQuickSettings());
         this._safely('panel icons', () => this._adoptPanel());
         this._safely('calendar menu', () => this._takeOverDateMenu());
@@ -160,6 +162,8 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('releasing calendar menu', () => this._releaseDateMenu());
         this._safely('releasing notifications', () => this._releaseNotifications());
         this._safely('releasing quick settings', () => this._releaseQuickSettings());
+        this._safely('releasing charge limit', () => this._charge?.destroy());
+        this._charge = null;
 
         this._pointerWatch?.remove();
         this._pointerWatch = null;

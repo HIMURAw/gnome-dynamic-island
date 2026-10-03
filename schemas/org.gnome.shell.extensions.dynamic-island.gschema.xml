@@ -61,5 +61,10 @@
       <default>true</default>
       <summary>Other extensions' icons</summary>
     </key>
+    <key name="charge-limit" type="i">
+      <range min="20" max="99"/>
+      <default>80</default>
+      <summary>Battery charge limit the Charge Limit toggle turns on</summary>
+    </key>
   </schema>
 </schemalist>

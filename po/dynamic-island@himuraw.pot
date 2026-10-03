@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-30 13:10+0300\n"
+"POT-Creation-Date: 2026-10-03 15:21+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,98 +17,98 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:294
+#: extension.js:314
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:337
+#: extension.js:357
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:365
+#: extension.js:385
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:371
+#: extension.js:391
 msgid "Volume"
 msgstr ""
 
-#: extension.js:441
+#: extension.js:461
 msgid "Back"
 msgstr ""
 
-#: extension.js:511
+#: extension.js:531
 msgid "Previous"
 msgstr ""
 
-#: extension.js:512
+#: extension.js:532
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:513
+#: extension.js:533
 msgid "Next"
 msgstr ""
 
-#: extension.js:527
+#: extension.js:547
 msgid "Open notification"
 msgstr ""
 
-#: extension.js:604 center.js:176
+#: extension.js:614 center.js:183
 msgid "Notifications"
 msgstr ""
 
-#: extension.js:636 prefs.js:96
+#: extension.js:646 prefs.js:96
 msgid "Now playing"
 msgstr ""
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1328
+#: extension.js:1338
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1346
+#: extension.js:1356
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1349
+#: extension.js:1359
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1350
+#: extension.js:1360
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1353
+#: extension.js:1363
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1355
+#: extension.js:1365
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1356
+#: extension.js:1366
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1364 center.js:284
+#: extension.js:1374 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1365
+#: extension.js:1375
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1365
+#: extension.js:1375
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1500
+#: extension.js:1510
 msgid "Nothing is playing"
 msgstr ""
 
@@ -275,19 +275,55 @@ msgstr ""
 msgid "No notifications"
 msgstr ""
 
-#: center.js:176
+#: center.js:183
 #, javascript-format
 msgid "Notifications · %d"
 msgstr ""
 
-#: center.js:263
+#: center.js:270
 msgid "Dismiss"
 msgstr ""
 
-#: center.js:282
+#: center.js:289
 msgid "now"
 msgstr ""
 
 #: apps.js:36
 msgid "No open apps"
+msgstr ""
+
+#: charge.js:46 charge.js:53
+msgid "Charge Limit"
+msgstr ""
+
+#: charge.js:48
+msgid "Open charge limit menu"
+msgstr ""
+
+#: charge.js:54
+msgid "Charging stops early to keep the battery healthy"
+msgstr ""
+
+#: charge.js:58
+msgid "Stop at {n}%"
+msgstr ""
+
+#: charge.js:63
+msgid "Charge to 100% once"
+msgstr ""
+
+#: charge.js:97
+msgid "{n}%"
+msgstr ""
+
+#: charge.js:97
+msgid "Off"
+msgstr ""
+
+#: charge.js:108
+msgid "Health {n}%"
+msgstr ""
+
+#: charge.js:110
+msgid "{n} cycles"
 msgstr ""
