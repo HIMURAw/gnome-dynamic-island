@@ -78,5 +78,9 @@
       <default>''</default>
       <summary>Where quick notes are saved: a path, or a folder inside the notes folder (empty: the notes folder)</summary>
     </key>
+    <key name="show-privacy-bubble" type="b">
+      <default>true</default>
+      <summary>Show the microphone and camera bubble while they are in use</summary>
+    </key>
   </schema>
 </schemalist>

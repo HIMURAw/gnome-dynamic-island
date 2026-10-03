@@ -57,6 +57,9 @@ the middle of the screen, with a control center, notifications and what is playi
   dynada ci                                   # follows the GitHub Actions run of HEAD (gh)
   dynada update deploy "Deploy" "Uploading" "" 0.4 ; dynada end deploy "Live" ok
   ```
+- **Microphone and camera:** a bubble next to now playing shows while something records or a
+  camera is on: an orange microphone that turns green while you talk, a green camera. An
+  always-listening wake word (Harvis) shows as a dim microphone instead.
 - **Charge limit** (ASUS laptops with `asusctl`): stop charging at 60 or 80 % to keep the
   battery healthy, charge to full once before a trip, and see battery health and cycles.
   Hidden on other machines.

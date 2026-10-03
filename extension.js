@@ -26,6 +26,7 @@ import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher} from './media.js';
 import {Palette} from './palette.js';
+import {PrivacyWatcher} from './privacy.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
@@ -158,6 +159,12 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('auto-hide', () => this._setupAutoHide());
         this._safely('desktop icons', () => this._setupDesktopIcons());
         this._safely('palette shortcut', () => this._setupPaletteShortcut());
+        if (this._settings.get_boolean('show-privacy-bubble'))
+            this._safely('privacy bubble', () => {
+                this._privacyWatcher = new PrivacyWatcher(() => this._syncPrivacy());
+                // Its first state arrived while it was still being made.
+                this._syncPrivacy();
+            });
         this._syncModules();
         this._syncActivities();
     }
@@ -172,6 +179,8 @@ export default class DynamicIslandExtension extends Extension {
         this._centerIdle = this._answerTimeout = 0;
 
         this._safely('releasing palette', () => this._releasePalette());
+        this._safely('releasing privacy bubble', () => this._privacyWatcher?.destroy());
+        this._privacyWatcher = null;
         this._safely('releasing desktop icons', () => this._releaseDesktopIcons());
         this._safely('releasing auto-hide', () => this._releaseAutoHide());
         this._safely('releasing calendar menu', () => this._releaseDateMenu());
@@ -206,7 +215,7 @@ export default class DynamicIslandExtension extends Extension {
             Main.layoutManager.removeChrome(this._strip);
             this._strip.destroy();
         }
-        this._strip = this._island = this._left = this._right = null;
+        this._strip = this._island = this._left = this._right = this._privacy = null;
 
         this._power = null;
         this._clock = null;
@@ -278,14 +287,18 @@ export default class DynamicIslandExtension extends Extension {
         this._left = this._buildCenterBubble();
         this._right = this._buildMediaBubble();
 
+        this._privacy = this._buildPrivacyBubble();
+
         this._left.visible = this._settings.get_boolean('show-notification-bubble');
         this._right.visible = this._settings.get_boolean('show-media-bubble');
         this._strip.add_child(this._left);
         this._strip.add_child(this._island);
         this._strip.add_child(this._right);
+        this._strip.add_child(this._privacy);
         this._layout.left = this._left;
         this._layout.center = this._island;
         this._layout.right = this._right;
+        this._layout.extraRight = [this._privacy];
 
         this._connect(this._compact, 'clicked', () => this._open('controls'));
         this._connect(this._controlsHeader, 'clicked', () => this._close());
@@ -299,7 +312,7 @@ export default class DynamicIslandExtension extends Extension {
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         });
-        for (const actor of [this._island, this._left, this._right]) {
+        for (const actor of [this._island, this._left, this._right, this._privacy]) {
             this._connect(actor, 'notify::hover', () => {
                 if (this._mode && !this._anyHover())
                     this._scheduleCollapse();
@@ -307,7 +320,7 @@ export default class DynamicIslandExtension extends Extension {
         }
         // The blur behind the glass follows layout; moving the whole layer needs a nudge.
         this._connect(this._strip, 'notify::translation-y', () => {
-            for (const glass of [this._island, this._left, this._right])
+            for (const glass of [this._island, this._left, this._right, this._privacy])
                 glass.syncBackdrop();
         });
     }
@@ -696,6 +709,57 @@ export default class DynamicIslandExtension extends Extension {
         return bubble;
     }
 
+    // Right of the media bubble: a microphone that shows while something records
+    // (orange, green while you talk, dim for an always-listening wake word) and a
+    // camera that shows while one is on. Like the dots on an iPhone.
+    _buildPrivacyBubble() {
+        const bubble = new Glass({
+            style_class: 'dynada-bubble dynada-privacy',
+            radius: PILL_HEIGHT / 2,
+            reactive: true,
+            track_hover: true,
+            height: PILL_HEIGHT,
+            visible: false,
+        });
+        // Padding on the box, not on the glass: the glass lays its children out
+        // inside its padding, which would leave the blur short of the edges.
+        const box = new St.BoxLayout({
+            style_class: 'dynada-privacy-box',
+            x_expand: true,
+            y_expand: true,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._micIcon = new St.Icon({
+            icon_name: 'audio-input-microphone-symbolic',
+            style_class: 'dynada-privacy-icon',
+            visible: false,
+        });
+        // Shipped like the bell: some icon themes have no webcam icon.
+        this._cameraIcon = new St.Icon({
+            gicon: new Gio.FileIcon({file: this.dir.get_child('icons').get_child('dynada-camera-symbolic.svg')}),
+            style_class: 'dynada-privacy-icon dynada-camera-on',
+            visible: false,
+        });
+        box.add_child(this._micIcon);
+        box.add_child(this._cameraIcon);
+        bubble.add_child(box);
+        return bubble;
+    }
+
+    _syncPrivacy() {
+        const watcher = this._privacyWatcher;
+        if (!watcher || !this._privacy || this._stripGone)
+            return;
+        const icon = this._micIcon;
+        icon.visible = watcher.mic !== 'off';
+        for (const state of ['standby', 'on'])
+            (watcher.mic === state ? icon.add_style_class_name : icon.remove_style_class_name).call(icon, `dynada-mic-${state}`);
+        (watcher.speaking ? icon.add_style_pseudo_class : icon.remove_style_pseudo_class).call(icon, 'speaking');
+        this._cameraIcon.visible = watcher.camera;
+        this._privacy.visible = icon.visible || watcher.camera;
+    }
+
     // ---------- Open / close ----------
 
     _viewFor(mode) {
@@ -872,7 +936,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _anyHover() {
-        return [this._island, this._left, this._right].some(a => a.hover);
+        return [this._island, this._left, this._right, this._privacy].some(a => a?.hover);
     }
 
     _anyMenuOpen() {

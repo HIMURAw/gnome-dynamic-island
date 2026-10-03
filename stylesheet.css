@@ -912,3 +912,34 @@
 .dynada-answer-actions {
   spacing: 8px;
 }
+
+/* Privacy bubble: microphone and camera in use */
+.dynada-privacy {
+  min-width: 38px;
+}
+
+.dynada-privacy-box {
+  spacing: 8px;
+  padding: 0 11px;
+}
+
+.dynada-privacy-icon {
+  icon-size: 16px;
+  transition-duration: 180ms;
+}
+
+.dynada-privacy-icon.dynada-mic-on {
+  color: #ff9f0a;
+}
+
+.dynada-privacy-icon.dynada-mic-on:speaking {
+  color: #30d158;
+}
+
+.dynada-privacy-icon.dynada-mic-standby {
+  color: rgba(245, 245, 247, 0.35);
+}
+
+.dynada-privacy-icon.dynada-camera-on {
+  color: #30d158;
+}

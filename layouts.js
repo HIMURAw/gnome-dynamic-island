@@ -13,6 +13,8 @@ class TopCenterLayout extends Clutter.LayoutManager {
         this.center = null;
         this.left = null;
         this.right = null;
+        // Further bubbles after `right`, in order; hidden ones take no room.
+        this.extraRight = [];
     }
 
     vfunc_get_preferred_width(_container, _forHeight) {
@@ -36,12 +38,19 @@ class TopCenterLayout extends Clutter.LayoutManager {
         const y = box.y1 + this._margin;
         this.center.allocate(new Clutter.ActorBox({x1: cx, y1: y, x2: cx + cw, y2: y + ch}));
 
-        for (const side of [this.left, this.right]) {
+        if (this.left) {
+            const [w, h] = size(this.left);
+            const x = cx - this._gap - w;
+            this.left.allocate(new Clutter.ActorBox({x1: x, y1: y, x2: x + w, y2: y + h}));
+        }
+        let x = cx + cw + this._gap;
+        for (const side of [this.right, ...this.extraRight]) {
             if (!side)
                 continue;
             const [w, h] = size(side);
-            const x = side === this.left ? cx - this._gap - w : cx + cw + this._gap;
             side.allocate(new Clutter.ActorBox({x1: x, y1: y, x2: x + w, y2: y + h}));
+            if (side.visible)
+                x += w + this._gap;
         }
     }
 });

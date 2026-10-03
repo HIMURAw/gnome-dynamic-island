@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-03 15:58+0300\n"
+"POT-Creation-Date: 2026-10-03 21:38+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,98 +13,98 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:333
+#: extension.js:347
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:387
+#: extension.js:401
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:418
+#: extension.js:432
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:424
+#: extension.js:438
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:494
+#: extension.js:508
 msgid "Back"
 msgstr "Geri"
 
-#: extension.js:564
+#: extension.js:578
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:565
+#: extension.js:579
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:566
+#: extension.js:580
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:580
+#: extension.js:594
 msgid "Open notification"
 msgstr "Bildirimi aç"
 
-#: extension.js:647 center.js:183
+#: extension.js:661 center.js:183
 msgid "Notifications"
 msgstr "Bildirimler"
 
-#: extension.js:679 prefs.js:96
+#: extension.js:693 prefs.js:96
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1464
+#: extension.js:1543
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:1482
+#: extension.js:1561
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:1485
+#: extension.js:1564
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:1486
+#: extension.js:1565
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:1489
+#: extension.js:1568
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:1491
+#: extension.js:1570
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:1492
+#: extension.js:1571
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:1500 center.js:291
+#: extension.js:1579 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:1501
+#: extension.js:1580
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:1501
+#: extension.js:1580
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1636
+#: extension.js:1715
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
 
@@ -216,43 +216,51 @@ msgid "The bubble on the right"
 msgstr "Sağdaki baloncuk"
 
 #: prefs.js:98
+msgid "Microphone and camera"
+msgstr "Mikrofon ve kamera"
+
+#: prefs.js:99
+msgid "Shows while they are in use; the microphone turns green while you talk"
+msgstr "Kullanılırken görünür; konuşurken mikrofon yeşile döner"
+
+#: prefs.js:100
 msgid "Connectivity"
 msgstr "Bağlantı"
 
-#: prefs.js:99
+#: prefs.js:101
 msgid "Wi-Fi, Bluetooth, tethering, VPN"
 msgstr "Wi-Fi, Bluetooth, internet paylaşımı, VPN"
 
-#: prefs.js:100 apps.js:26 apps.js:92 apps.js:109
+#: prefs.js:102 apps.js:26 apps.js:92 apps.js:109
 msgid "Open apps"
 msgstr "Açık uygulamalar"
 
-#: prefs.js:101
+#: prefs.js:103
 msgid "Sliders"
 msgstr "Kaydırıcılar"
 
-#: prefs.js:102
+#: prefs.js:104
 msgid "Volume, microphone, brightness"
 msgstr "Ses, mikrofon, parlaklık"
 
-#: prefs.js:103
+#: prefs.js:105
 msgid "Toggles"
 msgstr "Düğmeler"
 
-#: prefs.js:104
+#: prefs.js:106
 msgid ""
 "Power mode, dark style, Do Not Disturb and toggles from other extensions"
 msgstr "Güç modu, karanlık stil, Rahatsız Etme ve diğer eklentilerin düğmeleri"
 
-#: prefs.js:105
+#: prefs.js:107
 msgid "Other extensions' icons"
 msgstr "Diğer eklentilerin simgeleri"
 
-#: prefs.js:108
+#: prefs.js:110
 msgid "Command palette"
 msgstr "Komut paleti"
 
-#: prefs.js:109
+#: prefs.js:111
 msgid ""
 "Super+Space: apps, calculator, timers, notes, Claude. Type ? to ask Claude, "
 "n to take a note."
@@ -260,27 +268,27 @@ msgstr ""
 "Super+Space: uygulamalar, hesap makinesi, zamanlayıcı, notlar, Claude. "
 "Claude'a sormak için ?, not almak için n yaz."
 
-#: prefs.js:112
+#: prefs.js:114
 msgid "Notes folder (searched, empty for none)"
 msgstr "Not klasörü (aranır, boşsa arama yok)"
 
-#: prefs.js:115
+#: prefs.js:117
 msgid "Quick notes go to (a path, or a folder inside the notes folder)"
 msgstr "Hızlı notların yeri (bir yol ya da not klasörü içinde bir klasör)"
 
-#: prefs.js:131
+#: prefs.js:133
 msgid "Compatibility"
 msgstr "Uyumluluk"
 
-#: prefs.js:132
+#: prefs.js:134
 msgid "These extensions also change the top bar"
 msgstr "Bu eklentiler de üst çubuğu değiştiriyor"
 
-#: prefs.js:146
+#: prefs.js:148
 msgid "About"
 msgstr "Hakkında"
 
-#: prefs.js:150
+#: prefs.js:152
 msgid "Report a problem or suggest an idea"
 msgstr "Sorun bildir ya da fikir öner"
 
@@ -301,7 +309,7 @@ msgstr "Bildirim yok"
 msgid "Notifications · %d"
 msgstr "Bildirimler · %d"
 
-#: center.js:270 activities.js:232
+#: center.js:270 activities.js:251
 msgid "Dismiss"
 msgstr "Kapat"
 
@@ -441,27 +449,27 @@ msgstr "Kopyala"
 msgid "Save as a note"
 msgstr "Not olarak kaydet"
 
-#: palette.js:510
+#: palette.js:522
 msgid "Thinking…"
 msgstr "Düşünüyor…"
 
-#: palette.js:533
+#: palette.js:545
 msgid "No answer came back."
 msgstr "Cevap gelmedi."
 
-#: palette.js:535
+#: palette.js:547
 msgid "Claude could not answer."
 msgstr "Claude cevap veremedi."
 
-#: palette.js:539
+#: palette.js:551
 #, javascript-format
 msgid "Claude could not be started: %s"
 msgstr "Claude başlatılamadı: %s"
 
-#: activities.js:114
+#: activities.js:133
 msgid "Timer"
 msgstr "Zamanlayıcı"
 
-#: activities.js:160
+#: activities.js:179
 msgid "Time is up"
 msgstr "Süre doldu"
