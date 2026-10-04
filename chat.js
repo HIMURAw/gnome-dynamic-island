@@ -58,7 +58,7 @@ class TypingDots {
 // `harvis ask --stream`, which shares one Claude conversation with the wake word,
 // so spoken and typed turns follow on from each other. Without Harvis, `claude -p`.
 export class ChatView {
-    constructor({settings, width, onClose}) {
+    constructor({settings, width, onClose, onMind}) {
         this._settings = settings;
         this._onClose = onClose;
         this._messages = this._load();
@@ -77,11 +77,16 @@ export class ChatView {
         });
 
         const header = new St.BoxLayout({style_class: 'dynada-chat-header', x_expand: true});
-        header.add_child(new St.Label({
-            style_class: 'dynada-center-month',
-            text: _('Harvis'),
+        // The name goes back to Harvis's brain view.
+        const title = new St.Button({
+            style_class: 'dynada-chat-title',
+            can_focus: true,
+            accessible_name: _('Back to Harvis'),
             y_align: Clutter.ActorAlign.CENTER,
-        }));
+            child: new St.Label({style_class: 'dynada-center-month', text: _('Harvis')}),
+        });
+        title.connect('clicked', () => onMind?.());
+        header.add_child(title);
         this.wave = new Waveform({height: 18, styleClass: 'dynada-wave dynada-chat-wave'});
         header.add_child(this.wave.actor);
         this._status = new St.Label({

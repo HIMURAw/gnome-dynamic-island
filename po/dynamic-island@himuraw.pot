@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-03 22:44+0300\n"
+"POT-Creation-Date: 2026-10-04 16:47+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,102 +17,102 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:363
+#: extension.js:374
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:420
+#: extension.js:438
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:451
+#: extension.js:469
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:457
+#: extension.js:475
 msgid "Volume"
 msgstr ""
 
-#: extension.js:527
+#: extension.js:545
 msgid "Back"
 msgstr ""
 
-#: extension.js:597
+#: extension.js:615
 msgid "Previous"
 msgstr ""
 
-#: extension.js:598
+#: extension.js:616
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:599
+#: extension.js:617
 msgid "Next"
 msgstr ""
 
-#: extension.js:613
+#: extension.js:631
 msgid "Open notification"
 msgstr ""
 
-#: extension.js:680 center.js:183
+#: extension.js:698 center.js:183
 msgid "Notifications"
 msgstr ""
 
-#: extension.js:712 prefs.js:96
+#: extension.js:730 prefs.js:96
 msgid "Now playing"
 msgstr ""
 
-#: extension.js:1052
+#: extension.js:1089
 msgid "Chat with Harvis"
 msgstr ""
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1709
+#: extension.js:1814
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1727
+#: extension.js:1832
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1730
+#: extension.js:1835
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1731
+#: extension.js:1836
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1734
+#: extension.js:1839
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1736
+#: extension.js:1841
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1737
+#: extension.js:1842
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1745 center.js:291
+#: extension.js:1850 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1746
+#: extension.js:1851
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1746
+#: extension.js:1851
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1881
+#: extension.js:1986
 msgid "Nothing is playing"
 msgstr ""
 
@@ -218,7 +218,7 @@ msgstr ""
 msgid "The bubble on the right"
 msgstr ""
 
-#: prefs.js:98
+#: prefs.js:98 mind.js:337
 msgid "Chat"
 msgstr ""
 
@@ -318,7 +318,7 @@ msgstr ""
 msgid "Notifications · %d"
 msgstr ""
 
-#: center.js:270 activities.js:283
+#: center.js:270 activities.js:289
 msgid "Dismiss"
 msgstr ""
 
@@ -462,7 +462,7 @@ msgstr ""
 msgid "Thinking…"
 msgstr ""
 
-#: palette.js:545 chat.js:460
+#: palette.js:545 chat.js:482
 msgid "No answer came back."
 msgstr ""
 
@@ -475,55 +475,97 @@ msgstr ""
 msgid "Claude could not be started: %s"
 msgstr ""
 
-#: activities.js:165
+#: activities.js:171
 msgid "Timer"
 msgstr ""
 
-#: activities.js:211
+#: activities.js:217
 msgid "Time is up"
 msgstr ""
 
-#: chat.js:82
+#: chat.js:84
+msgid "Back to Harvis"
+msgstr ""
+
+#: chat.js:86
 msgid "Harvis"
 msgstr ""
 
-#: chat.js:95
+#: chat.js:100
 msgid "Read voice answers aloud"
 msgstr ""
 
-#: chat.js:102
+#: chat.js:107
 msgid "New chat"
 msgstr ""
 
-#: chat.js:123
+#: chat.js:128
 msgid ""
 "Write, or press the microphone and talk. “Hey Harvis” works from anywhere."
 msgstr ""
 
-#: chat.js:132
+#: chat.js:137
 msgid "Message Harvis"
 msgstr ""
 
-#: chat.js:143
+#: chat.js:148 mind.js:338
 msgid "Talk"
 msgstr ""
 
-#: chat.js:145
+#: chat.js:150
 msgid "Send"
 msgstr ""
 
-#: chat.js:340
+#: chat.js:345
 msgid "Read aloud"
 msgstr ""
 
-#: chat.js:374
+#: chat.js:391
 msgid "The Harvis service is not running (systemctl --user start harvis)."
 msgstr ""
 
-#: chat.js:400
+#: chat.js:417
 msgid "Neither Harvis nor the claude command is installed."
 msgstr ""
 
-#: chat.js:444 chat.js:454
+#: chat.js:466 chat.js:476
 msgid "Could not get an answer"
+msgstr ""
+
+#: mind.js:396
+#, javascript-format
+msgid "Last: “%s”"
+msgstr ""
+
+#: mind.js:396
+msgid "No conversation yet."
+msgstr ""
+
+#: mind.js:404
+#, javascript-format
+msgid "Last answer: %s"
+msgstr ""
+
+#: mind.js:406
+msgid "Local model"
+msgstr ""
+
+#: mind.js:406
+msgid "Claude"
+msgstr ""
+
+#: mind.js:425
+msgid "Ready. Say “Hey Harvis” or snap twice."
+msgstr ""
+
+#: mind.js:426
+msgid "Listening"
+msgstr ""
+
+#: mind.js:427
+msgid "Thinking"
+msgstr ""
+
+#: mind.js:428
+msgid "Speaking"
 msgstr ""

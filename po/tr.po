@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-03 22:44+0300\n"
+"POT-Creation-Date: 2026-10-04 16:47+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,102 +13,102 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:363
+#: extension.js:374
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:420
+#: extension.js:438
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:451
+#: extension.js:469
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:457
+#: extension.js:475
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:527
+#: extension.js:545
 msgid "Back"
 msgstr "Geri"
 
-#: extension.js:597
+#: extension.js:615
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:598
+#: extension.js:616
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:599
+#: extension.js:617
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:613
+#: extension.js:631
 msgid "Open notification"
 msgstr "Bildirimi aç"
 
-#: extension.js:680 center.js:183
+#: extension.js:698 center.js:183
 msgid "Notifications"
 msgstr "Bildirimler"
 
-#: extension.js:712 prefs.js:96
+#: extension.js:730 prefs.js:96
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
-#: extension.js:1052
+#: extension.js:1089
 msgid "Chat with Harvis"
 msgstr "Harvis ile sohbet"
 
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1709
+#: extension.js:1814
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:1727
+#: extension.js:1832
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:1730
+#: extension.js:1835
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:1731
+#: extension.js:1836
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:1734
+#: extension.js:1839
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:1736
+#: extension.js:1841
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:1737
+#: extension.js:1842
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:1745 center.js:291
+#: extension.js:1850 center.js:291
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:1746
+#: extension.js:1851
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:1746
+#: extension.js:1851
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1881
+#: extension.js:1986
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
 
@@ -219,7 +219,7 @@ msgstr "Soldaki zil"
 msgid "The bubble on the right"
 msgstr "Sağdaki baloncuk"
 
-#: prefs.js:98
+#: prefs.js:98 mind.js:337
 msgid "Chat"
 msgstr "Sohbet"
 
@@ -321,7 +321,7 @@ msgstr "Bildirim yok"
 msgid "Notifications · %d"
 msgstr "Bildirimler · %d"
 
-#: center.js:270 activities.js:283
+#: center.js:270 activities.js:289
 msgid "Dismiss"
 msgstr "Kapat"
 
@@ -465,7 +465,7 @@ msgstr "Not olarak kaydet"
 msgid "Thinking…"
 msgstr "Düşünüyor…"
 
-#: palette.js:545 chat.js:460
+#: palette.js:545 chat.js:482
 msgid "No answer came back."
 msgstr "Cevap gelmedi."
 
@@ -478,58 +478,100 @@ msgstr "Claude cevap veremedi."
 msgid "Claude could not be started: %s"
 msgstr "Claude başlatılamadı: %s"
 
-#: activities.js:165
+#: activities.js:171
 msgid "Timer"
 msgstr "Zamanlayıcı"
 
-#: activities.js:211
+#: activities.js:217
 msgid "Time is up"
 msgstr "Süre doldu"
 
-#: chat.js:82
+#: chat.js:84
+msgid "Back to Harvis"
+msgstr "Harvis'e dön"
+
+#: chat.js:86
 msgid "Harvis"
 msgstr "Harvis"
 
-#: chat.js:95
+#: chat.js:100
 msgid "Read voice answers aloud"
 msgstr "Sesli cevapları oku"
 
-#: chat.js:102
+#: chat.js:107
 msgid "New chat"
 msgstr "Yeni sohbet"
 
-#: chat.js:123
+#: chat.js:128
 msgid ""
 "Write, or press the microphone and talk. “Hey Harvis” works from anywhere."
 msgstr ""
 
-#: chat.js:132
+#: chat.js:137
 msgid "Message Harvis"
 msgstr "Harvis'e yaz"
 
-#: chat.js:143
+#: chat.js:148 mind.js:338
 msgid "Talk"
 msgstr "Konuş"
 
-#: chat.js:145
+#: chat.js:150
 msgid "Send"
 msgstr "Gönder"
 
-#: chat.js:340
+#: chat.js:345
 msgid "Read aloud"
 msgstr "Sesli oku"
 
-#: chat.js:374
+#: chat.js:391
 msgid "The Harvis service is not running (systemctl --user start harvis)."
 msgstr "Harvis servisi çalışmıyor (systemctl --user start harvis)."
 
-#: chat.js:400
+#: chat.js:417
 msgid "Neither Harvis nor the claude command is installed."
 msgstr "Ne Harvis ne de claude komutu kurulu."
 
-#: chat.js:444 chat.js:454
+#: chat.js:466 chat.js:476
 msgid "Could not get an answer"
 msgstr "Cevap alınamadı"
+
+#: mind.js:396
+#, javascript-format
+msgid "Last: “%s”"
+msgstr "Son: “%s”"
+
+#: mind.js:396
+msgid "No conversation yet."
+msgstr "Henüz konuşma yok."
+
+#: mind.js:404
+#, javascript-format
+msgid "Last answer: %s"
+msgstr "Son cevap: %s"
+
+#: mind.js:406
+msgid "Local model"
+msgstr "Yerel model"
+
+#: mind.js:406
+msgid "Claude"
+msgstr "Claude"
+
+#: mind.js:425
+msgid "Ready. Say “Hey Harvis” or snap twice."
+msgstr "Hazır. “Hey Harvis” de ya da iki kez şıklat."
+
+#: mind.js:426
+msgid "Listening"
+msgstr "Dinliyorum"
+
+#: mind.js:427
+msgid "Thinking"
+msgstr "Düşünüyor"
+
+#: mind.js:428
+msgid "Speaking"
+msgstr "Konuşuyor"
 
 #~ msgid "Listening…"
 #~ msgstr "Dinliyor…"
