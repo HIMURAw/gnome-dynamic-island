@@ -1085,3 +1085,94 @@
   color: #f5f5f7;
   background-color: rgba(255, 255, 255, 0.14);
 }
+
+/* Harvis: thinking (amber) and speaking (cyan) in the collapsed island */
+.dynada-island.dynada-thinking {
+  border-color: rgba(245, 181, 81, 0.4);
+}
+
+.dynada-island.dynada-speaking {
+  border-color: rgba(143, 227, 255, 0.45);
+}
+
+/* Harvis's brain: the Brain vault's own graph, with the state under it */
+.dynada-mind {
+  spacing: 6px;
+  padding-top: 16px;
+}
+
+.dynada-mind-stage {
+  margin-bottom: 8px;
+}
+
+.dynada-mind-node {
+  font-size: 9pt;
+  color: #f5f5f7;
+  background-color: rgba(28, 28, 30, 0.92);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+
+.dynada-mind-status {
+  font-size: 15pt;
+  font-weight: bold;
+  padding-left: 4px;
+  color: rgba(245, 245, 247, 0.92);
+}
+
+.dynada-mind-status.dynada-mind-listening { color: #30d158; }
+.dynada-mind-status.dynada-mind-thinking { color: #f5b551; }
+.dynada-mind-status.dynada-mind-speaking { color: #8fe3ff; }
+
+.dynada-mind-last {
+  font-size: 9.5pt;
+  color: rgba(245, 245, 247, 0.55);
+  padding-left: 4px;
+}
+
+.dynada-mind-actions {
+  spacing: 8px;
+  padding-top: 12px;
+}
+
+.dynada-mind-button {
+  border-radius: 99px;
+  padding: 7px 14px;
+  color: rgba(245, 245, 247, 0.85);
+  background-color: rgba(255, 255, 255, 0.07);
+  font-size: 9.5pt;
+}
+
+.dynada-mind-button:hover,
+.dynada-mind-button:focus {
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+.dynada-mind-button.primary {
+  color: #1c1c1e;
+  background-color: #f5f5f7;
+}
+
+.dynada-mind-button.primary:hover,
+.dynada-mind-button.primary:focus {
+  background-color: #ffffff;
+}
+
+.dynada-mind-button-box {
+  spacing: 7px;
+}
+
+.dynada-mind-model {
+  font-size: 9pt;
+  color: rgba(245, 245, 247, 0.45);
+  padding-right: 4px;
+}
+
+.dynada-chat-title {
+  border-radius: 8px;
+}
+
+.dynada-chat-title:hover,
+.dynada-chat-title:focus {
+  background-color: rgba(255, 255, 255, 0.08);
+}

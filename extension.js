@@ -29,6 +29,7 @@ import {ChatView} from './chat.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
 import {Waveform} from './wave.js';
+import {MindView, ThinkingGlyph, VoiceEnvelope, VoiceGlyph} from './mind.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
@@ -287,8 +288,19 @@ export default class DynamicIslandExtension extends Extension {
             width: this._contentWidth,
             onClose: () => this._close(),
         });
-        this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close()});
-        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor, this._chat.actor])
+        this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close(),
+            onMind: () => this._openMind()});
+        this._voiceEnvelope ??= new VoiceEnvelope();
+        this._mind = new MindView({
+            width: this._contentWidth,
+            dir: this.dir,
+            state: () => this._harvisState(),
+            micLevel: () => this._privacyWatcher?.level ?? 0,
+            envelope: this._voiceEnvelope,
+            onChat: () => this._toggleChat(),
+            onListen: () => this._chat._listen(),
+        });
+        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor, this._chat.actor, this._mind.actor])
             this._island.add_child(view);
 
         this._left = this._buildCenterBubble();
@@ -388,6 +400,13 @@ export default class DynamicIslandExtension extends Extension {
         // While the assistant listens, bars that move with your voice.
         this._compactWave = new Waveform({height: 14, styleClass: 'dynada-wave dynada-compact-wave'});
         box.add_child(this._compactWave.actor);
+        // Thinking and speaking each have their own motion (mind.js).
+        this._compactThinking = new ThinkingGlyph();
+        this._compactThinking.actor.visible = false;
+        this._compactSpeaking = new VoiceGlyph(this._voiceEnvelope ??= new VoiceEnvelope());
+        this._compactSpeaking.actor.visible = false;
+        box.add_child(this._compactThinking.actor);
+        box.add_child(this._compactSpeaking.actor);
         box.add_child(this._compactActivity);
         box.add_child(this._compactTime);
         box.add_child(this._compactDate);
@@ -790,6 +809,8 @@ export default class DynamicIslandExtension extends Extension {
             return this._palette.actor;
         case 'chat':
             return this._chat.actor;
+        case 'mind':
+            return this._mind.actor;
         default:
             return this._controls;
         }
@@ -817,7 +838,7 @@ export default class DynamicIslandExtension extends Extension {
         const outgoing = previous ? this._viewFor(previous) : this._compact;
         // A view still fading out from an earlier close would keep its height.
         for (const other of [this._controls, this._detail, this._mediaView, this._notificationView,
-            this._center.actor, this._palette.actor, this._chat.actor]) {
+            this._center.actor, this._palette.actor, this._chat.actor, this._mind.actor]) {
             if (other !== view && other !== outgoing)
                 other.hide();
         }
@@ -1071,8 +1092,36 @@ export default class DynamicIslandExtension extends Extension {
             child: content,
         });
         bubble.add_child(button);
-        this._connect(button, 'clicked', () => this._toggleChat());
+        this._connect(button, 'clicked', () => this._openMind());
         return bubble;
+    }
+
+    // The Harvis bubble opens its brain view; Chat is one button away (and the
+    // Copilot key still goes straight to the chat).
+    _openMind() {
+        if (this._mode === 'mind') {
+            this._close();
+            return;
+        }
+        if (this._chatBadge)
+            this._chatBadge.visible = false;
+        if (Main.overview.visible)
+            Main.overview.hide();
+        if (this._hidden)
+            this._setHidden(false);
+        this._open('mind');
+    }
+
+    // What Harvis is doing, from the activity its service keeps up to date.
+    _harvisState() {
+        const harvis = this._activities?.items.find(item => item.id === 'harvis');
+        if (!harvis)
+            return {mode: 'idle', text: ''};
+        const mode = {
+            'audio-input-microphone-symbolic': 'listening',
+            'audio-speakers-symbolic': 'speaking',
+        }[harvis.icon] ?? 'thinking';
+        return {mode, text: harvis.subtitle ?? ''};
     }
 
     // A spoken exchange from the voice assistant goes into the chat, which does not
@@ -1180,7 +1229,14 @@ export default class DynamicIslandExtension extends Extension {
         // The service marks listening with the microphone icon.
         const listening = harvis?.icon === 'audio-input-microphone-symbolic';
         this._setListening(listening);
-        const [first] = this._activities.items.filter(item => !(listening && item === harvis));
+        const {mode} = this._harvisState();
+        this._compactThinking.actor.visible = mode === 'thinking';
+        this._compactSpeaking.actor.visible = mode === 'speaking';
+        for (const m of ['thinking', 'speaking'])
+            (m === mode ? this._island.add_style_class_name : this._island.remove_style_class_name)
+                .call(this._island, `dynada-${m}`);
+        // Harvis shows as its motion, not as a line of text.
+        const [first] = this._activities.items.filter(item => item !== harvis);
         this._compactActivity.visible = !!first;
         if (first) {
             this._compactActivityIcon.icon_name = first.icon;
