@@ -32,6 +32,12 @@ const GLIDE_MAX = 380;
 const GLIDE_PER_PX = 0.35;
 
 const us = () => GLib.get_monotonic_time();
+// Chromium/Electron apps (Spotify, Discord, VS Code) drop a click whose press,
+// release and pointer-return all share one instant; a hand takes a few frames.
+const pause = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
+    resolve();
+    return GLib.SOURCE_REMOVE;
+}));
 
 function keyval(name) {
     const lower = name.toLowerCase();
@@ -156,10 +162,15 @@ export class Control {
             Clutter.BUTTON_PRIMARY;
         const [ux, uy] = global.get_pointer();
         this._pointer.notify_absolute_motion(us(), x, y);
+        await pause(40);  // the app sees the pointer arrive (hover) before the press
         for (let i = 0; i < Math.max(1, count); i++) {
+            if (i)
+                await pause(60);
             this._pointer.notify_button(us(), code, Clutter.ButtonState.PRESSED);
+            await pause(30);
             this._pointer.notify_button(us(), code, Clutter.ButtonState.RELEASED);
         }
+        await pause(40);  // the release is handled where it happened, then the pointer goes home
         this._pointer.notify_absolute_motion(us(), ux, uy);
     }
 
@@ -167,12 +178,17 @@ export class Control {
         await this._ghost.glide(x1, y1);
         const [ux, uy] = global.get_pointer();
         this._pointer.notify_absolute_motion(us(), x1, y1);
+        await pause(40);
         this._pointer.notify_button(us(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+        await pause(40);
         const steps = 12;
-        for (let i = 1; i <= steps; i++)
+        for (let i = 1; i <= steps; i++) {
             this._pointer.notify_absolute_motion(us(), x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps);
+            await pause(16);
+        }
         this._ghost.actor.set_position(x2, y2);
         this._pointer.notify_button(us(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+        await pause(40);
         this._pointer.notify_absolute_motion(us(), ux, uy);
     }
 
@@ -180,9 +196,13 @@ export class Control {
         await this._ghost.glide(x, y);
         const [ux, uy] = global.get_pointer();
         this._pointer.notify_absolute_motion(us(), x, y);
+        await pause(40);
         const dir = SCROLL[direction] ?? Clutter.ScrollDirection.DOWN;
-        for (let i = 0; i < Math.max(1, Math.min(amount, 30)); i++)
+        for (let i = 0; i < Math.max(1, Math.min(amount, 30)); i++) {
             this._pointer.notify_discrete_scroll(us(), dir, Clutter.ScrollSource.WHEEL);
+            await pause(15);
+        }
+        await pause(40);
         this._pointer.notify_absolute_motion(us(), ux, uy);
     }
 
