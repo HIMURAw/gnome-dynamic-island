@@ -159,11 +159,13 @@ export class Activities {
             const stream = file.replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
             // The island itself ("Harvis · Listening…") is not part of what is on screen:
             // out of the picture while it is taken, then a flash to say it was.
+            // A watcher looks every half minute: out of the picture, but no flash.
+            const quiet = base.startsWith('watch-');
             this._onScreenshot?.('before');
             try {
                 await new Shell.Screenshot().screenshot(true, stream);
             } finally {
-                this._onScreenshot?.('after');
+                this._onScreenshot?.(quiet ? 'quiet' : 'after');
             }
             stream.close(null);
             invocation.return_value(new GLib.Variant('(bs)', [true, path]));

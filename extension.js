@@ -1264,6 +1264,8 @@ export default class DynamicIslandExtension extends Extension {
             return;
         }
         this._strip.opacity = 255;
+        if (phase === 'quiet')
+            return;
         this._island.add_style_pseudo_class('shot');
         this._timeout(450, () => {
             this._island?.remove_style_pseudo_class('shot');
