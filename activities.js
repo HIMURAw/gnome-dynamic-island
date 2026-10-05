@@ -8,6 +8,8 @@ import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js'
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {BarLevel} from 'resource:///org/gnome/shell/ui/barLevel.js';
 
+import {Control} from './control.js';
+
 // Live activities: things in progress that the island keeps in view, like
 // iPhone's Live Activities. Timers are built in; anything else (a build, a
 // deploy, a CI run, a long command) reports itself over D-Bus, usually through
@@ -42,6 +44,12 @@ const IFACE = `
       <arg type="s" direction="in" name="name"/>
       <arg type="b" direction="out" name="ok"/>
       <arg type="s" direction="out" name="path"/>
+    </method>
+    <method name="Control">
+      <arg type="s" direction="in" name="action"/>
+      <arg type="s" direction="in" name="args"/>
+      <arg type="b" direction="out" name="ok"/>
+      <arg type="s" direction="out" name="info"/>
     </method>
     <method name="Timer">
       <arg type="u" direction="in" name="seconds"/>
@@ -88,6 +96,8 @@ export class Activities {
     }
 
     destroy() {
+        this._control?.destroy();
+        this._control = null;
         this._dbus?.unexport();
         this._dbus = null;
         if (this._tickId)
@@ -160,6 +170,45 @@ export class Activities {
         } catch (e) {
             console.error('Dynamic Island: screenshot failed', e);
             invocation.return_value(new GLib.Variant('(bs)', [false, '']));
+        }
+    }
+
+    // The assistant's hands (control.js): size, move, click, drag, scroll, type, key.
+    // args is JSON: {x, y, button, count, x2, y2, direction, amount, text, combo}.
+    Control(action, args) {
+        try {
+            this._control ??= new Control();
+            const a = args ? JSON.parse(args) : {};
+            const c = this._control;
+            switch (action) {
+            case 'size':
+                return [true, c.size().join('x')];
+            case 'move':
+                c.move(a.x, a.y);
+                break;
+            case 'click':
+                c.click(a.x, a.y, a.button ?? 1, a.count ?? 1);
+                break;
+            case 'drag':
+                c.drag(a.x, a.y, a.x2, a.y2);
+                break;
+            case 'scroll':
+                c.scroll(a.x, a.y, a.direction ?? 'down', a.amount ?? 3);
+                break;
+            case 'type':
+                c.type(String(a.text ?? ''));
+                break;
+            case 'key':
+                if (!c.key(String(a.combo ?? '')))
+                    return [false, `unknown key: ${a.combo}`];
+                break;
+            default:
+                return [false, `unknown action: ${action}`];
+            }
+            return [true, ''];
+        } catch (e) {
+            console.error('Dynamic Island: control failed', e);
+            return [false, String(e)];
         }
     }
 
