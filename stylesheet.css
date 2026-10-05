@@ -1176,3 +1176,13 @@
 .dynada-chat-title:focus {
   background-color: rgba(255, 255, 255, 0.08);
 }
+
+/* Harvis's own pointer (control.js): a second person at the desk */
+.dynada-ghost-label {
+  font-size: 9pt;
+  font-weight: bold;
+  color: white;
+  background-color: rgba(140, 92, 245, 0.92);
+  border-radius: 8px;
+  padding: 1px 7px;
+}

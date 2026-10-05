@@ -175,42 +175,49 @@ export class Activities {
         }
     }
 
-    // The assistant's hands (control.js): size, move, click, drag, scroll, type, key.
-    // args is JSON: {x, y, button, count, x2, y2, direction, amount, text, combo}.
-    Control(action, args) {
+    // The assistant's hands (control.js): size, windows, move, click, drag, scroll, type,
+    // key, hide. args is JSON: {x, y, button, count, x2, y2, direction, amount, text, combo}.
+    // Answers once Harvis's own pointer has arrived, so the next screenshot sees the result.
+    async ControlAsync([action, args], invocation) {
+        const reply = (ok, info = '') => invocation.return_value(new GLib.Variant('(bs)', [ok, info]));
         try {
             this._control ??= new Control();
             const a = args ? JSON.parse(args) : {};
             const c = this._control;
             switch (action) {
             case 'size':
-                return [true, c.size().join('x')];
+                return reply(true, c.size().join('x'));
+            case 'windows':
+                return reply(true, JSON.stringify(c.windows()));
+            case 'hide':
+                c.hide();
+                break;
             case 'move':
-                c.move(a.x, a.y);
+                await c.move(a.x, a.y);
                 break;
             case 'click':
-                c.click(a.x, a.y, a.button ?? 1, a.count ?? 1);
+                await c.click(a.x, a.y, a.button ?? 1, a.count ?? 1);
                 break;
             case 'drag':
-                c.drag(a.x, a.y, a.x2, a.y2);
+                await c.drag(a.x, a.y, a.x2, a.y2);
                 break;
             case 'scroll':
-                c.scroll(a.x, a.y, a.direction ?? 'down', a.amount ?? 3);
+                await c.scroll(a.x, a.y, a.direction ?? 'down', a.amount ?? 3);
                 break;
             case 'type':
                 c.type(String(a.text ?? ''));
                 break;
             case 'key':
                 if (!c.key(String(a.combo ?? '')))
-                    return [false, `unknown key: ${a.combo}`];
+                    return reply(false, `unknown key: ${a.combo}`);
                 break;
             default:
-                return [false, `unknown action: ${action}`];
+                return reply(false, `unknown action: ${action}`);
             }
-            return [true, ''];
+            return reply(true);
         } catch (e) {
             console.error('Dynamic Island: control failed', e);
-            return [false, String(e)];
+            return reply(false, String(e));
         }
     }
 
