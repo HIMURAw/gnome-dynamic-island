@@ -89,6 +89,27 @@ export class PrivacyWatcher {
             this._stopMeter();
     }
 
+    // The laptop's own microphone, not the default: the default follows Bluetooth
+    // headphones, and opening their microphone drops their music to the telephone
+    // profile. The meter only draws a level; Harvis listens on the same microphone.
+    _builtInSource() {
+        if (this._source !== undefined)
+            return this._source;
+        this._source = null;
+        try {
+            const [ok, out] = GLib.spawn_command_line_sync('pactl list sources');
+            if (!ok)
+                return null;
+            const text = new TextDecoder().decode(out);
+            const found = [...text.matchAll(/Name: (alsa_input\S+)\s+Description: ([^\n]*)/g)];
+            const digital = found.find(m => /digital/i.test(m[2]) || /dmic/i.test(m[1]));
+            this._source = (digital ?? found[0])?.[1] ?? null;
+        } catch (e) {
+            console.error('Dynamic Island: no microphone list', e);
+        }
+        return this._source;
+    }
+
     // A small parec stream at 8 kHz gives the level GNOME's mixer does not.
     _startMeter() {
         if (this._meter)
@@ -98,7 +119,8 @@ export class PrivacyWatcher {
             return;
         try {
             this._meter = Gio.Subprocess.new([parec, `--rate=${METER_RATE}`, '--channels=1', '--format=s16le',
-                '--latency-msec=50', `--client-name=${METER_NAME}`, `--stream-name=${METER_NAME}`],
+                '--latency-msec=50', `--client-name=${METER_NAME}`, `--stream-name=${METER_NAME}`,
+                ...(this._builtInSource() ? [`--device=${this._builtInSource()}`] : [])],
             Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {
             console.error('Dynamic Island: microphone level unavailable', e);
