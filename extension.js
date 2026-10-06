@@ -1752,7 +1752,11 @@ export default class DynamicIslandExtension extends Extension {
         const monitor = this._monitor();
         if (!monitor || x < monitor.x || x >= monitor.x + monitor.width)
             return;
-        if (!this._hidden) {
+        // "Shown" must mean on screen: a show or hide cut short could leave the strip
+        // hidden or off its place while the state said shown, and then no rest on the
+        // top edge ever brought it back (over a maximized Zen, 2026-10-06).
+        const onScreen = this._strip.visible && Math.abs(this._strip.translation_y) < 2;
+        if (!this._hidden && onScreen) {
             this._maybeHide();
             return;
         }
@@ -1767,8 +1771,11 @@ export default class DynamicIslandExtension extends Extension {
         this._revealTimeout = this._timeout(REVEAL_DELAY, () => {
             this._revealTimeout = 0;
             const [, py] = global.get_pointer();
-            if (this._hidden && py <= monitor.y + 1)
+            if (py <= monitor.y + 1 && (this._hidden || !this._strip.visible ||
+                    Math.abs(this._strip.translation_y) >= 2)) {
+                this._hidden = true; // whatever it thought, it is not on screen: show it
                 this._setHidden(false);
+            }
             return GLib.SOURCE_REMOVE;
         });
     }
