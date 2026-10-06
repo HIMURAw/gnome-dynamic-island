@@ -114,14 +114,24 @@ export class PrivacyWatcher {
     _startMeter() {
         if (this._meter)
             return;
+        // pw-record with the source pinned: given only a device, PipeWire moved the stream
+        // to the headphones' microphone when they reconnected (music turned to a phone call).
+        const source = this._builtInSource();
+        const pwRecord = GLib.find_program_in_path('pw-record');
         const parec = GLib.find_program_in_path('parec');
-        if (!parec)
+        let argv;
+        if (source && pwRecord) {
+            argv = [pwRecord, '--raw', `--target=${source}`, `--rate=${METER_RATE}`, '--channels=1', '--format=s16',
+                '-P', `{ node.dont-move=true node.dont-reconnect=true node.dont-fallback=true ` +
+                    `application.name="${METER_NAME}" media.name="${METER_NAME}" }`, '-'];
+        } else if (parec) {
+            argv = [parec, `--rate=${METER_RATE}`, '--channels=1', '--format=s16le', '--latency-msec=50',
+                `--client-name=${METER_NAME}`, `--stream-name=${METER_NAME}`];
+        } else {
             return;
+        }
         try {
-            this._meter = Gio.Subprocess.new([parec, `--rate=${METER_RATE}`, '--channels=1', '--format=s16le',
-                '--latency-msec=50', `--client-name=${METER_NAME}`, `--stream-name=${METER_NAME}`,
-                ...(this._builtInSource() ? [`--device=${this._builtInSource()}`] : [])],
-            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+            this._meter = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
         } catch (e) {
             console.error('Dynamic Island: microphone level unavailable', e);
             return;
