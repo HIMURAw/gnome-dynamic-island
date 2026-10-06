@@ -1017,8 +1017,10 @@ export default class DynamicIslandExtension extends Extension {
         this._paletteBound = true;
         // The Copilot key on laptops that have one sends Super+Shift+F23: a press
         // talks to Harvis, two presses open the chat, holding it 2 s stops Harvis.
+        // POPUP too: with the chat open the island holds the keyboard, and two presses close it.
         Main.wm.addKeybinding('chat-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
-            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._onCopilotKey());
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
+            () => this._onCopilotKey());
         this._chatBound = true;
     }
 
@@ -1033,8 +1035,14 @@ export default class DynamicIslandExtension extends Extension {
         if (key && key.released) {
             this._copilot = null;
             key.tap = this._clearTimeout(key.tap);
-            console.log('Dynamic Island: Copilot key pressed twice: chat');
-            this._toggleChat();
+            // Open → closed (also a chat a voice answer showed without the keyboard).
+            if (this._mode === 'chat') {
+                console.log('Dynamic Island: Copilot key pressed twice: chat closed');
+                this._close();
+            } else {
+                console.log('Dynamic Island: Copilot key pressed twice: chat');
+                this._toggleChat();
+            }
             return;
         }
         if (key) {
