@@ -88,7 +88,7 @@
     </key>
     <key name="chat-shortcut" type="as">
       <default><![CDATA[['<Super><Shift>F23']]]></default>
-      <summary>Shortcut that opens the chat (the Copilot key sends Super+Shift+F23)</summary>
+      <summary>The Copilot key (Super+Shift+F23): press to talk to Harvis, press twice for the chat, hold 2 s to stop Harvis</summary>
     </key>
   </schema>
 </schemalist>

@@ -575,3 +575,6 @@ msgstr "Konuşuyor"
 
 #~ msgid "Listening…"
 #~ msgstr "Dinliyor…"
+
+msgid "Harvis stopped"
+msgstr "Harvis durdu"

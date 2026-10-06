@@ -60,6 +60,12 @@ const SKIPPED_ROLES = ['dateMenu', 'media-controls'];
 const REVEAL_DELAY = 180;
 // Desktop Icons NG (and forks) let other extensions reserve room on the desktop
 // through an object tagged with this id, the same way Dash to Dock does.
+// Copilot key (ms): held this long stops Harvis; a second press within this long
+// opens the chat; without modifiers to watch, no repeat for this long means released.
+const COPILOT_HOLD = 2000;
+const COPILOT_DOUBLE = 350;
+const COPILOT_REPEAT_GAP = 600;
+
 const DESKTOP_ICONS_ID = '130cbc66-235c-4bd6-8571-98d2d8bba5e2';
 
 const DisplayDeviceProxy = Gio.DBusProxy.makeProxyWrapper(
@@ -1009,13 +1015,100 @@ export default class DynamicIslandExtension extends Extension {
         Main.wm.addKeybinding('palette-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._togglePalette());
         this._paletteBound = true;
-        // The Copilot key on laptops that have one sends Super+Shift+F23.
+        // The Copilot key on laptops that have one sends Super+Shift+F23: a press
+        // talks to Harvis, two presses open the chat, holding it 2 s stops Harvis.
         Main.wm.addKeybinding('chat-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
-            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._toggleChat());
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._onCopilotKey());
         this._chatBound = true;
     }
 
+    // ---------- Copilot key: press, double press, hold ----------
+
+    // A keybinding only reports presses. The key is "still held" while its Super and
+    // Shift are down (the keyboard holds them with F23), or, on a keyboard that
+    // releases them at once, while autorepeat keeps pressing it.
+    _onCopilotKey() {
+        const now = GLib.get_monotonic_time() / 1000;
+        const key = this._copilot;
+        if (key && key.released) {
+            this._copilot = null;
+            key.tap = this._clearTimeout(key.tap);
+            console.log('Dynamic Island: Copilot key pressed twice: chat');
+            this._toggleChat();
+            return;
+        }
+        if (key) {
+            key.repeat = now; // autorepeat while held
+            return;
+        }
+        const mods = global.get_pointer()[2];
+        this._copilot = {start: now, repeat: now, released: false, done: false, tap: 0, poll: 0,
+            byMods: this._copilotMods(mods)};
+        this._copilot.poll = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 40, () => this._copilotPoll());
+    }
+
+    _copilotMods(mods) {
+        const SUPER = Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK;
+        return (mods & Clutter.ModifierType.SHIFT_MASK) !== 0 && (mods & SUPER) !== 0;
+    }
+
+    _copilotPoll() {
+        const key = this._copilot;
+        if (!key)
+            return GLib.SOURCE_REMOVE;
+        const now = GLib.get_monotonic_time() / 1000;
+        const held = key.byMods
+            ? this._copilotMods(global.get_pointer()[2])
+            : now - key.repeat < COPILOT_REPEAT_GAP;
+        if (held) {
+            if (!key.done && now - key.start >= COPILOT_HOLD) {
+                key.done = true;
+                console.log('Dynamic Island: Copilot key held: stop Harvis');
+                this._harvisSignal('SIGRTMIN+2');
+                Main.osdWindowManager.showAll?.(new Gio.ThemedIcon({name: 'process-stop-symbolic'}),
+                    _('Harvis stopped'), null, null);
+            }
+            return GLib.SOURCE_CONTINUE;
+        }
+        key.poll = 0;
+        if (key.done) {
+            this._copilot = null;
+            return GLib.SOURCE_REMOVE;
+        }
+        // Released quickly: one press, unless a second one follows.
+        key.released = true;
+        key.tap = GLib.timeout_add(GLib.PRIORITY_DEFAULT, COPILOT_DOUBLE, () => {
+            key.tap = 0;
+            if (this._copilot === key) {
+                this._copilot = null;
+                console.log(`Dynamic Island: Copilot key pressed (${key.byMods ? 'modifiers' : 'repeat'}): listen`);
+                this._harvisSignal('SIGUSR1');
+            }
+            return GLib.SOURCE_REMOVE;
+        });
+        return GLib.SOURCE_REMOVE;
+    }
+
+    _harvisSignal(signal) {
+        try {
+            Gio.Subprocess.new(['systemctl', '--user', 'kill', '--kill-whom=main', `--signal=${signal}`,
+                'harvis.service'], Gio.SubprocessFlags.STDERR_SILENCE);
+        } catch (e) {
+            console.error('Dynamic Island: could not reach Harvis', e);
+        }
+    }
+
+    _releaseCopilot() {
+        const key = this._copilot;
+        this._copilot = null;
+        if (key?.poll)
+            GLib.source_remove(key.poll);
+        if (key?.tap)
+            GLib.source_remove(key.tap);
+    }
+
     _releasePalette() {
+        this._releaseCopilot();
         this._releaseKeyboard();
         if (this._paletteBound)
             Main.wm.removeKeybinding('palette-shortcut');
