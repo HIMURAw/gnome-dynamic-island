@@ -1,4 +1,5 @@
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
@@ -17,13 +18,15 @@ import {Ticker, drawingArea} from './mind.js';
 //   {"type": "stats", "title": "Gündem Gözlüğü", "items": [{"label": "İzlenme", "value": "12,4 B", "delta": "+320"}]}
 //   {"type": "list", "title": "Bugün", "items": ["…", "…"]}
 //   {"type": "text", "title": "…", "text": "…"}
+//   {"type": "image", "title": "…", "path": "/an/image.svg"}   (a picture, e.g. the phone's pairing QR code)
 // Optional everywhere: "subtitle", "seconds" (how long it stays). Hovering keeps it,
 // a click closes it, a new card replaces it.
 
 const WIDTH = 320;
 const MARGIN = 28;
 const SECONDS = 15;
-const ICONS = {stats: 'view-statistics-symbolic', list: 'view-list-symbolic', text: 'dialog-information-symbolic'};
+const ICONS = {stats: 'view-statistics-symbolic', list: 'view-list-symbolic', text: 'dialog-information-symbolic',
+    image: 'phone-symbolic'};
 const TINT = {sun: [1.0, 0.8, 0.3], moon: [0.85, 0.88, 1.0], cloud: [0.85, 0.88, 0.93], rain: [0.45, 0.72, 1.0],
     snow: [0.92, 0.96, 1.0], storm: [1.0, 0.86, 0.35], fog: [0.75, 0.78, 0.82]};
 
@@ -267,6 +270,9 @@ export class Cards {
                 statsBody(card, box);
             else if (card.type === 'list')
                 listBody(card, box);
+            else if (card.type === 'image')
+                box.add_child(new St.Icon({gicon: new Gio.FileIcon({file: Gio.File.new_for_path(card.path ?? '')}),
+                    icon_size: WIDTH - 40, style_class: 'dynada-card-image', x_align: Clutter.ActorAlign.CENTER}));
             else
                 box.add_child(label(card.text ?? '', 'dynada-card-text'));
         }

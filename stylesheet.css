@@ -1304,3 +1304,8 @@
   font-size: 10.5pt;
 }
 
+.dynada-card-image {
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 8px;
+}
