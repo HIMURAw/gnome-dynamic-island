@@ -75,7 +75,7 @@ export class VoiceEnvelope {
     }
 }
 
-function drawingArea(width, height, paint) {
+export function drawingArea(width, height, paint) {
     const area = new St.DrawingArea({width, height, y_align: Clutter.ActorAlign.CENTER});
     area.connect('repaint', a => {
         const cr = a.get_context();
@@ -90,7 +90,7 @@ function drawingArea(width, height, paint) {
 }
 
 // A loop that runs only while its actor is on screen.
-class Ticker {
+export class Ticker {
     constructor(actor, tick) {
         this._actor = actor;
         this._tick = tick;

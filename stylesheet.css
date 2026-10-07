@@ -1191,3 +1191,116 @@
   border-radius: 8px;
   padding: 1px 7px;
 }
+
+/* Visual cards (cards.js): a frosted card in an empty part of the screen */
+.dynada-card {
+  border-radius: 26px;
+  background-color: rgba(24, 24, 28, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dynada-card-content {
+  padding: 18px 20px;
+  spacing: 12px;
+  color: #f5f5f7;
+}
+
+.dynada-card-header {
+  spacing: 10px;
+}
+
+.dynada-card-header-icon {
+  icon-size: 20px;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.dynada-card-title {
+  font-size: 13pt;
+  font-weight: bold;
+}
+
+.dynada-card-subtitle {
+  font-size: 9.5pt;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.dynada-card-text {
+  font-size: 10.5pt;
+  color: rgba(245, 245, 247, 0.85);
+}
+
+.dynada-card-weather-now {
+  spacing: 8px;
+}
+
+.dynada-card-temp {
+  font-size: 34pt;
+  font-weight: 300;
+}
+
+.dynada-card-days {
+  spacing: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dynada-card-day {
+  spacing: 2px;
+}
+
+.dynada-card-day-name,
+.dynada-card-day-temp {
+  font-size: 9pt;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.dynada-card-stats {
+  spacing: 8px;
+}
+
+.dynada-card-stat {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 10px 12px;
+  spacing: 2px;
+}
+
+.dynada-card-stat-value {
+  font-size: 16pt;
+  font-weight: bold;
+}
+
+.dynada-card-stat-label {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+.dynada-card-stat-delta {
+  font-size: 8.5pt;
+  font-weight: bold;
+}
+
+.dynada-card-stat-delta.up {
+  color: #30d158;
+}
+
+.dynada-card-stat-delta.down {
+  color: #ff453a;
+}
+
+.dynada-card-row {
+  spacing: 10px;
+}
+
+.dynada-card-row-n {
+  font-size: 9pt;
+  font-weight: bold;
+  color: rgba(245, 245, 247, 0.45);
+  min-width: 14px;
+}
+
+.dynada-card-row-text {
+  font-size: 10.5pt;
+}
+

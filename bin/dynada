@@ -8,6 +8,7 @@
 #   dynada end ID [MESSAGE] [ok|fail]
 #   dynada clear ID                       remove an activity without a notification
 #   dynada answer QUESTION ANSWER         show an answer card (e.g. from a voice assistant)
+#   dynada card JSON                      a visual card in an empty part of the screen (cards.js: weather, stats, list, text)
 #   dynada screenshot NAME                screen with pointer to ~/.cache/harvis/screen/NAME.png, prints the path
 set -uo pipefail
 
@@ -38,6 +39,7 @@ update) update "$@" ;;
 end) finish "$@" ;;
 clear) call Clear "$1" ;;
 answer) call ShowAnswer "$1" "$2" ;;
+card) call ShowCard "$1" ;;
 screenshot)
     gdbus call --session --dest org.gnome.Shell --object-path /io/github/himuraw/DynamicIsland \
         --method io.github.himuraw.DynamicIsland.Screenshot "${1:-screen}" | sed -n "s/^(true, '\(.*\)')$/\1/p"

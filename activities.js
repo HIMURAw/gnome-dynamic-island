@@ -40,6 +40,9 @@ const IFACE = `
       <arg type="s" direction="in" name="question"/>
       <arg type="s" direction="in" name="answer"/>
     </method>
+    <method name="ShowCard">
+      <arg type="s" direction="in" name="card"/>
+    </method>
     <method name="Screenshot">
       <arg type="s" direction="in" name="name"/>
       <arg type="b" direction="out" name="ok"/>
@@ -80,9 +83,10 @@ export class Activities {
     // onChanged(): the list or a countdown changed.
     // onAnswer(question, answer): a voice assistant has an answer to show.
     // onScreenshot(): a screenshot was taken for the assistant (the island flashes).
-    constructor({onChanged, onAnswer, onScreenshot}) {
+    constructor({onChanged, onAnswer, onScreenshot, onCard}) {
         this._onChanged = onChanged;
         this._onAnswer = onAnswer;
+        this._onCard = onCard;
         this._onScreenshot = onScreenshot;
         this._items = new Map();
         this._timerCount = 0;
@@ -145,6 +149,11 @@ export class Activities {
 
     ShowAnswer(question, answer) {
         this._onAnswer?.(question, answer);
+    }
+
+    // A visual card (cards.js) in an empty part of the screen.
+    ShowCard(card) {
+        this._onCard?.(card);
     }
 
     // The whole screen with the pointer in it, so "this green thing" can be found.
