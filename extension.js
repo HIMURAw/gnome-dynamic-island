@@ -24,12 +24,11 @@ import {ChargeIndicator} from './charge.js';
 import {Glass, RoundedMask, setBlurEnabled} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
-import {MediaWatcher} from './media.js';
+import {MediaWatcher, squareArt} from './media.js';
 import {ChatView} from './chat.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
-import {Waveform} from './wave.js';
-import {MindView, ThinkingGlyph, VoiceEnvelope, VoiceGlyph} from './mind.js';
+import {BrainGlyph, MindView, VoiceEnvelope} from './mind.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
@@ -403,16 +402,11 @@ export default class DynamicIslandExtension extends Extension {
         this._compactActivity.add_child(this._compactActivityIcon);
         this._compactActivity.add_child(this._compactActivityLabel);
 
-        // While the assistant listens, bars that move with your voice.
-        this._compactWave = new Waveform({height: 14, styleClass: 'dynada-wave dynada-compact-wave'});
-        box.add_child(this._compactWave.actor);
-        // Thinking and speaking each have their own motion (mind.js).
-        this._compactThinking = new ThinkingGlyph();
-        this._compactThinking.actor.visible = false;
-        this._compactSpeaking = new VoiceGlyph(this._voiceEnvelope ??= new VoiceEnvelope());
-        this._compactSpeaking.actor.visible = false;
-        box.add_child(this._compactThinking.actor);
-        box.add_child(this._compactSpeaking.actor);
+        // Harvis as a brain: green in a conversation, amber at work, red when it failed (mind.js).
+        this._voiceEnvelope ??= new VoiceEnvelope();
+        this._compactBrain = new BrainGlyph(mode => mode === 'speaking'
+            ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6);
+        box.add_child(this._compactBrain.actor);
         box.add_child(this._compactActivity);
         box.add_child(this._compactTime);
         box.add_child(this._compactDate);
@@ -1221,6 +1215,7 @@ export default class DynamicIslandExtension extends Extension {
         const mode = {
             'audio-input-microphone-symbolic': 'listening',
             'audio-speakers-symbolic': 'speaking',
+            'dialog-error-symbolic': 'failed',
         }[harvis.icon] ?? 'thinking';
         return {mode, text: harvis.subtitle ?? ''};
     }
@@ -1331,9 +1326,8 @@ export default class DynamicIslandExtension extends Extension {
         const listening = harvis?.icon === 'audio-input-microphone-symbolic';
         this._setListening(listening);
         const {mode} = this._harvisState();
-        this._compactThinking.actor.visible = mode === 'thinking';
-        this._compactSpeaking.actor.visible = mode === 'speaking';
-        for (const m of ['thinking', 'speaking'])
+        this._compactBrain.setMode(mode);
+        for (const m of ['thinking', 'speaking', 'failed'])
             (m === mode ? this._island.add_style_class_name : this._island.remove_style_class_name)
                 .call(this._island, `dynada-${m}`);
         // Harvis shows as its motion, not as a line of text.
@@ -1383,7 +1377,6 @@ export default class DynamicIslandExtension extends Extension {
         this._voiceLevel ??= () => this._privacyWatcher?.level ?? 0;
         this._privacyWatcher?.listen(on);
         if (on) {
-            this._compactWave.start(this._voiceLevel);
             this._island.add_style_class_name('dynada-listening');
             let bright = false;
             this._breathId = this._timeout(900, () => {
@@ -1397,7 +1390,6 @@ export default class DynamicIslandExtension extends Extension {
                 onComplete: () => this._island?.ease({scale_x: 1, scale_y: 1, duration: 420,
                     mode: Clutter.AnimationMode.EASE_OUT_BACK})});
         } else {
-            this._compactWave.stop();
             this._breathId = this._clearTimeout(this._breathId);
             this._island.remove_style_class_name('dynada-listening');
             this._island.remove_style_pseudo_class('breath');
@@ -2054,7 +2046,7 @@ export default class DynamicIslandExtension extends Extension {
         this._mediaLength = info?.length ?? 0;
 
         const artIcon = info?.artUrl
-            ? new Gio.FileIcon({file: Gio.File.new_for_uri(info.artUrl)})
+            ? new Gio.FileIcon({file: Gio.File.new_for_uri(squareArt(info.artUrl))})
             : null;
 
         // Side bubble: cover art filling the circle, else the app icon, else a note.

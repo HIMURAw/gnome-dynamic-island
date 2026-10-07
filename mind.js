@@ -8,18 +8,21 @@ import Graphene from 'gi://Graphene';
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 // Harvis's mind, drawn from the thing it remembers with: the Brain vault's own
-// pages and the links between them. Three states, three motions, one colour each:
-//   listening  green, Umut's voice (the bars in wave.js)
+// pages and the links between them. A conversation is green, work amber,
+// a failure red:
+//   listening  green, Umut's voice
+//   speaking   green, rings from the centre that follow Harvis's actual voice
 //   thinking   amber, a signal hopping from page to page along real links
-//   speaking   cyan, rings from the centre that follow Harvis's actual voice
-// The collapsed island shows small versions of the last two (ThinkingGlyph,
-// VoiceGlyph); clicking the Harvis bubble opens MindView, the whole graph.
+//   failed     red, Harvis could not do what was asked
+// The collapsed island shows a small brain in the same colours (BrainGlyph);
+// clicking the Harvis bubble opens MindView, the whole graph.
 
 const FRAME = 33; // ms, ~30 fps, only while visible
 export const COLORS = {
     listening: [0.19, 0.82, 0.35],
     thinking: [0.96, 0.71, 0.32],
-    speaking: [0.56, 0.89, 1.0],
+    speaking: [0.19, 0.82, 0.35],
+    failed: [1.0, 0.27, 0.23],
     person: [0.56, 0.89, 1.0],
     project: [0.96, 0.71, 0.32],
     mistake: [1.0, 0.48, 0.45],
@@ -117,82 +120,167 @@ class Ticker {
 
 // ---------- Collapsed island ----------
 
-// Thinking: five pages and the links between them; an amber signal runs the
-// path and each page it reaches lights up and fades.
-export class ThinkingGlyph {
-    constructor() {
-        const nodes = [[0.08, 0.6], [0.3, 0.25], [0.52, 0.7], [0.74, 0.3], [0.93, 0.62]];
-        const lit = nodes.map(() => 0);
-        this.actor = drawingArea(38, 16, (cr, w, h, s) => {
-            const [r, g, b] = COLORS.thinking;
-            const p = nodes.map(([x, y]) => [x * w, y * h]);
-            cr.setLineCap(Cairo.LineCap.ROUND);
-            cr.setLineWidth(1 * s);
-            cr.setSourceRGBA(r, g, b, 0.22);
-            p.slice(1).forEach(([x, y], i) => {
-                cr.moveTo(...p[i]);
-                cr.lineTo(x, y);
-            });
-            cr.stroke();
-            // The signal: where on the path it is now, with a short tail.
-            const pos = (this._ticker.t * 2.2) % (nodes.length - 1 + 0.6);
-            for (let k = 0; k < 6; k++) {
-                const q = pos - k * 0.06;
-                if (q < 0 || q > nodes.length - 1)
-                    continue;
-                const i = Math.min(nodes.length - 2, Math.floor(q));
-                const f = q - i;
-                const x = p[i][0] + (p[i + 1][0] - p[i][0]) * f;
-                const y = p[i][1] + (p[i + 1][1] - p[i][1]) * f;
-                cr.setSourceRGBA(r, g, b, 0.9 - k * 0.15);
-                cr.arc(x, y, (1.8 - k * 0.2) * s, 0, 2 * Math.PI);
-                cr.fill();
-            }
-            const reached = Math.floor(pos + 0.02);
-            if (reached < nodes.length)
-                lit[reached] = 1;
-            p.forEach(([x, y], i) => {
-                cr.setSourceRGBA(r, g, b, 0.35 + 0.65 * lit[i]);
-                cr.arc(x, y, (1.6 + 1.2 * lit[i]) * s, 0, 2 * Math.PI);
-                cr.fill();
-                lit[i] *= 0.9;
-            });
+// A brain seen from the side, front to the left, drawn in a 1 x 0.7 box: the
+// cortex's bumpy outline, the cerebellum and the stem under its back, and the
+// folds (sulci) that signals run along.
+const CORTEX = (() => {
+    const points = [];
+    for (let i = 0; i < 64; i++) {
+        const a = (i / 64) * 2 * Math.PI;
+        const up = Math.max(0, -Math.sin(a)); // gyri bump the top and the sides, not the base
+        const r = 1 + 0.07 * up * Math.cos(11 * a) + 0.03 * Math.cos(5 * a);
+        const ry = Math.sin(a) > 0 ? 0.25 : 0.31; // a flatter underside
+        points.push([0.47 + 0.43 * r * Math.cos(a), 0.34 + ry * r * Math.sin(a)]);
+    }
+    return points;
+})();
+const FOLDS = [
+    [[0.13, 0.36], [0.21, 0.24], [0.3, 0.31], [0.36, 0.16]], // frontal
+    [[0.52, 0.06], [0.47, 0.17], [0.5, 0.26], [0.44, 0.38]], // central sulcus
+    [[0.2, 0.47], [0.33, 0.42], [0.48, 0.4], [0.62, 0.32]], // lateral (Sylvian) fissure
+    [[0.62, 0.13], [0.67, 0.24], [0.77, 0.22], [0.83, 0.33]], // parietal
+    [[0.29, 0.54], [0.41, 0.5], [0.54, 0.53], [0.64, 0.48]], // temporal
+    [[0.7, 0.42], [0.79, 0.38], [0.87, 0.45]], // occipital
+];
+
+function foldPoint(fold, f) {
+    const q = Math.min(fold.length - 1.0001, Math.max(0, f) * (fold.length - 1));
+    const i = Math.floor(q);
+    const k = q - i;
+    return [fold[i][0] + (fold[i + 1][0] - fold[i][0]) * k, fold[i][1] + (fold[i + 1][1] - fold[i][1]) * k];
+}
+
+// A smooth curve through the points (their midpoints, with each point as the control).
+function smoothPath(cr, points, x, y, closed) {
+    const P = points.map(([u, v]) => [x(u), y(v)]);
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if (closed) {
+        cr.moveTo(...mid(P[P.length - 1], P[0]));
+        P.forEach((p, i) => {
+            const m = mid(p, P[(i + 1) % P.length]);
+            cr.curveTo(p[0], p[1], p[0], p[1], m[0], m[1]);
         });
-        this.actor.margin_right = 9;
-        this._ticker = new Ticker(this.actor, () => this.actor.queue_repaint());
+        cr.closePath();
+    } else {
+        cr.moveTo(...P[0]);
+        for (let i = 1; i < P.length - 1; i++) {
+            const m = mid(P[i], P[i + 1]);
+            cr.curveTo(P[i][0], P[i][1], P[i][0], P[i][1], m[0], m[1]);
+        }
+        cr.lineTo(...P[P.length - 1]);
     }
 }
 
-// Speaking: three strands of one wave, wide when Harvis is loud, a thin line
-// between words. The loudness is the real voice, not a guess.
-export class VoiceGlyph {
-    constructor(envelope) {
+// Harvis in the collapsed island: the brain, coloured by what it is doing.
+//   listening, speaking  green, glowing with the voice (Umut's, then Harvis's),
+//                        a wave running through its folds from front to back
+//   thinking             amber, signals running along the folds
+//   failed               red, a short shake, then a slow dim pulse
+// Colours ease into each other and a new state gives a small pop, so a change
+// reads as one motion. level(mode) is the loudness, 0..1, for that state.
+export class BrainGlyph {
+    constructor(level) {
+        this.mode = 'idle';
+        this._color = [...COLORS.listening];
+        this._since = 0;
         let smooth = 0;
-        this.actor = drawingArea(40, 16, (cr, w, h, s) => {
-            const [r, g, b] = COLORS.speaking;
-            const target = envelope.level();
-            smooth += (target - smooth) * (target > smooth ? 0.5 : 0.15);
+        this.actor = drawingArea(27, 19, (cr, w, h, s) => {
             const t = this._ticker.t;
+            const mode = this.mode;
+            const target = COLORS[mode] ?? COLORS.listening;
+            this._color = this._color.map((c, i) => c + (target[i] - c) * 0.18);
+            const [r, g, b] = this._color;
+            const loud = mode === 'listening' || mode === 'speaking' ? Math.min(1, level(mode)) : 0;
+            smooth += (loud - smooth) * (loud > smooth ? 0.5 : 0.12);
+            const age = t - this._since;
+            let glow;
+            if (mode === 'thinking')
+                glow = 0.45 + 0.15 * Math.sin(t * 3);
+            else if (mode === 'failed')
+                glow = 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(t * 3.5));
+            else
+                glow = 0.3 + 0.7 * smooth;
+            // Failed: a head shake that dies away within half a second.
+            const shake = mode === 'failed' ? Math.sin(age * 45) * 1.6 * s * Math.exp(-age * 6) : 0;
+            const pad = 2 * s;
+            const scale = Math.min(w - 2 * pad, (h - 2 * pad) / 0.7);
+            const ox = (w - scale) / 2 + shake;
+            const oy = (h - 0.7 * scale) / 2;
+            const x = u => ox + u * scale;
+            const y = v => oy + v * scale;
             cr.setLineCap(Cairo.LineCap.ROUND);
-            [[1, 0.95, 1.6], [0.7, 0.45, 1.1], [0.5, 0.25, 0.8]].forEach(([amp, alpha, width], k) => {
+            cr.setLineJoin(Cairo.LineJoin.ROUND);
+
+            // Stem and cerebellum, under the back of the brain.
+            cr.setSourceRGBA(r, g, b, 0.35 + 0.3 * glow);
+            cr.setLineWidth(1.6 * s);
+            cr.moveTo(x(0.6), y(0.58));
+            cr.curveTo(x(0.61), y(0.64), x(0.6), y(0.66), x(0.62), y(0.7));
+            cr.stroke();
+            cr.save();
+            cr.translate(x(0.75), y(0.6));
+            cr.scale(0.13 * scale, 0.075 * scale);
+            cr.arc(0, 0, 1, 0, 2 * Math.PI);
+            cr.restore();
+            cr.setSourceRGBA(r, g, b, 0.18 + 0.2 * glow);
+            cr.fillPreserve();
+            cr.setSourceRGBA(r, g, b, 0.5 + 0.4 * glow);
+            cr.setLineWidth(0.9 * s);
+            cr.stroke();
+
+            // The cortex: a soft halo, a tinted fill, a bright rim.
+            smoothPath(cr, CORTEX, x, y, true);
+            cr.setSourceRGBA(r, g, b, 0.1 * glow);
+            cr.setLineWidth(4 * s);
+            cr.strokePreserve();
+            cr.setSourceRGBA(r, g, b, 0.1 + 0.2 * glow);
+            cr.fillPreserve();
+            cr.setSourceRGBA(r, g, b, 0.6 + 0.4 * glow);
+            cr.setLineWidth(1.15 * s);
+            cr.stroke();
+
+            // The folds: lit by a wave (voice) or by the signals (thinking).
+            FOLDS.forEach((fold, k) => {
+                let alpha = 0.3 + 0.25 * glow;
+                if (mode === 'listening' || mode === 'speaking')
+                    alpha = 0.25 + (0.25 + 0.5 * smooth) * (0.5 + 0.5 * Math.sin(fold[0][0] * 9 - t * 7));
+                smoothPath(cr, fold, x, y, false);
                 cr.setSourceRGBA(r, g, b, alpha);
-                cr.setLineWidth(width * s);
-                for (let i = 0; i <= 40; i++) {
-                    const x = (i / 40) * w;
-                    // Pinned at both ends, fullest in the middle.
-                    const envelopeX = Math.sin((i / 40) * Math.PI);
-                    const a = (0.08 + smooth * 0.92) * amp * envelopeX * (h / 2 - 1.5 * s);
-                    const y = h / 2 + a * Math.sin(i / 40 * Math.PI * (2.5 + k) - t * (7 + k * 2.3) + k);
-                    if (i === 0)
-                        cr.moveTo(x, y);
-                    else
-                        cr.lineTo(x, y);
-                }
+                cr.setLineWidth(0.85 * s);
                 cr.stroke();
+                if (mode !== 'thinking')
+                    return;
+                // A signal per fold, out of step with the others, with a short tail.
+                const pos = (t * (0.7 + 0.13 * k) + k * 0.37) % 1.5;
+                for (let i = 0; i < 5; i++) {
+                    const f = pos - i * 0.05;
+                    if (f < 0 || f > 1)
+                        continue;
+                    const [u, v] = foldPoint(fold, f);
+                    cr.setSourceRGBA(1, 1, 0.92, (0.9 - i * 0.17) * (0.6 + 0.4 * glow));
+                    cr.arc(x(u), y(v), (1.3 - i * 0.18) * s, 0, 2 * Math.PI);
+                    cr.fill();
+                }
             });
         });
-        this.actor.margin_right = 9;
+        this.actor.margin_right = 8;
+        this.actor.pivot_point = new Graphene.Point({x: 0.5, y: 0.5});
+        this.actor.visible = false;
         this._ticker = new Ticker(this.actor, () => this.actor.queue_repaint());
+    }
+
+    setMode(mode) {
+        if (mode === this.mode)
+            return;
+        this.mode = mode;
+        this._since = this._ticker.t;
+        this.actor.visible = mode !== 'idle';
+        if (!this.actor.visible)
+            return;
+        // A small pop on each change of state.
+        this.actor.remove_all_transitions();
+        this.actor.set_scale(0.8, 0.8);
+        this.actor.ease({scale_x: 1, scale_y: 1, duration: 380, mode: Clutter.AnimationMode.EASE_OUT_BACK});
     }
 }
 
@@ -321,7 +409,7 @@ function loadGraph() {
 // ---------- The brain view ----------
 
 export class MindView {
-    // state(): {mode: 'idle'|'listening'|'thinking'|'speaking', text}
+    // state(): {mode: 'idle'|'listening'|'thinking'|'speaking'|'failed', text}
     // micLevel(): 0..1 while listening; envelope: VoiceEnvelope
     // onChat(), onListen(): the buttons
     constructor({width, dir, state, micLevel, envelope, onChat, onListen}) {
@@ -452,8 +540,9 @@ export class MindView {
             listening: _('Listening'),
             thinking: text || _('Thinking'),
             speaking: _('Speaking'),
+            failed: text || _('Could not do it'),
         }[mode] ?? '';
-        for (const m of ['idle', 'listening', 'thinking', 'speaking'])
+        for (const m of ['idle', 'listening', 'thinking', 'speaking', 'failed'])
             (m === mode ? this._status.add_style_class_name : this._status.remove_style_class_name)
                 .call(this._status, `dynada-mind-${m}`);
         this._mode = mode;

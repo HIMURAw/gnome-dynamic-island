@@ -1086,13 +1086,17 @@
   background-color: rgba(255, 255, 255, 0.14);
 }
 
-/* Harvis: thinking (amber) and speaking (cyan) in the collapsed island */
+/* Harvis: speaking (green, like listening), thinking (amber), failed (red) in the collapsed island */
 .dynada-island.dynada-thinking {
   border-color: rgba(245, 181, 81, 0.4);
 }
 
 .dynada-island.dynada-speaking {
-  border-color: rgba(143, 227, 255, 0.45);
+  border-color: rgba(48, 209, 88, 0.45);
+}
+
+.dynada-island.dynada-failed {
+  border-color: rgba(255, 69, 58, 0.6);
 }
 
 /* Harvis's brain: the Brain vault's own graph, with the state under it */
@@ -1122,7 +1126,8 @@
 
 .dynada-mind-status.dynada-mind-listening { color: #30d158; }
 .dynada-mind-status.dynada-mind-thinking { color: #f5b551; }
-.dynada-mind-status.dynada-mind-speaking { color: #8fe3ff; }
+.dynada-mind-status.dynada-mind-speaking { color: #30d158; }
+.dynada-mind-status.dynada-mind-failed { color: #ff453a; }
 
 .dynada-mind-last {
   font-size: 9.5pt;
