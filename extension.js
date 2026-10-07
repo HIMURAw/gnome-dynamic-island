@@ -30,6 +30,7 @@ import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
 import {BrainGlyph, MindView, VoiceEnvelope} from './mind.js';
 import {GlassMenus} from './menus.js';
+import {Cards} from './cards.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
 
@@ -90,6 +91,7 @@ export default class DynamicIslandExtension extends Extension {
             onChanged: () => this._syncActivities(),
             onAnswer: (question, answer) => this._showAnswer(question, answer),
             onScreenshot: phase => this._flashShot(phase),
+            onCard: card => (this._cards ??= new Cards()).show(card),
         });
         // Any change rebuilds the island: disable() puts everything back, so
         // building again with the new settings is the simplest safe way.
@@ -125,6 +127,8 @@ export default class DynamicIslandExtension extends Extension {
         this._settings.disconnect(this._settingsId);
         this._teardown();
         this._activities.destroy();
+        this._cards?.destroy();
+        this._cards = null;
         this._activities = null;
         this._settings = null;
     }
