@@ -1,3 +1,4 @@
+import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
@@ -9,6 +10,44 @@ const MprisProxy = Gio.DBusProxy.makeProxyWrapper(loadInterfaceXML('org.mpris.Me
 const PlayerProxy = Gio.DBusProxy.makeProxyWrapper(loadInterfaceXML('org.mpris.MediaPlayer2.Player'));
 
 const PREFIX = 'org.mpris.MediaPlayer2.';
+const ART_CACHE = GLib.build_filenamev([GLib.get_user_cache_dir(), 'dynamic-island', 'art']);
+const ART_KEEP = 30; // cropped covers kept; more and the folder is emptied
+
+// Cover art cut to a square from its centre. The island draws art in square tiles and
+// circles, and a video's 16:9 frame (a browser's art for YouTube, say) was squeezed into
+// them. Local files only; one crop per file version, cached.
+export function squareArt(uri) {
+    if (!uri?.startsWith('file://'))
+        return uri;
+    try {
+        const file = Gio.File.new_for_uri(uri);
+        const modified = file.query_info('time::modified', Gio.FileQueryInfoFlags.NONE, null)
+            .get_attribute_uint64('time::modified');
+        const key = GLib.compute_checksum_for_string(GLib.ChecksumType.SHA1, `${uri}@${modified}`, -1);
+        const out = GLib.build_filenamev([ART_CACHE, `${key}.png`]);
+        if (GLib.file_test(out, GLib.FileTest.EXISTS))
+            return GLib.filename_to_uri(out, null);
+        const [, width, height] = GdkPixbuf.Pixbuf.get_file_info(file.get_path());
+        if (!width || width === height)
+            return uri;
+        const side = Math.min(width, height);
+        const pixbuf = GdkPixbuf.Pixbuf.new_from_file(file.get_path())
+            .new_subpixbuf(Math.floor((width - side) / 2), Math.floor((height - side) / 2), side, side);
+        GLib.mkdir_with_parents(ART_CACHE, 0o700);
+        const dir = Gio.File.new_for_path(ART_CACHE);
+        const names = [];
+        const children = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+        for (let info; (info = children.next_file(null));)
+            names.push(info.get_name());
+        children.close(null);
+        if (names.length >= ART_KEEP)
+            names.forEach(name => dir.get_child(name).delete(null));
+        pixbuf.savev(out, 'png', [], []);
+        return GLib.filename_to_uri(out, null);
+    } catch {
+        return uri;
+    }
+}
 const OBJECT_PATH = '/org/mpris/MediaPlayer2';
 
 // Follows every MPRIS player on the session bus (Spotify, browsers playing video,
