@@ -167,6 +167,11 @@ export class QuickSettingsAdopter {
                     // the page was an empty panel.
                     this._toDetail(record);
                     this._reveal(menu);
+                    this._sinkBlur();
+                    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                        this._sinkBlur();
+                        return GLib.SOURCE_REMOVE;
+                    });
                     this.openMenu = menu;
                     this._onMenuOpened(menu);
                 } else if (this.openMenu === menu) {
@@ -200,6 +205,24 @@ export class QuickSettingsAdopter {
             menu.box.remove_all_transitions();
             menu.box.opacity = 255;
         }
+    }
+
+    // Blur My Shell draws a blurred surface for the quick settings menu in the top layer, just below
+    // GNOME's menu, which is above the island: with the menu on the island's page that surface covered
+    // the page (an empty dark panel). Its surfaces (live blur widgets, static blur background groups) go below the island's layer instead; Blur My Shell
+    // only restacks one that is above the menu again, so they stay there.
+    _sinkBlur() {
+        const ui = Main.layoutManager.uiGroup;
+        let layer = this._detail;
+        while (layer && layer.get_parent() !== ui)
+            layer = layer.get_parent();
+        if (!layer)
+            return;
+        const children = ui.get_children();
+        children.slice(children.indexOf(layer) + 1)
+            .filter(c => c.has_style_class_name?.('bms-popup-blurred-widget') ||
+                c.name === 'bms-popup-backgroundgroup')
+            .forEach(c => ui.set_child_below_sibling(c, layer));
     }
 
     _fromDetail(record) {
