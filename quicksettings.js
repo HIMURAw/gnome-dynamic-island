@@ -157,19 +157,16 @@ export class QuickSettingsAdopter {
         menu.open = () => {
             this._toDetail(record);
             open.call(menu, PopupAnimation.NONE);
-            // GNOME 50's QuickToggleMenu hides its box (opacity 0) and fades it in only when its own
-            // height animation completes; moved onto the island's page that never happens and the
-            // page showed an empty panel. The island animates the page itself: show the menu now.
-            menu.actor.remove_all_transitions();
-            menu.actor.height = -1;
-            if (menu.box) {
-                menu.box.remove_all_transitions();
-                menu.box.opacity = 255;
-            }
         };
         record.menuIds = [
             menu.connect('open-state-changed', (_m, isOpen) => {
                 if (isOpen) {
+                    // However GNOME opened it (its own open, or another extension's replacement of it),
+                    // the menu comes onto the island's page, shown at once: GNOME 50 hides the box
+                    // (opacity 0) until its own height animation ends, which never happens here, and
+                    // the page was an empty panel.
+                    this._toDetail(record);
+                    this._reveal(menu);
                     this.openMenu = menu;
                     this._onMenuOpened(menu);
                 } else if (this.openMenu === menu) {
@@ -193,6 +190,16 @@ export class QuickSettingsAdopter {
         record.constraints.forEach(c => actor.remove_constraint(c));
         record.layer?.remove_child(actor);
         this._detail.add_child(actor);
+    }
+
+    _reveal(menu) {
+        menu.actor.show();
+        menu.actor.remove_all_transitions();
+        menu.actor.height = -1;
+        if (menu.box) {
+            menu.box.remove_all_transitions();
+            menu.box.opacity = 255;
+        }
     }
 
     _fromDetail(record) {
