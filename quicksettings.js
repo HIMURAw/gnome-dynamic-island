@@ -157,6 +157,15 @@ export class QuickSettingsAdopter {
         menu.open = () => {
             this._toDetail(record);
             open.call(menu, PopupAnimation.NONE);
+            // GNOME 50's QuickToggleMenu hides its box (opacity 0) and fades it in only when its own
+            // height animation completes; moved onto the island's page that never happens and the
+            // page showed an empty panel. The island animates the page itself: show the menu now.
+            menu.actor.remove_all_transitions();
+            menu.actor.height = -1;
+            if (menu.box) {
+                menu.box.remove_all_transitions();
+                menu.box.opacity = 255;
+            }
         };
         record.menuIds = [
             menu.connect('open-state-changed', (_m, isOpen) => {
