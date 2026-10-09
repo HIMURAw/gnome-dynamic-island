@@ -155,6 +155,11 @@
   spacing: 10px;
 }
 
+.dynada-media-volume {
+  margin-top: 4px;
+  padding: 0 4px 0 0;
+}
+
 .dynada-volume-icon {
   icon-size: 16px;
 }
