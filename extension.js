@@ -624,6 +624,24 @@ export default class DynamicIslandExtension extends Extension {
         this._transport.add_child(this._nextButton);
         view.add_child(this._transport);
 
+        // The system volume, right under what is playing (the same sink as the control center's).
+        this._mediaVolumeRow = new St.BoxLayout({style_class: 'dynada-volume dynada-media-volume', x_expand: true});
+        this._mediaMuteButton = new St.Button({
+            style_class: 'dynada-round-button',
+            can_focus: true,
+            accessible_name: _('Mute or unmute'),
+            child: new St.Icon({style_class: 'dynada-volume-icon', icon_name: 'audio-volume-high-symbolic'}),
+        });
+        this._mediaSlider = new Slider(0);
+        this._mediaSlider.x_expand = true;
+        this._mediaSlider.y_align = Clutter.ActorAlign.CENTER;
+        this._mediaSlider.accessible_name = _('Volume');
+        this._mediaVolumeLabel = new St.Label({style_class: 'dynada-volume-label', y_align: Clutter.ActorAlign.CENTER});
+        this._mediaVolumeRow.add_child(this._mediaMuteButton);
+        this._mediaVolumeRow.add_child(this._mediaSlider);
+        this._mediaVolumeRow.add_child(this._mediaVolumeLabel);
+        view.add_child(this._mediaVolumeRow);
+
         return view;
     }
 
@@ -1963,11 +1981,19 @@ export default class DynamicIslandExtension extends Extension {
         this._control = getMixerControl();
         this._connect(this._control, 'default-sink-changed', () => this._bindSink());
         this._connect(this._control, 'state-changed', () => this._bindSink());
-        this._connect(this._slider, 'notify::value', () => this._onSliderChanged());
-        this._connect(this._muteButton, 'clicked', () => {
+        const toggleMute = () => {
             if (this._sink)
                 this._sink.change_is_muted(!this._sink.is_muted);
-        });
+        };
+        // Two sliders drive the same sink: the control center's and the one under the music.
+        this._volumeControls = [
+            {row: this._volumeRow, slider: this._slider, mute: this._muteButton, label: this._volumeLabel},
+            {row: this._mediaVolumeRow, slider: this._mediaSlider, mute: this._mediaMuteButton, label: this._mediaVolumeLabel},
+        ].filter(c => c.slider);
+        for (const c of this._volumeControls) {
+            this._connect(c.slider, 'notify::value', () => this._onSliderChanged(c.slider));
+            this._connect(c.mute, 'clicked', toggleMute);
+        }
         this._bindSink();
     }
 
@@ -1976,6 +2002,8 @@ export default class DynamicIslandExtension extends Extension {
         this._sink = this._control.get_default_sink();
         // Quick settings bring their own volume slider.
         this._volumeRow.visible = !!this._sink && !this._qsAdopter;
+        if (this._mediaVolumeRow)
+            this._mediaVolumeRow.visible = !!this._sink;
         if (!this._sink)
             return;
         this._sinkIds = [
@@ -1997,7 +2025,8 @@ export default class DynamicIslandExtension extends Extension {
         const value = this._sink.is_muted ? 0 : Math.min(1, this._sink.volume / max);
 
         this._syncingVolume = true;
-        this._slider.value = value;
+        for (const c of this._volumeControls)
+            c.slider.value = value;
         this._syncingVolume = false;
 
         let icon = 'audio-volume-muted-symbolic';
@@ -2007,14 +2036,16 @@ export default class DynamicIslandExtension extends Extension {
             icon = 'audio-volume-medium-symbolic';
         else if (value > 0)
             icon = 'audio-volume-low-symbolic';
-        this._muteButton.child.icon_name = icon;
-        this._volumeLabel.text = `${Math.round(value * 100)}`;
+        for (const c of this._volumeControls) {
+            c.mute.child.icon_name = icon;
+            c.label.text = `${Math.round(value * 100)}`;
+        }
     }
 
-    _onSliderChanged() {
+    _onSliderChanged(slider = this._slider) {
         if (this._syncingVolume || !this._sink)
             return;
-        const volume = this._slider.value * this._control.get_vol_max_norm();
+        const volume = slider.value * this._control.get_vol_max_norm();
         this._sink.volume = volume;
         if (volume < 1) {
             if (!this._sink.is_muted)
