@@ -84,14 +84,49 @@ export class Palette {
         this.actor.add_child(this._answer);
 
         const text = this.entry.clutter_text;
-        text.connect('text-changed', () => this._onTextChanged());
-        text.connect('activate', () => this._activate(this._selected));
-        text.connect('key-press-event', (_a, event) => this._onKey(event));
+        // The search runs after the key press, not inside it: text-changed is emitted deep in
+        // Clutter's key handling, and an error escaping there aborted the whole shell
+        // ("Palette/< terminated with uncatchable exception", 2026-10-03…10).
+        text.connect('text-changed', () => this._queueTextChanged());
+        text.connect('activate', () => this._guard('activate', () => {
+            this._flushTextChanged();
+            this._activate(this._selected);
+        }));
+        text.connect('key-press-event', (_a, event) => this._guard('key', () => this._onKey(event)) ?? Clutter.EVENT_PROPAGATE);
     }
 
     destroy() {
         this._cancel();
         this.actor.destroy();
+    }
+
+    // Runs fn; an error is logged instead of reaching Clutter's signal emission.
+    _guard(what, fn) {
+        try {
+            return fn();
+        } catch (e) {
+            console.error(`Dynamic Island: palette ${what} failed`, e);
+            return undefined;
+        }
+    }
+
+    _queueTextChanged() {
+        if (this._textId)
+            return;
+        this._textId = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            this._textId = 0;
+            this._guard('search', () => this._onTextChanged());
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    // Enter right after typing: the results must match what is in the entry.
+    _flushTextChanged() {
+        if (!this._textId)
+            return;
+        GLib.source_remove(this._textId);
+        this._textId = 0;
+        this._guard('search', () => this._onTextChanged());
     }
 
     // Called when the island shows the palette.
@@ -100,7 +135,11 @@ export class Palette {
         this._answer.hide();
         this._list.show();
         this.entry.text = text;
-        this._onTextChanged();
+        // Same text as before: no text-changed was queued, so search once here.
+        if (this._textId)
+            this._flushTextChanged();
+        else
+            this._guard('search', () => this._onTextChanged());
     }
 
     focus() {
@@ -119,6 +158,9 @@ export class Palette {
         if (this._flashId)
             GLib.source_remove(this._flashId);
         this._flashId = 0;
+        if (this._textId)
+            GLib.source_remove(this._textId);
+        this._textId = 0;
     }
 
     _onKey(event) {

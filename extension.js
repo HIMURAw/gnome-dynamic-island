@@ -665,7 +665,9 @@ export default class DynamicIslandExtension extends Extension {
             width: NOTIFICATION_ICON,
             height: NOTIFICATION_ICON,
             y_align: Clutter.ActorAlign.START,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0.5}),
         });
+        this._notificationIconBin = iconBin;
         const iconMask = new RoundedMask();
         iconMask.setGeometry(NOTIFICATION_ICON, NOTIFICATION_ICON, 11);
         iconBin.add_effect(iconMask);
@@ -684,6 +686,7 @@ export default class DynamicIslandExtension extends Extension {
         text.add_child(this._notificationApp);
         text.add_child(this._notificationTitle);
         text.add_child(this._notificationBody);
+        this._notificationText = text;
 
         row.add_child(iconBin);
         row.add_child(text);
@@ -740,7 +743,11 @@ export default class DynamicIslandExtension extends Extension {
             return;
         const dnd = this._center.dndActive;
         this._bellIcon.gicon = bellIcon(this.dir, dnd);
-        this._badge.visible = !dnd && NotificationCenter.notifications().some(n => !n.acknowledged);
+        const unseen = !dnd && NotificationCenter.notifications().some(n => !n.acknowledged);
+        const appeared = unseen && !this._badge.visible;
+        this._badge.visible = unseen;
+        if (appeared)
+            this._ringBell();
     }
 
     _buildMediaBubble() {
@@ -872,7 +879,7 @@ export default class DynamicIslandExtension extends Extension {
             this._positionTimeout = this._clearTimeout(this._positionTimeout);
         }
         if (mode === 'center') {
-            this._center.refresh();
+            this._center.refresh({animate: true});
             this._center.acknowledgeAll();
             this._syncBell();
         }
@@ -1581,6 +1588,7 @@ export default class DynamicIslandExtension extends Extension {
         if (this._hidden)
             this._setHidden(false);
         this._open('notification');
+        this._animateNotification();
 
         this._notificationTimeout = this._clearTimeout(this._notificationTimeout);
         if (notification.urgency !== Urgency.CRITICAL) {
@@ -1592,6 +1600,45 @@ export default class DynamicIslandExtension extends Extension {
                 return GLib.SOURCE_REMOVE;
             });
         }
+    }
+
+    // The icon pops in with a little overshoot, the text slides in after it.
+    _animateNotification() {
+        const icon = this._notificationIconBin;
+        const text = this._notificationText;
+        if (!icon || !text)
+            return;
+        icon.remove_all_transitions();
+        text.remove_all_transitions();
+        icon.set({scale_x: 0.4, scale_y: 0.4, opacity: 0});
+        icon.ease({scale_x: 1, scale_y: 1, opacity: 255, duration: 420, delay: 60,
+            mode: Clutter.AnimationMode.EASE_OUT_BACK});
+        text.set({translation_x: Clutter.get_default_text_direction() === Clutter.TextDirection.RTL ? -16 : 16, opacity: 0});
+        text.ease({translation_x: 0, opacity: 255, duration: 340, delay: 140,
+            mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+    }
+
+    // A new notification nobody has seen: the bell rings and the dot pops in.
+    _ringBell() {
+        const bell = this._bellIcon;
+        if (!bell)
+            return;
+        bell.remove_all_transitions();
+        bell.set_pivot_point(0.5, 0.15);
+        const swings = [16, -13, 9, -6, 3, 0];
+        const swing = i => {
+            if (i >= swings.length || !bell.mapped) {
+                bell.rotation_angle_z = 0;
+                return;
+            }
+            bell.ease({rotation_angle_z: swings[i], duration: i === 0 ? 90 : 110,
+                mode: Clutter.AnimationMode.EASE_IN_OUT_SINE, onComplete: () => swing(i + 1)});
+        };
+        swing(0);
+        this._badge.remove_all_transitions();
+        this._badge.set_pivot_point(0.5, 0.5);
+        this._badge.set({scale_x: 0, scale_y: 0});
+        this._badge.ease({scale_x: 1, scale_y: 1, duration: 360, mode: Clutter.AnimationMode.EASE_OUT_BACK});
     }
 
     // Called when the notification leaves the island, whatever the reason.
