@@ -21,6 +21,9 @@ export function bellIcon(dir, off = false) {
 const MAX_ROWS = 30;
 // About two lines of body text on a card.
 const MAX_BODY = 110;
+// Opening the center: each of the first cards comes in this much (ms) after the one above.
+const STAGGER = 35;
+const STAGGER_ROWS = 8;
 
 // Minimal printf for translated strings: %d and %s in order.
 function fmt(str, ...args) {
@@ -172,12 +175,30 @@ export class NotificationCenter {
         }
     }
 
-    refresh() {
+    // animate: the center is opening, the cards come in one after another. Otherwise
+    // only cards that were not on screen before slide in.
+    refresh({animate = false} = {}) {
         this._syncWeek();
-        this._list.destroy_all_children();
         const all = NotificationCenter.notifications();
-        for (const notification of all.slice(0, MAX_ROWS))
-            this._list.add_child(this._card(notification));
+        const rows = all.slice(0, MAX_ROWS);
+        // Nothing new: keep the cards (and any animation still running on them).
+        if (!animate && this._shownList && rows.length === this._shownList.length &&
+            rows.every((n, i) => n === this._shownList[i]))
+            return;
+        this._shownList = rows;
+        this._list.destroy_all_children();
+        const before = this._shown ?? new Set();
+        this._shown = new Set();
+        let order = 0;
+        for (const notification of rows) {
+            const card = this._card(notification);
+            this._list.add_child(card);
+            this._shown.add(notification);
+            if (animate && order < STAGGER_ROWS)
+                this._enter(card, order++ * STAGGER, 8);
+            else if (!animate && !before.has(notification))
+                this._enter(card, 0, -10);
+        }
 
         this._heading.text = all.length
             ? fmt(_('Notifications · %d'), all.length) : _('Notifications');
@@ -210,6 +231,39 @@ export class NotificationCenter {
             else
                 day.remove_style_pseudo_class('today');
         });
+    }
+
+    // GNOME skips the animation of an actor that is not on screen yet (the center is
+    // filled just before it is shown): the cards wait hidden until it is.
+    _enter(card, delay, fromY) {
+        card.set({opacity: 0, translation_y: fromY});
+        const go = () => card.ease({opacity: 255, translation_y: 0, duration: 280, delay,
+            mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+        if (card.mapped) {
+            go();
+            return;
+        }
+        const id = card.connect('notify::mapped', () => {
+            if (!card.mapped)
+                return;
+            card.disconnect(id);
+            go();
+        });
+    }
+
+    // The card slides out sideways and fades, then the notification goes.
+    _dismiss(card, notification, delay = 0, onDone = null) {
+        card.reactive = false;
+        card.remove_all_transitions();
+        const away = (Clutter.get_default_text_direction() === Clutter.TextDirection.RTL ? -1 : 1) * Math.max(card.width, 120) * 0.6;
+        card.ease({translation_x: away, opacity: 0, duration: 220, delay,
+            mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            onStopped: () => {
+                if (onDone)
+                    onDone();
+                else
+                    notification.destroy();
+            }});
     }
 
     _card(notification) {
@@ -271,7 +325,7 @@ export class NotificationCenter {
                 y_align: Clutter.ActorAlign.START,
                 child: new St.Icon({icon_name: 'window-close-symbolic', icon_size: 12}),
             });
-            close.connect('clicked', () => notification.destroy());
+            close.connect('clicked', () => this._dismiss(button, notification));
             row.add_child(close);
         }
 
@@ -296,10 +350,19 @@ export class NotificationCenter {
         return datetime.format('%-d %b');
     }
 
+    // The cards leave one after another, then the notifications are removed together.
     _clear() {
-        for (const notification of NotificationCenter.notifications()) {
-            if (!notification.resident)
-                notification.destroy();
+        const going = NotificationCenter.notifications().filter(n => !n.resident);
+        const cards = this._list.get_children();
+        const visible = cards.filter((card, i) => i < STAGGER_ROWS && card.mapped);
+        if (!visible.length) {
+            going.forEach(n => n.destroy());
+            return;
         }
+        let left = visible.length;
+        visible.forEach((card, i) => this._dismiss(card, null, i * STAGGER, () => {
+            if (--left === 0)
+                going.forEach(n => n.destroy());
+        }));
     }
 }
