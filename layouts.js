@@ -68,8 +68,12 @@ class TopCenterLayout extends Clutter.LayoutManager {
 // Hidden or empty children take no space.
 export const TileGridLayout = GObject.registerClass(
 class TileGridLayout extends Clutter.LayoutManager {
-    _init(columns, rowHeight, gap) {
+    // maxSpan: the most columns one item may take. A panel indicator that reports a huge width
+    // for a moment (Astra Monitor's graphs, before their history fills) would otherwise take a
+    // whole row and the island would open stretched until it settled.
+    _init(columns, rowHeight, gap, maxSpan = columns) {
         super._init();
+        this._maxSpan = maxSpan;
         this._columns = columns;
         this._rowHeight = rowHeight;
         this._gap = gap;
@@ -89,7 +93,7 @@ class TileGridLayout extends Clutter.LayoutManager {
             const [, w] = child.get_preferred_width(-1);
             if (w <= 0)
                 continue;
-            const span = Math.min(cols, Math.max(1, Math.ceil((w + this._gap) / (cell + this._gap))));
+            const span = Math.min(this._maxSpan, Math.max(1, Math.ceil((w + this._gap) / (cell + this._gap))));
             items.push({child, span, order: items.length});
         }
         items.sort((a, b) => b.span - a.span || a.order - b.order);
