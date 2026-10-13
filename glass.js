@@ -4,7 +4,7 @@ import GObject from 'gi://GObject';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
-const BLUR_RADIUS = 36;
+const BLUR_RADIUS = 18;
 // The windows behind the glass are re-blurred at most this often (ms).
 const REFRESH = 200;
 
