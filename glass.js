@@ -24,14 +24,30 @@ uniform sampler2D tex;
 uniform float width;
 uniform float height;
 uniform float radius;
+uniform float tex_w;
+uniform float tex_h;
+uniform float frame_width;
+uniform float frame_r;
+uniform float frame_g;
+uniform float frame_b;
+uniform float frame_a;
 
 void main(void) {
     vec2 uv = cogl_tex_coord_in[0].xy;
     vec4 color = texture2D(tex, uv);
+    // The offscreen texture is a little larger than the actor (its paint box, rounded out):
+    // place the shape by the texture's real size, centred, not stretched over it.
+    vec2 tex_size = vec2(tex_w, tex_h);
     vec2 half_size = vec2(width, height) * 0.5;
-    vec2 q = abs(uv * vec2(width, height) - half_size) - (half_size - vec2(radius));
+    vec2 q = abs(uv * tex_size - tex_size * 0.5) - (half_size - vec2(radius));
     float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-    cogl_color_out = color * clamp(0.5 - dist, 0.0, 1.0);
+    float outer = clamp(0.5 - dist, 0.0, 1.0);
+    // The frame is drawn here, along the same rounded edge as the cut, so it follows the
+    // corners too (a CSS border is clipped away there by this very mask).
+    float inner = frame_width > 0.0 ? clamp(0.5 - (dist + frame_width), 0.0, 1.0) : outer;
+    vec4 frame = vec4(frame_r, frame_g, frame_b, 1.0) * frame_a;
+    vec4 over = frame + color * (1.0 - frame_a);
+    cogl_color_out = color * inner + over * (outer - inner);
 }`;
 
 // Cuts an actor to a rounded rectangle with antialiased edges.
@@ -52,7 +68,45 @@ class RoundedMask extends Clutter.ShaderEffect {
         this.set_uniform_value('height', asFloat(height));
         this.set_uniform_value('radius', asFloat(radius));
     }
+
+    vfunc_paint_target(node, paintContext) {
+        // In device pixels; the shape is in logical ones (fractional scaling: 1.67).
+        const [ok, dw, dh] = this.get_target_size();
+        const scale = this.actor?.get_resource_scale?.() || 1;
+        const tw = dw / scale;
+        const th = dh / scale;
+        if (ok && (tw !== this._tw || th !== this._th)) {
+            this._tw = tw;
+            this._th = th;
+            this.set_uniform_value('tex_w', asFloat(tw));
+            this.set_uniform_value('tex_h', asFloat(th));
+        }
+        super.vfunc_paint_target(node, paintContext);
+    }
+
+    // A frame along the rounded edge: [r, g, b, a] 0..1 and its width in px; width 0 for none.
+    setFrame(rgba, width) {
+        const key = `${rgba}|${width}`;
+        if (key === this._frame)
+            return;
+        this._frame = key;
+        this.set_uniform_value('frame_width', asFloat(width));
+        ['frame_r', 'frame_g', 'frame_b', 'frame_a'].forEach((name, i) =>
+            this.set_uniform_value(name, asFloat(rgba[i])));
+    }
 });
+
+// The frame colour comes from the stylesheet, so states (hover, editing, playing) can change it:
+//   -glass-frame-color: rgba(...);  -glass-frame-width: 1px;
+function themeFrame(actor) {
+    const node = actor.get_theme_node();
+    const [ok, c] = node.lookup_color('-glass-frame-color', false);
+    if (!ok)
+        return [[0, 0, 0, 0], 0];
+    const ch = k => (typeof c[`get_${k}`] === 'function' ? c[`get_${k}`]() : c[k] / 255);
+    const [hasWidth, width] = node.lookup_length('-glass-frame-width', false);
+    return [[ch('red'), ch('green'), ch('blue'), ch('alpha')], hasWidth ? width : 1];
+}
 
 // Keeps the last picture of the glass and repaints it, instead of re-rendering
 // every window and the blur, when something behind changed less than REFRESH ago;
@@ -173,6 +227,8 @@ class Glass extends St.Widget {
         this.add_child(this.backdrop);
         this._mask = new RoundedMask();
         this.add_effect(this._mask);
+        this.connect('style-changed', () => this._mask.setFrame(...themeFrame(this)));
+        this._mask.setFrame([0, 0, 0, 0], 0);
     }
 
     vfunc_allocate(box) {
