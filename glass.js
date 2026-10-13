@@ -1,6 +1,7 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Mtk from 'gi://Mtk';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
@@ -117,48 +118,100 @@ function themeFrame(actor) {
     return [[ch('red'), ch('green'), ch('blue'), ch('alpha')], hasWidth ? width : 1];
 }
 
-// Keeps the last picture of the glass and repaints it, instead of re-rendering
-// every window and the blur, when something behind changed less than REFRESH ago;
-// the late change is picked up when the time is up. A move or resize of the glass
-// itself always repaints at once, so the island's own animations stay smooth.
-const Throttle = GObject.registerClass(
-class Throttle extends Clutter.OffscreenEffect {
-    _init() {
-        super._init();
-        this._last = 0;
-        this._timer = 0;
-        this.force = true;
-    }
+// ---------- The scene behind the glasses, as one shared snapshot ----------
+//
+// Every glass used to hold a live Clutter.Clone of what is behind it and a custom
+// effect suppressed the clone's repaints to save re-blurring. Clearing the dirty
+// flag made the compositor now and then paint the clone unmasked for one frame:
+// with a video wallpaper that showed as a purple flash around the island (Umut's
+// recording, 2026-10-13). Now one snapshot of the scene (a finished frame, the
+// cursor left out) is taken for all glasses at most every REFRESH ms and each
+// backdrop just shows and blurs that texture: between snapshots nothing behind a
+// glass changes, and a finished frame cannot be caught mid-paint.
+const snapshot = {content: null, at: 0, timer: 0, idle: 0, clients: new Set()};
 
-    vfunc_paint(node, paintContext, flags) {
-        const now = GLib.get_monotonic_time() / 1000;
-        if ((flags & Clutter.EffectPaintFlags.ACTOR_DIRTY) && !this.force && now - this._last < REFRESH) {
-            flags &= ~Clutter.EffectPaintFlags.ACTOR_DIRTY;
-            if (!this._timer) {
-                this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, REFRESH - (now - this._last), () => {
-                    this._timer = 0;
-                    this.force = true;
-                    this.actor?.queue_redraw();
-                    return GLib.SOURCE_REMOVE;
-                });
-            }
-        } else if (flags & Clutter.EffectPaintFlags.ACTOR_DIRTY) {
-            this._last = now;
-            this.force = false;
+function snapshotSource() {
+    return global.stage;
+}
+
+// Extra actors (the island's strip, the dock) blanked out of the snapshot on top of
+// every glass itself, so a glass never sees its own extension in what is "behind".
+export const snapshotExclude = new Set();
+
+function takeSnapshot() {
+    snapshot.at = GLib.get_monotonic_time() / 1000;
+    // The glasses and their extension's surfaces are blanked for the capture and
+    // restored in the same tick: the on-screen frame never sees it, and the
+    // capture shows what is genuinely behind them.
+    const blanked = [];
+    for (const actor of [...snapshotExclude, ...[...snapshot.clients].map(b => b.get_parent())]) {
+        if (actor && actor.opacity !== 0) {
+            blanked.push([actor, actor.opacity]);
+            actor.opacity = 0;
         }
-        super.vfunc_paint(node, paintContext, flags);
     }
-
-    stop() {
-        if (this._timer)
-            GLib.source_remove(this._timer);
-        this._timer = 0;
+    try {
+        let scale = 1;
+        try {
+            scale = global.display.get_monitor_scale(global.display.get_primary_monitor());
+        } catch {
+            scale = 1;
+        }
+        const [w, h] = global.stage.get_size();
+        const rect = new Mtk.Rectangle({x: 0, y: 0, width: Math.round(w), height: Math.round(h)});
+        snapshot.content = global.stage.paint_to_content(rect, scale, null, Clutter.PaintFlag.NO_CURSORS);
+    } catch (e) {
+        console.error('Dynamic Island: snapshot failed', e);
+        return;
+    } finally {
+        for (const [actor, opacity] of blanked)
+            actor.opacity = opacity;
     }
-});
+    for (const backdrop of snapshot.clients)
+        backdrop.setSnapshot(snapshot.content);
+}
 
-// A blurred copy of whatever sits behind it on screen (wallpaper and windows).
-// Shell.BlurEffect in background mode cannot be rounded, so instead we clone the
-// window group, line the clone up with the screen, and blur the clone itself.
+function stopSnapshots() {
+    for (const id of [snapshot.timer, snapshot.idle])
+        if (id)
+            GLib.source_remove(id);
+    snapshot.timer = snapshot.idle = 0;
+    snapshot.content = null; // free the texture while every glass is off screen
+    for (const backdrop of snapshot.clients)
+        backdrop.setSnapshot(null);
+}
+
+function syncSnapshots() {
+    if (![...snapshot.clients].some(b => b.mapped)) {
+        stopSnapshots();
+        return;
+    }
+    // Never synchronously: a map notification can arrive mid-layout, and painting
+    // the scene to a texture right then would re-enter it.
+    if (!snapshot.content && !snapshot.idle) {
+        snapshot.idle = GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+            snapshot.idle = 0;
+            if ([...snapshot.clients].some(b => b.mapped))
+                takeSnapshot();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+    if (!snapshot.timer) {
+        snapshot.timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, REFRESH, () => {
+            if (![...snapshot.clients].some(b => b.mapped)) {
+                snapshot.timer = 0;
+                stopSnapshots();
+                return GLib.SOURCE_REMOVE;
+            }
+            takeSnapshot();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+}
+
+// A blurred picture of whatever sits behind the glass on screen, from the shared
+// snapshot, lined up with the screen. Shell.BlurEffect in background mode cannot
+// be rounded, so the glass blurs its own copy.
 const Backdrop = GObject.registerClass(
 class Backdrop extends St.Widget {
     _init() {
@@ -174,19 +227,27 @@ class Backdrop extends St.Widget {
             this.add_child(this._tint);
             return;
         }
-        this._clone = new Clutter.Clone({source: global.window_group});
-        this.add_child(this._clone);
+        this._shot = new St.Widget();
+        this.add_child(this._shot);
         this.add_child(this._tint);
         this._blur = new Shell.BlurEffect({
             mode: Shell.BlurMode.ACTOR,
             radius: BLUR_RADIUS,
             brightness: 0.9,
         });
-        // Outermost, so a kept picture skips the windows and the blur alike.
-        this._throttle = new Throttle();
-        this.add_effect(this._throttle);
         this.add_effect(this._blur);
-        this.connect('destroy', () => this._throttle.stop());
+        snapshot.clients.add(this);
+        this.setSnapshot(snapshot.content);
+        this.connect('notify::mapped', () => syncSnapshots());
+        this.connect('destroy', () => {
+            this._shot = null;
+            snapshot.clients.delete(this);
+            syncSnapshots();
+        });
+    }
+
+    setSnapshot(content) {
+        this._shot?.set_content(content);
     }
 
     vfunc_get_preferred_width(_forHeight) {
@@ -200,18 +261,14 @@ class Backdrop extends St.Widget {
     vfunc_allocate(box) {
         this.set_allocation(box);
         this._tint.allocate(new Clutter.ActorBox({x1: 0, y1: 0, x2: box.get_width(), y2: box.get_height()}));
-        if (!this._clone)
+        if (!this._shot)
             return;
+        // Lined up with the screen, so the blur shows exactly what is behind.
         const [px, py] = this.get_parent().get_transformed_position();
         const x = px + box.x1;
         const y = py + box.y1;
-        const [w, h] = global.window_group.get_size();
-        const key = `${x},${y},${box.get_width()},${box.get_height()},${w},${h}`;
-        if (key !== this._key) {
-            this._key = key;
-            this._throttle.force = true;
-        }
-        this._clone.allocate(new Clutter.ActorBox({x1: -x, y1: -y, x2: -x + w, y2: -y + h}));
+        const [w, h] = snapshotSource().get_size();
+        this._shot.allocate(new Clutter.ActorBox({x1: -x, y1: -y, x2: -x + w, y2: -y + h}));
 
         // The blur downscales by its radius; on a small actor a large radius would
         // shrink the texture to nothing.
@@ -220,7 +277,6 @@ class Backdrop extends St.Widget {
         this._blur.radius = Math.max(1, Math.min(BLUR_RADIUS, Math.floor(side / 3)));
     }
 });
-
 // Frosted glass container. Children are stacked (BinLayout) on top of the blur,
 // and everything, content included, is clipped to the rounded shape.
 export const Glass = GObject.registerClass(

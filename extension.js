@@ -21,7 +21,7 @@ import {loadInterfaceXML} from 'resource:///org/gnome/shell/misc/fileUtils.js';
 import {Activities, ActivitiesCard} from './activities.js';
 import {AppsCard} from './apps.js';
 import {ChargeIndicator} from './charge.js';
-import {Glass, RoundedMask, setBlurEnabled} from './glass.js';
+import {Glass, RoundedMask, setBlurEnabled, snapshotExclude} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher, squareArt} from './media.js';
@@ -235,6 +235,7 @@ export default class DynamicIslandExtension extends Extension {
             Main.layoutManager.removeChrome(this._strip);
             this._strip.destroy();
         }
+        snapshotExclude.clear();
         this._strip = this._island = this._left = this._right = this._privacy = this._chatBubble = null;
 
         this._power = null;
@@ -273,6 +274,8 @@ export default class DynamicIslandExtension extends Extension {
         this._stripGone = false;
         this._strip.connect('destroy', () => (this._stripGone = true));
         Main.layoutManager.addChrome(this._strip, {affectsStruts: false, trackFullscreen: false});
+        // The whole strip is blanked out of the glass snapshots (glass.js), icons and all.
+        snapshotExclude.add(this._strip);
         // Below the panel menus, so menus opened from the island are not covered by it.
         Main.layoutManager.uiGroup.set_child_above_sibling(this._strip, Main.layoutManager.panelBox);
         this._syncStripGeometry();
