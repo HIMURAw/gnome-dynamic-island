@@ -1,8 +1,11 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
+import Cairo from 'cairo';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+
+import {Robot, drawCairo} from './robot.js';
 
 // A virtual pointer and keyboard for the voice assistant, so it can use any app
 // the way Umut does: Wayland lets no ordinary program move the pointer or type into
@@ -10,8 +13,8 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 // pixels, the size of global.stage). The assistant asks over D-Bus (activities.js);
 // it stops itself when Umut touches the keyboard or touchpad.
 //
-// Harvis has a pointer of its own on screen, an arrow labelled "Harvis" that glides
-// to where it is going, like a second person at the desk. Umut's pointer stays his:
+// Harvis has a pointer of its own on screen, the arrow-shaped robot that is Harvis, which
+// glides to where it is going, like a second person at the desk. Umut's pointer stays his:
 // for a click it goes there for an instant and comes straight back.
 
 const MODIFIERS = {
@@ -49,54 +52,77 @@ function keyval(name) {
     return Clutter[`KEY_${name}`] ?? 0;
 }
 
-// The classic arrow, drawn so it looks like a pointer and not an icon.
-function drawArrow(area) {
-    const cr = area.get_context();
-    const [, h] = area.get_surface_size();
-    const s = h / 22;
-    cr.scale(s, s);
-    cr.moveTo(1, 1);
-    cr.lineTo(1, 17);
-    cr.lineTo(5.2, 13.2);
-    cr.lineTo(8, 19.5);
-    cr.lineTo(10.6, 18.4);
-    cr.lineTo(7.9, 12.2);
-    cr.lineTo(13.5, 12.2);
-    cr.closePath();
-    cr.setSourceRGBA(0.55, 0.36, 0.96, 1);
-    cr.fillPreserve();
-    cr.setSourceRGBA(1, 1, 1, 1);
-    cr.setLineWidth(1.4);
-    cr.stroke();
-    cr.$dispose();
-}
+// Harvis's pointer is Harvis itself: the arrow-shaped pixel robot (robot.js). It rests with
+// its eyes open and blinking, squints and kicks up dust while it glides, and grins ^^ with a
+// spark at the tip when it clicks.
+const PX = 1.2; // logical pixels per sprite pixel: two device pixels at 1.67, a little bigger than a pointer
+const FRAME = 33;
 
 class Ghost {
     constructor() {
+        this._robot = new Robot('pointer');
         this.actor = new St.Widget({reactive: false, can_focus: false, opacity: 0,
             layout_manager: new Clutter.FixedLayout()});
-        const arrow = new St.DrawingArea({width: 16, height: 22});
-        arrow.connect('repaint', drawArrow);
-        const label = new St.Label({text: 'Harvis', style_class: 'dynada-ghost-label', x: 14, y: 18});
-        this.actor.add_child(arrow);
-        this.actor.add_child(label);
+        const {w, h, hot} = this._robot.frame();
+        // The widget's origin is the point Harvis aims at: the sprite is shifted so its tip is there.
+        this._area = new St.DrawingArea({width: Math.ceil(w * PX), height: Math.ceil(h * PX),
+            x: -Math.round(hot[0] * PX), y: -Math.round(hot[1] * PX)});
+        this._area.connect('repaint', area => {
+            const cr = area.get_context();
+            const [sw] = area.get_surface_size();
+            const s = sw / Math.max(1, area.width);
+            try {
+                drawCairo(cr, this._robot.frame(), {px: PX * s, Cairo});
+            } finally {
+                cr.$dispose();
+            }
+        });
+        this.actor.add_child(this._area);
         Main.layoutManager.uiGroup.add_child(this.actor);
         const [px, py] = global.get_pointer();
         this.actor.set_position(px, py);
+        this._last = 0;
+    }
+
+    // Animates only while it can be seen.
+    _run(on) {
+        if (on && !this._frameId) {
+            this._last = 0;
+            this._frameId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, FRAME, () => {
+                const now = GLib.get_monotonic_time() / 1e6;
+                this._robot.step(this._last ? now - this._last : 0);
+                this._last = now;
+                this._area.queue_repaint();
+                return GLib.SOURCE_CONTINUE;
+            });
+        } else if (!on && this._frameId) {
+            GLib.source_remove(this._frameId);
+            this._frameId = 0;
+        }
+    }
+
+    state(name) {
+        this._robot.setState(name);
     }
 
     destroy() {
+        this._run(false);
         this.actor.destroy();
     }
 
     show() {
         Main.layoutManager.uiGroup.set_child_above_sibling(this.actor, null);
+        this._run(true);
         if (this.actor.opacity < 255)
             this.actor.ease({opacity: 255, duration: 150});
     }
 
     hide() {
-        this.actor.ease({opacity: 0, duration: 300});
+        this._robot.setState('idle');
+        this.actor.ease({opacity: 0, duration: 300, onStopped: () => {
+            if (this.actor.opacity === 0)
+                this._run(false);
+        }});
     }
 
     // Resolves when it has arrived.
@@ -106,9 +132,13 @@ class Ghost {
         const duration = Math.round(Math.min(GLIDE_MAX, Math.max(GLIDE_MIN, dist * GLIDE_PER_PX)));
         if (dist < 2)
             return Promise.resolve();
+        this.state('moving');
         return new Promise(resolve => {
             this.actor.ease({x, y, duration, mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
-                onStopped: () => resolve()});
+                onStopped: () => {
+                    this.state('idle');
+                    resolve();
+                }});
         });
     }
 }
@@ -161,6 +191,7 @@ export class Control {
         const code = [0, Clutter.BUTTON_PRIMARY, Clutter.BUTTON_MIDDLE, Clutter.BUTTON_SECONDARY][button] ??
             Clutter.BUTTON_PRIMARY;
         const [ux, uy] = global.get_pointer();
+        this._ghost.state('click');
         this._pointer.notify_absolute_motion(us(), x, y);
         await pause(40);  // the app sees the pointer arrive (hover) before the press
         for (let i = 0; i < Math.max(1, count); i++) {
@@ -172,6 +203,7 @@ export class Control {
         }
         await pause(40);  // the release is handled where it happened, then the pointer goes home
         this._pointer.notify_absolute_motion(us(), ux, uy);
+        pause(600).then(() => this._ghost?.state('idle'));
     }
 
     async drag(x1, y1, x2, y2) {

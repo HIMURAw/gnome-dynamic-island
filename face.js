@@ -1,20 +1,24 @@
+import Cairo from 'cairo';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Graphene from 'gi://Graphene';
 
-import {Avatar, drawCairo} from './avatar.js';
+import {Robot, drawCairo} from './robot.js';
 import {drawingArea} from './mind.js';
 
-// Harvis in the collapsed island, as its character (avatar.js, shared with the Harvis app and
-// the cursor theme): an orange spark with a face. It is always there, not only when Harvis is
-// busy, because it is meant to feel alive:
-//   idle       breathes, blinks, its eyes follow the pointer; happy when the pointer comes close
-//   listening  perks up, rays shiver with Umut's voice
-//   thinking   spins like a pinwheel, eyes up and aside
-//   speaking   mouth and rays move with Harvis's own voice
-//   failed     droops, turns red, frowns
-//   sleeping   the Harvis service is not running: eyes shut, rays pulled in
-// The mood (mind.json, valence/arousal) tints it and sets its tempo.
+// Harvis in the collapsed island, as its character: the purple neon pixel robot (robot.js,
+// shared with the Harvis app). It is always there, not only when Harvis is busy, because it
+// is meant to feel alive:
+//   idle       breathes, blinks, its eyes follow the pointer; ^^ when the pointer comes close
+//   listening  hops up, its ear lights flash with Umut's voice
+//   thinking   eyes scan the visor side to side, the antenna blinks fast
+//   speaking   a mouth in the visor and the chest light move with Harvis's own voice
+//   failed     red X eyes, the antenna flashes red
+//   sleeping   the Harvis service is not running: eyes shut, lights dim, a "z"
+// The mood (mind.json) sets its tempo; high spirits give it ^^ eyes when idle.
+
+// The robot's own box inside its 32 x 32 sprite (ears to feet, antenna to soles).
+const CROP = {x: 2, y: 3, w: 28, h: 26};
 
 const FAST = 33;  // ms, while something happens
 const SLOW = 50;  // ms, idle
@@ -25,11 +29,12 @@ export class AvatarGlyph {
     constructor(level) {
         this.mode = 'idle';
         this._level = level;
-        this._avatar = new Avatar({compact: true});
+        this._avatar = new Robot('head');
         this._serviceUp = true;
         this._last = 0;
-        this.actor = drawingArea(24, 24, (cr, w, h) => {
-            drawCairo(cr, this._avatar.shapes(), {x: w / 2, y: h / 2, size: Math.min(w, h)});
+        // One sprite pixel per logical pixel; drawCairo snaps them to device pixels.
+        this.actor = drawingArea(CROP.w, CROP.h, (cr, w, h, s) => {
+            drawCairo(cr, this._avatar.frame(), {x: -CROP.x * s, y: -CROP.y * s, px: s, Cairo});
         });
         this.actor.margin_right = 7;
         this.actor.pivot_point = new Graphene.Point({x: 0.5, y: 0.5});
@@ -104,8 +109,8 @@ export class AvatarGlyph {
             this._px = px;
             this._py = py;
             this._still = 0;
-            const k = Math.min(1, d / 120) / Math.max(d, 1);
-            a.lookAt(dx * k, dy * k);
+            // Pixel eyes move a whole pixel or not at all: look only when the pointer is clearly aside.
+            a.lookAt(Math.abs(dx) > 60 ? Math.sign(dx) : 0, dy > 80 ? 1 : 0);
         } else if ((this._still = (this._still ?? 0) + 1) > 90) {
             a.lookAt(null);  // the pointer has rested: look around by itself
         }
