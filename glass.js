@@ -6,7 +6,9 @@ import St from 'gi://St';
 
 const BLUR_RADIUS = 18;
 // The windows behind the glass are re-blurred at most this often (ms).
-const REFRESH = 200;
+// 500 since 2026-10-13: the wallpaper is a video now, so what is behind changes every frame and
+// this is what sets how often each glass re-blurs. Twice a second reads fine under the blur.
+const REFRESH = 500;
 
 // Blur is the costly part; with it off every glass is a plain dark surface.
 // Set before building any glass (the extension rebuilds when it changes).
