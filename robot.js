@@ -510,6 +510,17 @@ export class Robot {
     }
 }
 
+// Bir karenin parmak izi: piksel ızgarası ve haleler. Kabuklar bunu bir önceki kareyle karşılaştırıp
+// yalnızca görüntü gerçekten değiştiyse yeniden çizer; boştaki robot saniyede birkaç kez değişir,
+// her karede çizdirmek ekran yöneticisini boşuna çalıştırırdı.
+export function signature(frame) {
+    const g = frame.grid;
+    let s = g.cells.map(c => c ?? '.').join('');
+    for (const q of g.glows)
+        s += `|${q.x},${q.y},${q.r},${q.color},${q.a.toFixed(2)}`;
+    return s;
+}
+
 // ---------- Kabuklar ----------
 
 function rgb(hex) {

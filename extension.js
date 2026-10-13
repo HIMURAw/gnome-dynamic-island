@@ -1782,10 +1782,11 @@ export default class DynamicIslandExtension extends Extension {
         const wasFullscreen = this._fullscreen;
         this._fullscreen = fullscreen;
         // Out of fullscreen, let full-screen windows scan out directly again.
-        if (!fullscreen)
-            this._keepComposited(false);
-        else if (!this._hidden)
-            this._keepComposited(true);
+        // Not only in fullscreen: a maximized window that fills the whole screen (Zen
+        // without F11) is scanned out straight to the display as well, and then the
+        // shown island was not drawn over it (2026-10-13). Keep the compositor in the way
+        // whenever it shows over a window; when nothing is under it, let it go.
+        this._keepComposited(on && !this._hidden);
         if (on && !this._pointerWatch)
             this._pointerWatch = getPointerWatcher().addWatch(100, (x, y) => this._onPointerMove(x, y));
         else if (!on && this._pointerWatch) {
@@ -1870,7 +1871,7 @@ export default class DynamicIslandExtension extends Extension {
         // bypassing the shell: anything drawn over it stays invisible. While the
         // island shows over one, keep the compositor in the way (as GNOME's own
         // menus do).
-        this._keepComposited(!hidden && !!this._fullscreen);
+        this._keepComposited(!hidden && !!this._autoHide);
         if (hidden) {
             this._strip.ease({
                 translation_y: offset,

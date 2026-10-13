@@ -5,7 +5,7 @@ import Cairo from 'cairo';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {Robot, drawCairo} from './robot.js';
+import {Robot, drawCairo, signature} from './robot.js';
 
 // A virtual pointer and keyboard for the voice assistant, so it can use any app
 // the way Umut does: Wayland lets no ordinary program move the pointer or type into
@@ -72,7 +72,7 @@ class Ghost {
             const [sw] = area.get_surface_size();
             const s = sw / Math.max(1, area.width);
             try {
-                drawCairo(cr, this._robot.frame(), {px: PX * s, Cairo});
+                drawCairo(cr, this._shown ?? this._robot.frame(), {px: PX * s, Cairo});
             } finally {
                 cr.$dispose();
             }
@@ -92,7 +92,13 @@ class Ghost {
                 const now = GLib.get_monotonic_time() / 1e6;
                 this._robot.step(this._last ? now - this._last : 0);
                 this._last = now;
-                this._area.queue_repaint();
+                const frame = this._robot.frame();
+                const key = signature(frame);
+                if (key !== this._key) {  // only a changed picture is painted
+                    this._key = key;
+                    this._shown = frame;
+                    this._area.queue_repaint();
+                }
                 return GLib.SOURCE_CONTINUE;
             });
         } else if (!on && this._frameId) {
