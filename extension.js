@@ -30,6 +30,7 @@ import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
 import {MindView, VoiceEnvelope} from './mind.js';
 import {AvatarGlyph} from './face.js';
+import {EdgeGlow} from './edge.js';
 import {GlassMenus} from './menus.js';
 import {Cards} from './cards.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
@@ -195,6 +196,8 @@ export default class DynamicIslandExtension extends Extension {
 
         this._safely('releasing palette', () => this._releasePalette());
         this._safely('releasing privacy bubble', () => this._privacyWatcher?.destroy());
+        this._safely('removing edge glow', () => this._edgeGlow?.destroy());
+        this._edgeGlow = null;
         this._privacyWatcher = null;
         this._safely('releasing desktop icons', () => this._releaseDesktopIcons());
         this._safely('releasing auto-hide', () => this._releaseAutoHide());
@@ -1358,6 +1361,15 @@ export default class DynamicIslandExtension extends Extension {
         this._setListening(listening);
         const {mode} = this._harvisState();
         this._compactBrain.setMode(mode);
+        // Harvis working the screen: purple light on the edges, breathing with its voice (edge.js).
+        const controlling = this._activities.items.some(item => item.id === 'harvis-control');
+        if (controlling && !this._edgeGlow) {
+            this._voiceEnvelope ??= new VoiceEnvelope();
+            this._edgeGlow = new EdgeGlow(() => this._voiceEnvelope.level());
+            this._edgeGlow.keepBelow(this._island);
+        }
+        this._edgeGlow?.setActive(controlling);
+        this._edgeGlow?.setSpeaking(mode === 'speaking');
         for (const m of ['thinking', 'speaking', 'failed'])
             (m === mode ? this._island.add_style_class_name : this._island.remove_style_class_name)
                 .call(this._island, `dynada-${m}`);
