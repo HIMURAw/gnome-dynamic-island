@@ -12,7 +12,9 @@
 .dynada-island,
 .dynada-bubble {
   color: #f5f5f7;
-  border: 1px solid rgba(168, 132, 255, 0.6);
+  /* The frame is drawn by glass.js along the rounded edge; the CSS border only keeps the room. */
+  border: 1px solid transparent;
+  -glass-frame-color: rgba(168, 132, 255, 0.6);
   border-radius: 19px;
 }
 
@@ -21,7 +23,7 @@
 }
 
 .dynada-bubble:playing {
-  border-color: rgba(190, 160, 255, 0.85);
+  -glass-frame-color: rgba(190, 160, 255, 0.85);
 }
 
 /* Collapsed */
