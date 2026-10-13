@@ -12,7 +12,7 @@
 .dynada-island,
 .dynada-bubble {
   color: #f5f5f7;
-  border: 1px solid rgba(190, 170, 255, 0.13);
+  border: 1px solid rgba(168, 132, 255, 0.6);
   border-radius: 19px;
 }
 
@@ -21,7 +21,7 @@
 }
 
 .dynada-bubble:playing {
-  border-color: rgba(190, 170, 255, 0.28);
+  border-color: rgba(190, 160, 255, 0.85);
 }
 
 /* Collapsed */
