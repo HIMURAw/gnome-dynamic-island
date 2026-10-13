@@ -28,7 +28,8 @@ import {MediaWatcher, squareArt} from './media.js';
 import {ChatView} from './chat.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
-import {BrainGlyph, MindView, VoiceEnvelope} from './mind.js';
+import {MindView, VoiceEnvelope} from './mind.js';
+import {AvatarGlyph} from './face.js';
 import {GlassMenus} from './menus.js';
 import {Cards} from './cards.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
@@ -406,9 +407,9 @@ export default class DynamicIslandExtension extends Extension {
         this._compactActivity.add_child(this._compactActivityIcon);
         this._compactActivity.add_child(this._compactActivityLabel);
 
-        // Harvis as a brain: green in a conversation, amber at work, red when it failed (mind.js).
+        // Harvis as its character, always there: it breathes, blinks and watches the pointer (face.js).
         this._voiceEnvelope ??= new VoiceEnvelope();
-        this._compactBrain = new BrainGlyph(mode => mode === 'speaking'
+        this._compactBrain = new AvatarGlyph(mode => mode === 'speaking'
             ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6);
         box.add_child(this._compactBrain.actor);
         box.add_child(this._compactActivity);
@@ -1256,6 +1257,7 @@ export default class DynamicIslandExtension extends Extension {
         if (!this._chat || this._stripGone)
             return;
         this._chat.addExchange(question, answer);
+        this._compactBrain?.emote('joy');
         if (this._mode !== 'chat' && this._chatBadge)
             this._chatBadge.visible = true;
     }
