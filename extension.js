@@ -308,7 +308,7 @@ export default class DynamicIslandExtension extends Extension {
             ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6;
         this._chatAvatar = new AvatarGlyph(harvisLevel);
         this._chatAvatar.actor.margin_right = 0;
-        this._mindAvatar = new AvatarGlyph(harvisLevel, {scale: 2.4});
+        this._mindAvatar = new AvatarGlyph(harvisLevel, {scale: 3});
         this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close(),
             onMind: () => this._openMind(), avatar: this._chatAvatar, dir: this.dir});
         this._mind = new MindView({
@@ -530,7 +530,7 @@ export default class DynamicIslandExtension extends Extension {
         this._tray = new St.Widget({
             style_class: 'dynada-tray',
             x_expand: true,
-            layout_manager: new TileGridLayout(6, 44, 8),
+            layout_manager: new TileGridLayout(6, 44, 8, 3),
             visible: false,
         });
         view.add_child(this._tray);
@@ -2386,7 +2386,8 @@ export default class DynamicIslandExtension extends Extension {
         // label styles. The tile look (background, hover, open menu) is the slot's;
         // the button's own theme background is switched off with an inline style,
         // which beats every theme rule, hover included.
-        const slot = new St.Bin({name: 'panel', style_class: 'dynada-slot', child: container});
+        const slot = new St.Bin({name: 'panel', style_class: 'dynada-slot', child: container,
+            clip_to_allocation: true});
         container.visible = visible;
         const record = {container, box, index, slot, ids: []};
         this._slots.push(record);

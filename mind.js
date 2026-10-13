@@ -7,15 +7,10 @@ import Graphene from 'gi://Graphene';
 
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-// Harvis's mind, drawn from the thing it remembers with: the Brain vault's own
-// pages and the links between them. A conversation is green, work amber,
-// a failure red:
-//   listening  green, Umut's voice
-//   speaking   green, rings from the centre that follow Harvis's actual voice
-//   thinking   amber, a signal hopping from page to page along real links
-//   failed     red, Harvis could not do what was asked
-// The collapsed island shows a small brain in the same colours (BrainGlyph);
-// clicking the Harvis bubble opens MindView, the whole graph.
+// Harvis's own page in the island: its robot (face.js) beside its name, what it is doing
+// (green in a conversation, amber at work, red when it failed) and its last answer, with
+// Chat / Talk / backend buttons. (Until 2026-10-13 it also drew the Brain vault as a graph;
+// Umut asked for only the robot.) BrainGlyph, the old small brain, is no longer used.
 
 const FRAME = 33; // ms, ~30 fps, only while visible
 export const COLORS = {
@@ -28,9 +23,6 @@ export const COLORS = {
     mistake: [1.0, 0.48, 0.45],
     page: [0.93, 0.93, 0.95],
 };
-const BRAIN = GLib.build_filenamev([GLib.get_home_dir(), 'Masaüstü', 'Brain']);
-const VAULT = 'Brain';
-const MAX_NODES = 70;
 const HARVIS_DATA = GLib.build_filenamev([GLib.get_user_data_dir(), 'harvis']);
 const VOICE = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'harvis-voice.json']);
 
@@ -284,128 +276,6 @@ export class BrainGlyph {
     }
 }
 
-// ---------- The Brain graph ----------
-
-function listMarkdown(dir, base, out) {
-    let children;
-    try {
-        children = Gio.File.new_for_path(dir).enumerate_children('standard::name,standard::type',
-            Gio.FileQueryInfoFlags.NONE, null);
-    } catch {
-        return;
-    }
-    let info;
-    while ((info = children.next_file(null))) {
-        const name = info.get_name();
-        if (name.startsWith('.'))
-            continue;
-        const path = GLib.build_filenamev([dir, name]);
-        if (info.get_file_type() === Gio.FileType.DIRECTORY)
-            listMarkdown(path, `${base}${name}/`, out);
-        else if (name.endsWith('.md'))
-            out.push({path, rel: `${base}${name}`});
-    }
-    children.close(null);
-}
-
-// Pages that link to others, the best-connected ones, laid out once with a small
-// force simulation (pages pull on what they link to, everything pushes apart).
-function loadGraph() {
-    const files = [];
-    listMarkdown(GLib.build_filenamev([BRAIN, 'wiki']), 'wiki/', files);
-    listMarkdown(GLib.build_filenamev([BRAIN, 'mistakes']), 'mistakes/', files);
-    const byName = new Map(files.map(f => [f.rel.split('/').pop().slice(0, -3).toLowerCase(), f]));
-    const edges = new Map();
-    for (const file of files) {
-        const text = readText(file.path) ?? '';
-        for (const match of text.matchAll(/\[\[([^\]|#]+)/g)) {
-            const target = byName.get(match[1].trim().toLowerCase());
-            if (target && target !== file) {
-                const key = [file.rel, target.rel].sort().join('\n');
-                edges.set(key, [file.rel, target.rel]);
-            }
-        }
-    }
-    const degree = new Map();
-    for (const [a, b] of edges.values()) {
-        degree.set(a, (degree.get(a) ?? 0) + 1);
-        degree.set(b, (degree.get(b) ?? 0) + 1);
-    }
-    // The best-connected pages, then only those joined to the best-connected one
-    // (a stray pair far off would squeeze the rest of the picture).
-    let chosen = [...degree.entries()].sort((x, y) => y[1] - x[1]).slice(0, MAX_NODES).map(([rel]) => rel);
-    const inChosen = new Set(chosen);
-    const reach = new Set([chosen[0]]);
-    for (let grew = true; grew;) {
-        grew = false;
-        for (const [a, b] of edges.values()) {
-            if (inChosen.has(a) && inChosen.has(b) && reach.has(a) !== reach.has(b)) {
-                reach.add(a);
-                reach.add(b);
-                grew = true;
-            }
-        }
-    }
-    chosen = chosen.filter(rel => reach.has(rel));
-    const index = new Map(chosen.map((rel, i) => [rel, i]));
-    const nodes = chosen.map(rel => {
-        const kind = rel.startsWith('wiki/people/') ? 'person'
-            : rel.startsWith('wiki/projects/') ? 'project'
-                : rel.startsWith('mistakes/') ? 'mistake' : 'page';
-        return {rel, name: rel.split('/').pop().slice(0, -3), kind, degree: degree.get(rel),
-            x: Math.random() - 0.5, y: Math.random() - 0.5, glow: 0};
-    });
-    const links = [...edges.values()].filter(([a, b]) => index.has(a) && index.has(b))
-        .map(([a, b]) => [index.get(a), index.get(b)]);
-    const neighbours = nodes.map(() => []);
-    for (const [a, b] of links) {
-        neighbours[a].push(b);
-        neighbours[b].push(a);
-    }
-
-    // Fruchterman-Reingold, in a 2:1 box to fit the island.
-    const k = 0.9 / Math.sqrt(Math.max(1, nodes.length));
-    for (let step = 0; step < 300; step++) {
-        const heat = 0.1 * (1 - step / 300) + 0.005;
-        const dx = nodes.map(() => 0), dy = nodes.map(() => 0);
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                const x = nodes[i].x - nodes[j].x, y = (nodes[i].y - nodes[j].y) * 2;
-                const d2 = Math.max(1e-4, x * x + y * y);
-                const f = k * k / d2;
-                dx[i] += x * f; dy[i] += y * f; dx[j] -= x * f; dy[j] -= y * f;
-            }
-        }
-        for (const [a, b] of links) {
-            const x = nodes[a].x - nodes[b].x, y = (nodes[a].y - nodes[b].y) * 2;
-            const d = Math.sqrt(x * x + y * y) || 1e-3;
-            const f = d / k;
-            dx[a] -= x / d * f * d; dy[a] -= y / d * f * d; dx[b] += x / d * f * d; dy[b] += y / d * f * d;
-        }
-        nodes.forEach((n, i) => {
-            if (i === 0) {
-                // The best-connected page is Harvis's centre: it stays in the middle.
-                n.x = n.y = 0;
-                return;
-            }
-            // A pull to the middle keeps the islands of unlinked groups in view.
-            dx[i] -= n.x * 0.6; dy[i] -= n.y * 1.2;
-            const len = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]) || 1;
-            n.x += dx[i] / len * Math.min(len, heat);
-            n.y += dy[i] / len * Math.min(len, heat) / 2;
-        });
-    }
-    const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
-    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-    // Symmetric around the centre, so it sits in the middle of the view.
-    const sx = Math.max(-x0, x1) || 1, sy = Math.max(-y0, y1) || 1;
-    for (const n of nodes) {
-        n.x = 0.5 + n.x / sx / 2;
-        n.y = 0.5 + n.y / sy / 2;
-    }
-    return {nodes, links, neighbours, centre: 0};
-}
-
 // ---------- The brain view ----------
 
 export class MindView {
@@ -445,17 +315,6 @@ export class MindView {
         head.add_child(words);
         this.actor.add_child(head);
 
-        const stage = new St.Widget({style_class: 'dynada-mind-stage', x_expand: true, reactive: true});
-        this._canvas = drawingArea(width - 24, 150, (cr, w, h, s) => this._paint(cr, w, h, s));
-        this._canvas.reactive = true;
-        stage.add_child(this._canvas);
-        this._hoverLabel = new St.Label({style_class: 'dynada-mind-node', visible: false});
-        stage.add_child(this._hoverLabel);
-        this.actor.add_child(stage);
-        this._canvas.connect('motion-event', (_a, event) => this._hover(event));
-        this._canvas.connect('leave-event', () => this._hover(null));
-        this._canvas.connect('button-release-event', () => this._openHovered());
-
         const row = new St.BoxLayout({style_class: 'dynada-mind-actions', x_expand: true});
         row.add_child(this._button(_('Chat'), 'dynada-chat-symbolic', onChat, true));
         row.add_child(this._button(_('Talk'), 'audio-input-microphone-symbolic', onListen));
@@ -466,11 +325,7 @@ export class MindView {
         row.add_child(this._model);
         this.actor.add_child(row);
 
-        this._pulses = [];
-        this._rings = [];
-        this._lastSpawn = 0;
-        this._smoothVoice = 0;
-        this._ticker = new Ticker(this.actor, t => this._tick(t));
+        this._ticker = new Ticker(this.actor, () => this._tick());
         this.actor.connect('notify::mapped', () => {
             if (this.actor.mapped)
                 this.refresh();
@@ -500,15 +355,6 @@ export class MindView {
     // ---- data ----
 
     refresh() {
-        if (!this._graph || Date.now() - this._graphAt > 10 * 60 * 1000) {
-            try {
-                this._graph = loadGraph();
-            } catch (e) {
-                console.error('Dynamic Island: Brain graph', e);
-                this._graph = {nodes: [], links: [], neighbours: [], centre: 0};
-            }
-            this._graphAt = Date.now();
-        }
         let history = [];
         try {
             history = JSON.parse(readText(GLib.build_filenamev([GLib.get_user_data_dir(), 'dynamic-island',
@@ -544,7 +390,7 @@ export class MindView {
 
     // ---- motion ----
 
-    _tick(t) {
+    _tick() {
         const {mode, text} = this._state();
         this._status.text = {
             idle: _('Ready. Say “Hey Harvis” or snap twice.'),
@@ -557,182 +403,5 @@ export class MindView {
             (m === mode ? this._status.add_style_class_name : this._status.remove_style_class_name)
                 .call(this._status, `dynada-mind-${m}`);
         this._mode = mode;
-        const g = this._graph;
-        if (g?.nodes.length) {
-            // Thinking: signals leave the centre and wander along real links.
-            if (mode === 'thinking' && t - this._lastSpawn > 0.14) {
-                this._lastSpawn = t;
-                const from = this._pulses.length && Math.random() < 0.7
-                    ? this._pulses[this._pulses.length - 1].to : g.centre;
-                const next = g.neighbours[from];
-                if (next?.length)
-                    this._pulses.push({from, to: next[Math.floor(Math.random() * next.length)], f: 0});
-                if (this._pulses.length > 14)
-                    this._pulses.shift();
-            }
-            for (const p of this._pulses) {
-                p.f += 0.08;
-                if (p.f >= 1 && !p.done) {
-                    p.done = true;
-                    g.nodes[p.to].glow = 1;
-                }
-            }
-            this._pulses = this._pulses.filter(p => p.f < 1.6);
-            // Speaking: a ring from the centre on each louder moment of the voice.
-            const voice = mode === 'speaking' ? this._envelope.level() : 0;
-            this._smoothVoice += (voice - this._smoothVoice) * 0.35;
-            if (mode === 'speaking' && voice > 0.35 && t - (this._lastRing ?? 0) > 0.28) {
-                this._lastRing = t;
-                this._rings.push({r: 0, strength: voice});
-            }
-            for (const ring of this._rings)
-                ring.r += 0.02;
-            this._rings = this._rings.filter(ring => ring.r < 0.9);
-            for (const n of g.nodes)
-                n.glow *= 0.94;
-        }
-        this._canvas.queue_repaint();
-    }
-
-    _place(n, w, h) {
-        const pad = 14;
-        const t = this._ticker.t;
-        // A breath of drift, so the graph is alive without moving about.
-        const i = n.degree + n.name.length;
-        return [pad + n.x * (w - 2 * pad) + Math.sin(t * 0.4 + i) * 1.2,
-            pad + n.y * (h - 2 * pad) + Math.cos(t * 0.33 + i * 1.7) * 1.2];
-    }
-
-    _paint(cr, w, h, s) {
-        const g = this._graph;
-        if (!g?.nodes.length)
-            return;
-        const pos = g.nodes.map(n => this._place(n, w, h));
-        const [cx, cy] = pos[g.centre];
-        const mode = this._mode;
-        cr.setLineCap(Cairo.LineCap.ROUND);
-
-        // Links
-        cr.setLineWidth(0.8 * s);
-        for (const [a, b] of g.links) {
-            const hot = this._hovered === a || this._hovered === b;
-            cr.setSourceRGBA(1, 1, 1, hot ? 0.4 : 0.07);
-            cr.moveTo(...pos[a]);
-            cr.lineTo(...pos[b]);
-            cr.stroke();
-        }
-
-        // Listening: the centre swells with Umut's voice.
-        if (mode === 'listening') {
-            const level = this._micLevel?.() ?? 0;
-            const [r, gg, b] = COLORS.listening;
-            cr.setSourceRGBA(r, gg, b, 0.18 + 0.3 * level);
-            cr.arc(cx, cy, (10 + 26 * level) * s, 0, 2 * Math.PI);
-            cr.fill();
-        }
-
-        // Speaking: rings from the centre.
-        for (const ring of this._rings) {
-            const [r, gg, b] = COLORS.speaking;
-            cr.setSourceRGBA(r, gg, b, (0.9 - ring.r) * 0.6 * ring.strength);
-            cr.setLineWidth(1.4 * s);
-            cr.arc(cx, cy, ring.r * w * 0.6, 0, 2 * Math.PI);
-            cr.stroke();
-        }
-
-        // Thinking: the signals.
-        const [tr, tg, tb] = COLORS.thinking;
-        for (const p of this._pulses) {
-            if (p.f > 1)
-                continue;
-            const [x0, y0] = pos[p.from], [x1, y1] = pos[p.to];
-            const f = p.f;
-            cr.setLineWidth(1.4 * s);
-            cr.setSourceRGBA(tr, tg, tb, 0.5);
-            cr.moveTo(x0 + (x1 - x0) * Math.max(0, f - 0.25), y0 + (y1 - y0) * Math.max(0, f - 0.25));
-            cr.lineTo(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f);
-            cr.stroke();
-            cr.setSourceRGBA(tr, tg, tb, 0.95);
-            cr.arc(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, 2 * s, 0, 2 * Math.PI);
-            cr.fill();
-        }
-
-        // Pages
-        const voice = this._smoothVoice;
-        g.nodes.forEach((n, i) => {
-            const [x, y] = pos[i];
-            const [r, gg, b] = COLORS[n.kind];
-            let radius = (1.4 + Math.sqrt(n.degree) * 0.7) * s;
-            let alpha = 0.55 + 0.45 * n.glow;
-            if (mode === 'speaking') {
-                const near = 1 - Math.min(1, Math.hypot(x - cx, y - cy) / (w * 0.5));
-                alpha = Math.min(1, alpha + voice * near * 0.6);
-                radius *= 1 + voice * near * 0.5;
-            }
-            if (n.glow > 0.05) {
-                cr.setSourceRGBA(tr, tg, tb, 0.25 * n.glow);
-                cr.arc(x, y, radius + 5 * s * n.glow, 0, 2 * Math.PI);
-                cr.fill();
-            }
-            cr.setSourceRGBA(r, gg, b, i === this._hovered ? 1 : alpha);
-            cr.arc(x, y, i === this._hovered ? radius + 1.5 * s : radius, 0, 2 * Math.PI);
-            cr.fill();
-        });
-
-        // The centre: Harvis itself, a ring around the best-connected page.
-        const ringColor = COLORS[mode] ?? COLORS.page;
-        cr.setSourceRGBA(...ringColor, mode === 'idle' ? 0.35 : 0.8);
-        cr.setLineWidth(1.2 * s);
-        cr.arc(cx, cy, 8 * s, 0, 2 * Math.PI);
-        cr.stroke();
-    }
-
-    // ---- pointing at a page ----
-
-    _hover(event) {
-        const g = this._graph;
-        this._hovered = null;
-        if (event && g?.nodes.length) {
-            const [sx, sy] = event.get_coords();
-            const [ok, x, y] = this._canvas.transform_stage_point(sx, sy);
-            if (ok) {
-                const w = this._canvas.width, h = this._canvas.height;
-                let best = 12;
-                g.nodes.forEach((n, i) => {
-                    const [nx, ny] = this._place(n, w, h);
-                    const d = Math.hypot(nx - x, ny - y);
-                    if (d < best) {
-                        best = d;
-                        this._hovered = i;
-                    }
-                });
-                if (this._hovered !== null) {
-                    const n = g.nodes[this._hovered];
-                    const [nx, ny] = this._place(n, w, h);
-                    this._hoverLabel.text = n.name;
-                    this._hoverLabel.show();
-                    const lw = this._hoverLabel.get_preferred_width(-1)[1];
-                    this._hoverLabel.set_position(Math.round(Math.min(Math.max(4, nx - lw / 2), w - lw - 4)),
-                        Math.round(ny > h / 2 ? ny - 26 : ny + 10));
-                }
-            }
-        }
-        if (this._hovered === null)
-            this._hoverLabel.hide();
-        this._canvas.queue_repaint();
-        return Clutter.EVENT_PROPAGATE;
-    }
-
-    _openHovered() {
-        if (this._hovered === null)
-            return Clutter.EVENT_PROPAGATE;
-        const rel = this._graph.nodes[this._hovered].rel.slice(0, -3);
-        const uri = `obsidian://open?vault=${encodeURIComponent(VAULT)}&file=${encodeURIComponent(rel)}`;
-        try {
-            Gio.AppInfo.launch_default_for_uri(uri, global.create_app_launch_context(0, -1));
-        } catch (e) {
-            console.error('Dynamic Island: open in Obsidian', e);
-        }
-        return Clutter.EVENT_STOP;
     }
 }
