@@ -18,9 +18,9 @@ export function setBlurEnabled(enabled) {
 
 // GJS turns whole numbers into int GValues, which float uniforms ignore.
 const asFloat = v => (Number.isInteger(v) ? v + 1e-4 : v);
-// Square corners: Umut liked the glass without rounding better (2026-10-13); the frame still runs
-// round the whole edge. false brings the rounded shapes (each glass's own radius) back.
-const SQUARE = true;
+// Corners cut at 45 degrees, this many px (Umut: "ilk baştaki gibi altıgene benzeyen", 2026-10-13);
+// the frame runs along the cut too.
+const CHAMFER = 7;
 
 const MASK_SHADER = `
 uniform sampler2D tex;
@@ -42,8 +42,12 @@ void main(void) {
     // place the shape by the texture's real size, centred, not stretched over it.
     vec2 tex_size = vec2(tex_w, tex_h);
     vec2 half_size = vec2(width, height) * 0.5;
-    vec2 q = abs(uv * tex_size - tex_size * 0.5) - (half_size - vec2(radius));
-    float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    // A rectangle with its corners cut at 45 degrees (radius = the cut), like a stretched hexagon.
+    vec2 p = abs(uv * tex_size - tex_size * 0.5);
+    vec2 d = p - half_size;
+    float box = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+    float cut = (p.x + p.y - (half_size.x + half_size.y - radius)) * 0.70710678;
+    float dist = max(box, cut);
     float outer = clamp(0.5 - dist, 0.0, 1.0);
     // The frame is drawn here, along the same rounded edge as the cut, so it follows the
     // corners too (a CSS border is clipped away there by this very mask).
@@ -53,7 +57,7 @@ void main(void) {
     cogl_color_out = color * inner + over * (outer - inner);
 }`;
 
-// Cuts an actor to a rounded rectangle with antialiased edges.
+// Cuts an actor to a rectangle with chamfered corners, antialiased edges.
 export const RoundedMask = GObject.registerClass(
 class RoundedMask extends Clutter.ShaderEffect {
     _init() {
@@ -240,7 +244,7 @@ class Glass extends St.Widget {
         const h = box.get_height();
         // Offscreen effects cannot render an empty texture.
         this._mask.enabled = w >= 1 && h >= 1;
-        this._mask.setGeometry(w, h, SQUARE ? 0 : Math.min(this._radius, w / 2, h / 2));
+        this._mask.setGeometry(w, h, Math.min(CHAMFER, this._radius, w / 2, h / 2));
     }
 
     setRadius(radius) {

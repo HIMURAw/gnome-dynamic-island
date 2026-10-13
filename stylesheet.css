@@ -851,7 +851,7 @@
   padding: 8px 0;
   color: #f5f5f7;
   caret-color: #f5f5f7;
-  selection-background-color: rgba(10, 132, 255, 0.6);
+  selection-background-color: rgba(123, 92, 240, 0.6);
   font-size: 13pt;
 }
 
@@ -978,13 +978,13 @@
   max-width: 440px;
   padding: 9px 13px;
   border-radius: 18px;
-  background-color: rgba(255, 255, 255, 0.09);
+  background-color: rgba(168, 132, 255, 0.14);
   font-size: 10.5pt;
   line-height: 1.35;
 }
 
 .dynada-chat-bubble.dynada-chat-mine {
-  background-color: #0a84ff;
+  background-color: #7b5cf0;
   color: #ffffff;
 }
 
@@ -1013,12 +1013,12 @@
 }
 
 .dynada-chat-send {
-  background-color: #0a84ff;
+  background-color: #7b5cf0;
   color: #ffffff;
 }
 
 .dynada-chat-send:hover {
-  background-color: #3399ff;
+  background-color: #9277ff;
 }
 
 /* Listening: waveform bars and a breathing green edge */
@@ -1125,10 +1125,9 @@
 }
 
 .dynada-mind-status {
-  font-size: 15pt;
+  font-size: 10.5pt;
   font-weight: bold;
-  padding-left: 4px;
-  color: rgba(245, 245, 247, 0.92);
+  color: rgba(225, 212, 255, 0.92);
 }
 
 .dynada-mind-status.dynada-mind-listening { color: #30d158; }
@@ -1139,7 +1138,6 @@
 .dynada-mind-last {
   font-size: 9.5pt;
   color: rgba(245, 245, 247, 0.55);
-  padding-left: 4px;
 }
 
 .dynada-mind-actions {
@@ -1335,4 +1333,32 @@
   background-gradient-direction: horizontal;
   background-gradient-start: rgba(150, 110, 255, 0);
   background-gradient-end: rgba(150, 110, 255, 0.55);
+}
+
+/* Harvis's robot (face.js): beside its name in the brain view and the chat, beside its messages */
+.dynada-mind-head {
+  spacing: 14px;
+  padding: 2px 4px 10px 2px;
+}
+
+.dynada-mind-words {
+  spacing: 1px;
+}
+
+.dynada-mind-name {
+  font-size: 15pt;
+  font-weight: bold;
+  color: #f5f5f7;
+}
+
+.dynada-chat-title-box {
+  spacing: 8px;
+}
+
+.dynada-chat-row {
+  spacing: 7px;
+}
+
+.dynada-robot-icon {
+  margin-bottom: 2px;
 }
