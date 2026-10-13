@@ -1,18 +1,18 @@
-/* Dark frosted glass. The blur itself comes from glass.js; these rules add the
-   tint over it, a hairline edge and the type. */
+/* Dark frosted glass with a faint violet cast (Harvis's colour, kept quiet). The blur
+   itself comes from glass.js; these rules add the tint over it, a hairline edge and the type. */
 
 .dynada-glass-tint {
-  background-color: rgba(22, 22, 26, 0.52);
+  background-color: rgba(27, 22, 44, 0.54);
 }
 
 .dynada-glass-solid {
-  background-color: rgba(28, 28, 32, 0.96);
+  background-color: rgba(32, 27, 48, 0.96);
 }
 
 .dynada-island,
 .dynada-bubble {
   color: #f5f5f7;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(190, 170, 255, 0.13);
   border-radius: 19px;
 }
 
@@ -21,7 +21,7 @@
 }
 
 .dynada-bubble:playing {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(190, 170, 255, 0.28);
 }
 
 /* Collapsed */
@@ -1117,7 +1117,7 @@
 .dynada-mind-node {
   font-size: 9pt;
   color: #f5f5f7;
-  background-color: rgba(28, 28, 30, 0.92);
+  background-color: rgba(32, 27, 48, 0.92);
   border-radius: 6px;
   padding: 2px 7px;
 }
@@ -1191,7 +1191,7 @@
 /* Visual cards (cards.js): a frosted card in an empty part of the screen */
 .dynada-card {
   border-radius: 26px;
-  background-color: rgba(24, 24, 28, 0.9);
+  background-color: rgba(30, 25, 46, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
@@ -1304,4 +1304,33 @@
   background-color: #ffffff;
   border-radius: 16px;
   padding: 8px;
+}
+
+/* Harvis working the screen (edge.js): a soft purple light along the edges */
+.dynada-edge-top,
+.dynada-edge-bottom,
+.dynada-edge-left,
+.dynada-edge-right {
+  background-gradient-start: rgba(150, 110, 255, 0.55);
+  background-gradient-end: rgba(150, 110, 255, 0);
+}
+
+.dynada-edge-top {
+  background-gradient-direction: vertical;
+}
+
+.dynada-edge-bottom {
+  background-gradient-direction: vertical;
+  background-gradient-start: rgba(150, 110, 255, 0);
+  background-gradient-end: rgba(150, 110, 255, 0.55);
+}
+
+.dynada-edge-left {
+  background-gradient-direction: horizontal;
+}
+
+.dynada-edge-right {
+  background-gradient-direction: horizontal;
+  background-gradient-start: rgba(150, 110, 255, 0);
+  background-gradient-end: rgba(150, 110, 255, 0.55);
 }
