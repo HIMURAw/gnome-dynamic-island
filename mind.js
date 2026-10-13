@@ -411,8 +411,8 @@ function loadGraph() {
 export class MindView {
     // state(): {mode: 'idle'|'listening'|'thinking'|'speaking'|'failed', text}
     // micLevel(): 0..1 while listening; envelope: VoiceEnvelope
-    // onChat(), onListen(): the buttons
-    constructor({width, dir, state, micLevel, envelope, onChat, onListen}) {
+    // onChat(), onListen(): the buttons; avatar: Harvis's robot (face.js), shown beside its name
+    constructor({width, dir, state, micLevel, envelope, onChat, onListen, avatar}) {
         this._dir = dir;
         this._state = state;
         this._micLevel = micLevel;
@@ -428,8 +428,25 @@ export class MindView {
             visible: false,
         });
 
+        // Harvis itself on top: the robot, its name, what it is doing and what it did last.
+        const head = new St.BoxLayout({style_class: 'dynada-mind-head', x_expand: true});
+        if (avatar) {
+            avatar.actor.y_align = Clutter.ActorAlign.CENTER;
+            head.add_child(avatar.actor);
+        }
+        const words = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER, style_class: 'dynada-mind-words'});
+        words.add_child(new St.Label({style_class: 'dynada-mind-name', text: 'Harvis'}));
+        this._status = new St.Label({style_class: 'dynada-mind-status', x_expand: true});
+        this._last = new St.Label({style_class: 'dynada-mind-last', x_expand: true});
+        this._last.clutter_text.ellipsize = 3; // END
+        words.add_child(this._status);
+        words.add_child(this._last);
+        head.add_child(words);
+        this.actor.add_child(head);
+
         const stage = new St.Widget({style_class: 'dynada-mind-stage', x_expand: true, reactive: true});
-        this._canvas = drawingArea(width - 24, 190, (cr, w, h, s) => this._paint(cr, w, h, s));
+        this._canvas = drawingArea(width - 24, 150, (cr, w, h, s) => this._paint(cr, w, h, s));
         this._canvas.reactive = true;
         stage.add_child(this._canvas);
         this._hoverLabel = new St.Label({style_class: 'dynada-mind-node', visible: false});
@@ -438,12 +455,6 @@ export class MindView {
         this._canvas.connect('motion-event', (_a, event) => this._hover(event));
         this._canvas.connect('leave-event', () => this._hover(null));
         this._canvas.connect('button-release-event', () => this._openHovered());
-
-        this._status = new St.Label({style_class: 'dynada-mind-status', x_expand: true});
-        this._last = new St.Label({style_class: 'dynada-mind-last', x_expand: true});
-        this._last.clutter_text.ellipsize = 3; // END
-        this.actor.add_child(this._status);
-        this.actor.add_child(this._last);
 
         const row = new St.BoxLayout({style_class: 'dynada-mind-actions', x_expand: true});
         row.add_child(this._button(_('Chat'), 'dynada-chat-symbolic', onChat, true));

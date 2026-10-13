@@ -2,6 +2,7 @@ import Cairo from 'cairo';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Graphene from 'gi://Graphene';
+import St from 'gi://St';
 
 import {Robot, drawCairo, signature} from './robot.js';
 import {drawingArea} from './mind.js';
@@ -24,19 +25,29 @@ const FAST = 33;  // ms, while something happens
 const SLOW = 100; // ms, idle (only a changed frame is painted)
 const MIND = GLib.build_filenamev([GLib.get_user_data_dir(), 'harvis', 'mind.json']);
 
+// A still picture of the robot (icons/harvis-robot.svg), for places that need no motion
+// (beside each of Harvis's chat messages): nothing ticks for it.
+export function robotIcon(dir, size) {
+    return new St.Icon({gicon: new Gio.FileIcon({file: dir.get_child('icons').get_child('harvis-robot.svg')}),
+        icon_size: size, style_class: 'dynada-robot-icon'});
+}
+
 export class AvatarGlyph {
     // level(mode): loudness 0..1 for that state
-    constructor(level) {
+    // scale: logical px per sprite pixel (1 in the collapsed island, larger in the brain view)
+    constructor(level, {scale = 1} = {}) {
         this.mode = 'idle';
         this._level = level;
         this._avatar = new Robot('head');
         this._serviceUp = true;
         this._last = 0;
         // One sprite pixel per logical pixel; drawCairo snaps them to device pixels.
-        this.actor = drawingArea(CROP.w, CROP.h, (cr, w, h, s) => {
-            drawCairo(cr, this._shown ?? this._avatar.frame(), {x: -CROP.x * s, y: -CROP.y * s, px: s, Cairo});
+        this.actor = drawingArea(Math.round(CROP.w * scale), Math.round(CROP.h * scale), (cr, w, h, s) => {
+            const px = s * scale;
+            drawCairo(cr, this._shown ?? this._avatar.frame(), {x: -CROP.x * px, y: -CROP.y * px, px, Cairo});
         });
-        this.actor.margin_right = 7;
+        if (scale === 1)
+            this.actor.margin_right = 7;
         this.actor.pivot_point = new Graphene.Point({x: 0.5, y: 0.5});
         this.actor.connect('notify::mapped', () => this._sync());
         this.actor.connect('destroy', () => this._stop());

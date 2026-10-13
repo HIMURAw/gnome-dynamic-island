@@ -301,9 +301,16 @@ export default class DynamicIslandExtension extends Extension {
             width: this._contentWidth,
             onClose: () => this._close(),
         });
-        this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close(),
-            onMind: () => this._openMind()});
+        // Harvis's robot in the chat header and, larger, in the brain view; the same states as the
+        // one in the collapsed island (_syncActivities).
         this._voiceEnvelope ??= new VoiceEnvelope();
+        const harvisLevel = mode => mode === 'speaking'
+            ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6;
+        this._chatAvatar = new AvatarGlyph(harvisLevel);
+        this._chatAvatar.actor.margin_right = 0;
+        this._mindAvatar = new AvatarGlyph(harvisLevel, {scale: 2.4});
+        this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close(),
+            onMind: () => this._openMind(), avatar: this._chatAvatar, dir: this.dir});
         this._mind = new MindView({
             width: this._contentWidth,
             dir: this.dir,
@@ -311,6 +318,7 @@ export default class DynamicIslandExtension extends Extension {
             micLevel: () => this._privacyWatcher?.level ?? 0,
             envelope: this._voiceEnvelope,
             onChat: () => this._toggleChat(),
+            avatar: this._mindAvatar,
             onListen: () => this._chat._listen(),
         });
         for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor, this._chat.actor, this._mind.actor])
@@ -1261,6 +1269,7 @@ export default class DynamicIslandExtension extends Extension {
             return;
         this._chat.addExchange(question, answer);
         this._compactBrain?.emote('joy');
+        this._chatAvatar?.emote('joy');
         if (this._mode !== 'chat' && this._chatBadge)
             this._chatBadge.visible = true;
     }
@@ -1361,6 +1370,8 @@ export default class DynamicIslandExtension extends Extension {
         this._setListening(listening);
         const {mode} = this._harvisState();
         this._compactBrain.setMode(mode);
+        this._chatAvatar?.setMode(mode);
+        this._mindAvatar?.setMode(mode);
         // Harvis working the screen: purple light on the edges, breathing with its voice (edge.js).
         const controlling = this._activities.items.some(item => item.id === 'harvis-control');
         if (controlling && !this._edgeGlow) {

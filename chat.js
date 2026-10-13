@@ -8,6 +8,7 @@ import St from 'gi://St';
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {Waveform} from './wave.js';
+import {robotIcon} from './face.js';
 
 Gio._promisify(Gio.DataInputStream.prototype, 'read_line_async');
 Gio._promisify(Gio.Subprocess.prototype, 'wait_async');
@@ -58,7 +59,9 @@ class TypingDots {
 // `harvis ask --stream`, which shares one Claude conversation with the wake word,
 // so spoken and typed turns follow on from each other. Without Harvis, `claude -p`.
 export class ChatView {
-    constructor({settings, width, onClose, onMind}) {
+    // avatar: Harvis's live robot for the header (face.js); dir: the extension folder (for the still one)
+    constructor({settings, width, onClose, onMind, avatar, dir}) {
+        this._dir = dir;
         this._settings = settings;
         this._onClose = onClose;
         this._messages = this._load();
@@ -83,7 +86,16 @@ export class ChatView {
             can_focus: true,
             accessible_name: _('Back to Harvis'),
             y_align: Clutter.ActorAlign.CENTER,
-            child: new St.Label({style_class: 'dynada-center-month', text: _('Harvis')}),
+            child: (() => {
+                const box = new St.BoxLayout({style_class: 'dynada-chat-title-box'});
+                if (avatar) {
+                    avatar.actor.y_align = Clutter.ActorAlign.CENTER;
+                    box.add_child(avatar.actor);
+                }
+                box.add_child(new St.Label({style_class: 'dynada-center-month', text: _('Harvis'),
+                    y_align: Clutter.ActorAlign.CENTER}));
+                return box;
+            })(),
         });
         title.connect('clicked', () => onMind?.());
         header.add_child(title);
@@ -301,14 +313,24 @@ export class ChatView {
         });
         message.actor = box;
         this._fill(message);
-        this._list.add_child(box);
+        // Harvis's messages carry its (still) robot beside them.
+        let outer = box;
+        if (!mine && this._dir) {
+            outer = new St.BoxLayout({style_class: 'dynada-chat-row', x_align: Clutter.ActorAlign.START,
+                pivot_point: new Graphene.Point({x: 0, y: 1})});
+            const face = robotIcon(this._dir, 22);
+            face.y_align = Clutter.ActorAlign.END;
+            outer.add_child(face);
+            outer.add_child(box);
+        }
+        this._list.add_child(outer);
         this._syncEmpty();
         if (animate) {
             // Slides up and grows from the corner it is anchored to.
-            box.opacity = 0;
-            box.translation_y = 10;
-            box.set_scale(0.92, 0.92);
-            box.ease({
+            outer.opacity = 0;
+            outer.translation_y = 10;
+            outer.set_scale(0.92, 0.92);
+            outer.ease({
                 opacity: 255,
                 translation_y: 0,
                 scale_x: 1,
