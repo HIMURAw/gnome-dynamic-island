@@ -18,6 +18,9 @@ export function setBlurEnabled(enabled) {
 
 // GJS turns whole numbers into int GValues, which float uniforms ignore.
 const asFloat = v => (Number.isInteger(v) ? v + 1e-4 : v);
+// Square corners: Umut liked the glass without rounding better (2026-10-13); the frame still runs
+// round the whole edge. false brings the rounded shapes (each glass's own radius) back.
+const SQUARE = true;
 
 const MASK_SHADER = `
 uniform sampler2D tex;
@@ -237,7 +240,7 @@ class Glass extends St.Widget {
         const h = box.get_height();
         // Offscreen effects cannot render an empty texture.
         this._mask.enabled = w >= 1 && h >= 1;
-        this._mask.setGeometry(w, h, Math.min(this._radius, w / 2, h / 2));
+        this._mask.setGeometry(w, h, SQUARE ? 0 : Math.min(this._radius, w / 2, h / 2));
     }
 
     setRadius(radius) {
