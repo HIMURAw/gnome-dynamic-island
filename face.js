@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Graphene from 'gi://Graphene';
 
-import {Robot, drawCairo} from './robot.js';
+import {Robot, drawCairo, signature} from './robot.js';
 import {drawingArea} from './mind.js';
 
 // Harvis in the collapsed island, as its character: the purple neon pixel robot (robot.js,
@@ -21,7 +21,7 @@ import {drawingArea} from './mind.js';
 const CROP = {x: 2, y: 3, w: 28, h: 26};
 
 const FAST = 33;  // ms, while something happens
-const SLOW = 50;  // ms, idle
+const SLOW = 100; // ms, idle (only a changed frame is painted)
 const MIND = GLib.build_filenamev([GLib.get_user_data_dir(), 'harvis', 'mind.json']);
 
 export class AvatarGlyph {
@@ -34,7 +34,7 @@ export class AvatarGlyph {
         this._last = 0;
         // One sprite pixel per logical pixel; drawCairo snaps them to device pixels.
         this.actor = drawingArea(CROP.w, CROP.h, (cr, w, h, s) => {
-            drawCairo(cr, this._avatar.frame(), {x: -CROP.x * s, y: -CROP.y * s, px: s, Cairo});
+            drawCairo(cr, this._shown ?? this._avatar.frame(), {x: -CROP.x * s, y: -CROP.y * s, px: s, Cairo});
         });
         this.actor.margin_right = 7;
         this.actor.pivot_point = new Graphene.Point({x: 0.5, y: 0.5});
@@ -95,6 +95,14 @@ export class AvatarGlyph {
         a.setLevel(this.mode === 'listening' || this.mode === 'speaking' ? Math.min(1, this._level(this.mode)) : 0);
         this._follow(a);
         a.step(dt);
+        // Pixel art changes a few times a second when idle: repaint only then, so the
+        // compositor is not woken for identical frames.
+        const frame = a.frame();
+        const key = signature(frame);
+        if (key === this._key)
+            return;
+        this._key = key;
+        this._shown = frame;
         this.actor.queue_repaint();
     }
 
