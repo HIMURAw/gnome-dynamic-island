@@ -52,27 +52,28 @@ function keyval(name) {
     return Clutter[`KEY_${name}`] ?? 0;
 }
 
-// Harvis's pointer is Harvis itself: the arrow-shaped pixel robot (robot.js). It rests with
-// its eyes open and blinking, squints and kicks up dust while it glides, and grins ^^ with a
-// spark at the tip when it clicks.
-const PX = 1.2; // logical pixels per sprite pixel: two device pixels at 1.67, a little bigger than a pointer
+// Harvis's hand on the screen is the round robot itself: it RUNS to where it is
+// going (legs pumping, eyes set on the way) and for a click it jumps and lands
+// right on the spot, with a little spark ("avatar koşsun, tıklama yerine zıplayıp
+// vursun" - Umut, 2026-10-14). Its feet are the anchor: it stands on the target.
+const PX = 1.35; // logical pixels per sprite pixel (the robot is ~43 px tall)
 const FRAME = 33;
+const FOOT = [16, 29.5]; // the sprite point between the feet, placed on the target
 
 class Ghost {
     constructor() {
-        this._robot = new Robot('pointer');
+        this._robot = new Robot('head');
         this.actor = new St.Widget({reactive: false, can_focus: false, opacity: 0,
             layout_manager: new Clutter.FixedLayout()});
-        const {w, h, hot} = this._robot.frame();
-        // The widget's origin is the point Harvis aims at: the sprite is shifted so its tip is there.
+        const {w, h} = this._robot.frame();
         this._area = new St.DrawingArea({width: Math.ceil(w * PX), height: Math.ceil(h * PX),
-            x: -Math.round(hot[0] * PX), y: -Math.round(hot[1] * PX)});
+            x: -Math.round(FOOT[0] * PX), y: -Math.round(FOOT[1] * PX)});
         this._area.connect('repaint', area => {
             const cr = area.get_context();
             const [sw] = area.get_surface_size();
-            const s = sw / Math.max(1, area.width);
+            const scale = sw / Math.max(1, area.width);
             try {
-                drawCairo(cr, this._shown ?? this._robot.frame(), {px: PX * s, Cairo});
+                drawCairo(cr, this._shown ?? this._robot.frame(), {px: PX * scale, Cairo});
             } finally {
                 cr.$dispose();
             }
@@ -84,7 +85,13 @@ class Ghost {
         this._last = 0;
     }
 
-    // Animates only while it can be seen.
+    destroy() {
+        this._run(false);
+        this._keepComposited(false);
+        this.actor.destroy();
+    }
+
+    // Animates only while it can be seen, and only paints a changed picture.
     _run(on) {
         if (on && !this._frameId) {
             this._last = 0;
@@ -94,7 +101,7 @@ class Ghost {
                 this._last = now;
                 const frame = this._robot.frame();
                 const key = signature(frame);
-                if (key !== this._key) {  // only a changed picture is painted
+                if (key !== this._key) {
                     this._key = key;
                     this._shown = frame;
                     this._area.queue_repaint();
@@ -107,17 +114,26 @@ class Ghost {
         }
     }
 
+    // A maximized window that fills the screen is scanned out straight to the display
+    // and the robot drawn over it would never show; mutter counts these calls, so they
+    // nest safely with the island's own.
+    _keepComposited(on) {
+        if (on === !!this._composited)
+            return;
+        this._composited = on;
+        if (on)
+            global.compositor.disable_unredirect();
+        else
+            global.compositor.enable_unredirect();
+    }
+
     state(name) {
         this._robot.setState(name);
     }
 
-    destroy() {
-        this._run(false);
-        this.actor.destroy();
-    }
-
     show() {
         Main.layoutManager.uiGroup.set_child_above_sibling(this.actor, null);
+        this._keepComposited(true);
         this._run(true);
         if (this.actor.opacity < 255)
             this.actor.ease({opacity: 255, duration: 150});
@@ -125,13 +141,16 @@ class Ghost {
 
     hide() {
         this._robot.setState('idle');
+        this._robot.walking = false;
         this.actor.ease({opacity: 0, duration: 300, onStopped: () => {
-            if (this.actor.opacity === 0)
+            if (this.actor.opacity === 0) {
                 this._run(false);
+                this._keepComposited(false);
+            }
         }});
     }
 
-    // Resolves when it has arrived.
+    // Resolves when it has arrived: a run, legs pumping, eyes set on the way.
     glide(x, y) {
         this.show();
         const dist = Math.hypot(x - this.actor.x, y - this.actor.y);
@@ -139,10 +158,14 @@ class Ghost {
         if (dist < 2)
             return Promise.resolve();
         this.state('moving');
+        this._robot.walking = true;
+        this._robot.lookAt(Math.sign(x - this.actor.x), 0);
         return new Promise(resolve => {
             this.actor.ease({x, y, duration, mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
                 onStopped: () => {
                     this.state('idle');
+                    this._robot.walking = false;
+                    this._robot.lookAt(null);
                     resolve();
                 }});
         });
