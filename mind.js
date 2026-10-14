@@ -371,7 +371,17 @@ export class MindView {
         } catch {
             // no history or state yet
         }
-        this._model.text = model ? _('Last answer: %s').format(model) : '';
+        let voiceLine = '';
+        try {
+            const status = JSON.parse(readText(GLib.build_filenamev([HARVIS_DATA, 'voice-status.json'])) ?? '{}');
+            const engine = {gemini: 'Gemini', google: 'Google', edge: 'Edge', piper: 'Piper (yerel)'}[status.engine];
+            if (engine)
+                voiceLine = `Ses: ${engine}${status.note ? ` — ${status.note}` : ''}`;
+        } catch {
+            // the voice has not spoken yet
+        }
+        const modelLine = model ? _('Last answer: %s').format(model) : '';
+        this._model.text = [voiceLine, modelLine].filter(Boolean).join('  ·  ');
         this._local = (readText(GLib.build_filenamev([HARVIS_DATA, 'backend'])) ?? 'auto').trim() === 'local';
         this._backend._label.text = this._local ? _('Local model') : _('Claude');
         this._backend._icon.icon_name = this._local ? 'computer-symbolic' : 'weather-overcast-symbolic';

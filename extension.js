@@ -1402,6 +1402,27 @@ export default class DynamicIslandExtension extends Extension {
         this._mindAvatar?.setMode(mode);
         if (harvis)
             this._sleepHarvis(false);
+        // Small reactions: a wave at the first morning meeting, a surprised hop when
+        // something fails, a happy hop when a long job comes good (robot.js emotes).
+        const emote = name => {
+            for (const avatar of [this._compactBrain, this._chatAvatar, this._mindAvatar])
+                avatar?.emote?.(name);
+        };
+        const now = GLib.DateTime.new_now_local();
+        if (harvis) {
+            if (this._waveDay !== now.format('%F') && now.get_hour() >= 5 && now.get_hour() < 12) {
+                this._waveDay = now.format('%F');
+                emote('wave');
+            }
+            this._harvisSince ??= now.to_unix();
+        } else {
+            if (this._harvisSince && now.to_unix() - this._harvisSince > 60 && this._lastHarvisMode !== 'failed')
+                emote('joy');
+            this._harvisSince = null;
+        }
+        if (mode === 'failed' && this._lastHarvisMode !== 'failed')
+            emote('surprise');
+        this._lastHarvisMode = mode;
         // Harvis on the edges (edge.js): green while it speaks (with the voice),
         // yellow while it works, purple while it drives the screen.
         const controlling = this._activities.items.some(item => item.id === 'harvis-control');
