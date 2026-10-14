@@ -1306,15 +1306,89 @@
   padding: 8px;
 }
 
-/* Harvis working the screen (edge.js): a soft purple light along the edges */
-.dynada-edge-top,
-.dynada-edge-bottom,
-.dynada-edge-left,
-.dynada-edge-right {
+/* Harvis on the screen edges (edge.js): green speaking, yellow working, purple driving */
+
+.dynada-edge-top-purple,
+.dynada-edge-left-purple {
   background-gradient-start: rgba(150, 110, 255, 0.55);
   background-gradient-end: rgba(150, 110, 255, 0);
 }
 
+.dynada-edge-bottom-purple,
+.dynada-edge-right-purple {
+  background-gradient-start: rgba(150, 110, 255, 0);
+  background-gradient-end: rgba(150, 110, 255, 0.55);
+}
+
+.dynada-edge-top-purple,
+.dynada-edge-bottom-purple {
+  background-gradient-direction: vertical;
+}
+
+.dynada-edge-left-purple,
+.dynada-edge-right-purple {
+  background-gradient-direction: horizontal;
+}
+
+.dynada-edge-top-green,
+.dynada-edge-left-green {
+  background-gradient-start: rgba(48, 209, 88, 0.55);
+  background-gradient-end: rgba(48, 209, 88, 0);
+}
+
+.dynada-edge-bottom-green,
+.dynada-edge-right-green {
+  background-gradient-start: rgba(48, 209, 88, 0);
+  background-gradient-end: rgba(48, 209, 88, 0.55);
+}
+
+.dynada-edge-top-green,
+.dynada-edge-bottom-green {
+  background-gradient-direction: vertical;
+}
+
+.dynada-edge-left-green,
+.dynada-edge-right-green {
+  background-gradient-direction: horizontal;
+}
+
+.dynada-edge-top-yellow,
+.dynada-edge-left-yellow {
+  background-gradient-start: rgba(245, 181, 81, 0.55);
+  background-gradient-end: rgba(245, 181, 81, 0);
+}
+
+.dynada-edge-bottom-yellow,
+.dynada-edge-right-yellow {
+  background-gradient-start: rgba(245, 181, 81, 0);
+  background-gradient-end: rgba(245, 181, 81, 0.55);
+}
+
+.dynada-edge-top-yellow,
+.dynada-edge-bottom-yellow {
+  background-gradient-direction: vertical;
+}
+
+.dynada-edge-left-yellow,
+.dynada-edge-right-yellow {
+  background-gradient-direction: horizontal;
+}
+
+/* One press of the Copilot key (command.js) */
+.dynada-command {
+  color: #f5f5f7;
+  border: 1px solid transparent;
+  -glass-frame-color: rgba(168, 132, 255, 0.6);
+}
+
+.dynada-command-row {
+  spacing: 12px;
+  padding: 0 18px;
+}
+
+.dynada-command-entry {
+  font-size: 12pt;
+}
 .dynada-edge-top {
   background-gradient-direction: vertical;
 }

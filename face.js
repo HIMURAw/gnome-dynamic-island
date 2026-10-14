@@ -65,8 +65,16 @@ export class AvatarGlyph {
         this._avatar.emote(name);
     }
 
+    // The held Copilot key puts Harvis on standby: the robot sleeps until it is woken.
+    sleep(on) {
+        if (this._forceSleep === !!on)
+            return;
+        this._forceSleep = !!on;
+        this._apply();
+    }
+
     _apply() {
-        const mode = this.mode === 'idle' && !this._serviceUp ? 'sleeping' : this.mode;
+        const mode = this.mode === 'idle' && (!this._serviceUp || this._forceSleep) ? 'sleeping' : this.mode;
         this._avatar.setState(mode);
     }
 

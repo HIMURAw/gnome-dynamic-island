@@ -428,6 +428,12 @@ export class ChatView {
         return [null, false];
     }
 
+    // The Copilot command box hands its line in here: same session, same view.
+    sendText(text) {
+        this.entry.text = text;
+        this._send();
+    }
+
     async _send() {
         const text = this.entry.text.trim();
         if (!text || this._busy)

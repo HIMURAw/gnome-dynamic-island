@@ -578,3 +578,9 @@ msgstr "Konuşuyor"
 
 msgid "Harvis stopped"
 msgstr "Harvis durdu"
+
+msgid "A command for Harvis…"
+msgstr "Harvis'e bir komut…"
+
+msgid "Harvis stopped and asleep"
+msgstr "Harvis durdu ve uykuda"
