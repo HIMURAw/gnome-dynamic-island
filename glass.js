@@ -5,6 +5,8 @@ import Mtk from 'gi://Mtk';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+
 const BLUR_RADIUS = 18;
 // The windows behind the glass are re-blurred at most this often (ms).
 // 500 since 2026-10-13: the wallpaper is a video now, so what is behind changes every frame and
@@ -128,7 +130,7 @@ function themeFrame(actor) {
 // cursor left out) is taken for all glasses at most every REFRESH ms and each
 // backdrop just shows and blurs that texture: between snapshots nothing behind a
 // glass changes, and a finished frame cannot be caught mid-paint.
-const snapshot = {content: null, at: 0, timer: 0, idle: 0, clients: new Set()};
+const snapshot = {content: null, at: 0, timer: 0, idle: 0, startup: 0, clients: new Set()};
 
 function snapshotSource() {
     return global.stage;
@@ -139,18 +141,27 @@ function snapshotSource() {
 export const snapshotExclude = new Set();
 
 function takeSnapshot() {
+    // Not before the session has drawn its first frame: painting the stage to a
+    // texture during start-up left the whole desktop unpainted on some logins
+    // (Umut, 2026-10-14: "oturumu açtım, ekranda hiçbir şey görünmüyor").
+    if (Main.layoutManager._startingUp)
+        return;
     snapshot.at = GLib.get_monotonic_time() / 1000;
     // The glasses and their extension's surfaces are blanked for the capture and
-    // restored in the same tick: the on-screen frame never sees it, and the
-    // capture shows what is genuinely behind them.
+    // restored in the same tick - inside one try, each actor on its own, so a
+    // disposed actor can never leave the rest invisible.
     const blanked = [];
-    for (const actor of [...snapshotExclude, ...[...snapshot.clients].map(b => b.get_parent())]) {
-        if (actor && actor.opacity !== 0) {
-            blanked.push([actor, actor.opacity]);
-            actor.opacity = 0;
-        }
-    }
     try {
+        for (const actor of [...snapshotExclude, ...[...snapshot.clients].map(b => b.get_parent())]) {
+            try {
+                if (actor && actor.opacity !== 0) {
+                    blanked.push([actor, actor.opacity]);
+                    actor.opacity = 0;
+                }
+            } catch {
+                // a disposed actor: skip it
+            }
+        }
         let scale = 1;
         try {
             scale = global.display.get_monitor_scale(global.display.get_primary_monitor());
@@ -164,8 +175,13 @@ function takeSnapshot() {
         console.error('Dynamic Island: snapshot failed', e);
         return;
     } finally {
-        for (const [actor, opacity] of blanked)
-            actor.opacity = opacity;
+        for (const [actor, opacity] of blanked) {
+            try {
+                actor.opacity = opacity;
+            } catch {
+                // disposed while blanked: nothing to restore
+            }
+        }
     }
     for (const backdrop of snapshot.clients)
         backdrop.setSnapshot(snapshot.content);
@@ -176,6 +192,10 @@ function stopSnapshots() {
         if (id)
             GLib.source_remove(id);
     snapshot.timer = snapshot.idle = 0;
+    if (snapshot.startup) {
+        Main.layoutManager.disconnect(snapshot.startup);
+        snapshot.startup = 0;
+    }
     snapshot.content = null; // free the texture while every glass is off screen
     for (const backdrop of snapshot.clients)
         backdrop.setSnapshot(null);
@@ -184,6 +204,18 @@ function stopSnapshots() {
 function syncSnapshots() {
     if (![...snapshot.clients].some(b => b.mapped)) {
         stopSnapshots();
+        return;
+    }
+    // At login the glasses map before the shell has drawn anything: wait for the
+    // session to finish starting, then begin taking snapshots.
+    if (Main.layoutManager._startingUp) {
+        if (!snapshot.startup) {
+            snapshot.startup = Main.layoutManager.connect('startup-complete', () => {
+                Main.layoutManager.disconnect(snapshot.startup);
+                snapshot.startup = 0;
+                syncSnapshots();
+            });
+        }
         return;
     }
     // Never synchronously: a map notification can arrive mid-layout, and painting
