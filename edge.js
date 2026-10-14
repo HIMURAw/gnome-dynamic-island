@@ -5,9 +5,9 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-// While Harvis works the screen, a soft purple light along every edge of every monitor, so it
-// is plain from anywhere that the computer is in Harvis's hands. When Harvis speaks it breathes
-// with the voice.
+// Harvis along the edges of every monitor: a soft green light while it speaks, breathing
+// with its voice; yellow while it works on something; purple while it drives the screen
+// (Umut, 2026-10-14). From anywhere it is plain what the computer is doing.
 //
 // Cheap on purpose: four gradient strips per monitor, not one fullscreen layer, so only the edges
 // are ever redrawn; the gradient is painted once and cached by St, and the voice moves it only
@@ -45,6 +45,24 @@ export class EdgeGlow {
     // below: an actor (the island) the glow must stay under.
     keepBelow(below) {
         this._below = below;
+    }
+
+    // mode: null (off), 'speaking' (green, with the voice), 'working' (yellow),
+    // 'control' (purple, Harvis drives the screen).
+    setMode(mode) {
+        if (mode === this._modeName)
+            return;
+        this._modeName = mode;
+        if (mode)
+            for (const strip of this._strips)
+                strip.style_class = this._stripClass(strip._side);
+        this.setActive(!!mode);
+        this.setSpeaking(mode === 'speaking');
+    }
+
+    _stripClass(side) {
+        const color = {speaking: 'green', working: 'yellow'}[this._modeName] ?? 'purple';
+        return `dynada-edge dynada-edge-${side}-${color}`;
     }
 
     setActive(on) {
@@ -105,9 +123,10 @@ export class EdgeGlow {
                 ['left', m.x, m.y, t, m.height, [0, 0.5]],
                 ['right', m.x + m.width - t, m.y, t, m.height, [1, 0.5]],
             ]) {
-                const strip = new St.Widget({style_class: `dynada-edge dynada-edge-${side}`, reactive: false,
+                const strip = new St.Widget({style_class: this._stripClass(side), reactive: false,
                     x, y, width: w, height: h, pivot_point: new Graphene.Point({x: pivot[0], y: pivot[1]})});
                 strip._vertical = side === 'top' || side === 'bottom';
+                strip._side = side;
                 this._group.add_child(strip);
                 this._strips.push(strip);
             }

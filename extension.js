@@ -33,6 +33,7 @@ import {AvatarGlyph} from './face.js';
 import {EdgeGlow} from './edge.js';
 import {GlassMenus} from './menus.js';
 import {Cards} from './cards.js';
+import {CommandBox} from './command.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
 
@@ -195,6 +196,8 @@ export default class DynamicIslandExtension extends Extension {
         this._unwatchOutside();
 
         this._safely('releasing palette', () => this._releasePalette());
+        this._safely('releasing command box', () => this._commandBox?.destroy());
+        this._commandBox = null;
         this._safely('releasing privacy bubble', () => this._privacyWatcher?.destroy());
         this._safely('removing edge glow', () => this._edgeGlow?.destroy());
         this._edgeGlow = null;
@@ -1054,7 +1057,8 @@ export default class DynamicIslandExtension extends Extension {
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._togglePalette());
         this._paletteBound = true;
         // The Copilot key on laptops that have one sends Super+Shift+F23: a press
-        // talks to Harvis, two presses open the chat, holding it 2 s stops Harvis.
+        // opens the command box, two presses make Harvis listen, holding it 2 s
+        // stops Harvis and puts it to sleep (Umut, 2026-10-14).
         // POPUP too: with the chat open the island holds the keyboard, and two presses close it.
         Main.wm.addKeybinding('chat-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
@@ -1073,13 +1077,14 @@ export default class DynamicIslandExtension extends Extension {
         if (key && key.released) {
             this._copilot = null;
             key.tap = this._clearTimeout(key.tap);
-            // Open → closed (also a chat a voice answer showed without the keyboard).
+            // Two presses: Harvis listens, as if the name had been said. An open chat
+            // still closes this way (a voice answer may have opened it keyboardless).
             if (this._mode === 'chat') {
                 console.log('Dynamic Island: Copilot key pressed twice: chat closed');
                 this._close();
             } else {
-                console.log('Dynamic Island: Copilot key pressed twice: chat');
-                this._toggleChat();
+                console.log('Dynamic Island: Copilot key pressed twice: listen');
+                this._wakeHarvis();
             }
             return;
         }
@@ -1109,10 +1114,13 @@ export default class DynamicIslandExtension extends Extension {
         if (held) {
             if (!key.done && now - key.start >= COPILOT_HOLD) {
                 key.done = true;
-                console.log('Dynamic Island: Copilot key held: stop Harvis');
-                this._harvisSignal('SIGRTMIN+2');
-                Main.osdWindowManager.showAll?.(new Gio.ThemedIcon({name: 'process-stop-symbolic'}),
-                    _('Harvis stopped'), null, null);
+                console.log('Dynamic Island: Copilot key held: stop Harvis and sleep');
+                // SIGRTMIN+3: the service stops whatever it does AND stops listening
+                // until it is explicitly woken (two presses, or the chat's microphone).
+                this._harvisSignal('SIGRTMIN+3');
+                this._sleepHarvis(true);
+                Main.osdWindowManager.showAll?.(new Gio.ThemedIcon({name: 'media-playback-pause-symbolic'}),
+                    _('Harvis stopped and asleep'), null, null);
             }
             return GLib.SOURCE_CONTINUE;
         }
@@ -1127,12 +1135,29 @@ export default class DynamicIslandExtension extends Extension {
             key.tap = 0;
             if (this._copilot === key) {
                 this._copilot = null;
-                console.log(`Dynamic Island: Copilot key pressed (${key.byMods ? 'modifiers' : 'repeat'}): listen`);
-                this._harvisSignal('SIGUSR1');
+                console.log(`Dynamic Island: Copilot key pressed (${key.byMods ? 'modifiers' : 'repeat'}): command box`);
+                this._commandBox ??= new CommandBox({dir: this.dir, onSubmit: text => {
+                    this._chat?.sendText(text);
+                    if (this._chatBadge)
+                        this._chatBadge.visible = true;
+                }});
+                this._commandBox.open();
             }
             return GLib.SOURCE_REMOVE;
         });
         return GLib.SOURCE_REMOVE;
+    }
+
+    // Waking and sleeping: the robots everywhere follow the Copilot key at once;
+    // the service's own state catches up through its activity.
+    _wakeHarvis() {
+        this._sleepHarvis(false);
+        this._harvisSignal('SIGUSR1');
+    }
+
+    _sleepHarvis(asleep) {
+        for (const avatar of [this._compactBrain, this._chatAvatar, this._mindAvatar])
+            avatar?.sleep?.(asleep);
     }
 
     _harvisSignal(signal) {
@@ -1375,15 +1400,20 @@ export default class DynamicIslandExtension extends Extension {
         this._compactBrain.setMode(mode);
         this._chatAvatar?.setMode(mode);
         this._mindAvatar?.setMode(mode);
-        // Harvis working the screen: purple light on the edges, breathing with its voice (edge.js).
+        if (harvis)
+            this._sleepHarvis(false);
+        // Harvis on the edges (edge.js): green while it speaks (with the voice),
+        // yellow while it works, purple while it drives the screen.
         const controlling = this._activities.items.some(item => item.id === 'harvis-control');
-        if (controlling && !this._edgeGlow) {
+        const glow = mode === 'speaking' ? 'speaking'
+            : controlling ? 'control'
+                : mode === 'thinking' ? 'working' : null;
+        if (glow && !this._edgeGlow) {
             this._voiceEnvelope ??= new VoiceEnvelope();
             this._edgeGlow = new EdgeGlow(() => this._voiceEnvelope.level());
             this._edgeGlow.keepBelow(this._island);
         }
-        this._edgeGlow?.setActive(controlling);
-        this._edgeGlow?.setSpeaking(mode === 'speaking');
+        this._edgeGlow?.setMode(glow);
         for (const m of ['thinking', 'speaking', 'failed'])
             (m === mode ? this._island.add_style_class_name : this._island.remove_style_class_name)
                 .call(this._island, `dynada-${m}`);
