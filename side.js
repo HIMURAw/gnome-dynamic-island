@@ -501,6 +501,16 @@ export class SideIslands {
 
     // From outside (the touchpad service over D-Bus): "left"/"right" open, "toggle-…" also closes.
     fromOutside(request) {
+        if (request.startsWith('focus:')) {
+            const [, minutes, topic] = request.split(':');
+            if (Number(minutes) > 0) {
+                this._focus.stop();
+                this._focus.start(Number(minutes), topic || _('Other'));
+            } else {
+                this._focus.stop();
+            }
+            return;
+        }
         const toggle = request.startsWith('toggle-');
         const side = request.replace('toggle-', '');
         if (side !== 'left' && side !== 'right')
@@ -799,6 +809,12 @@ export class SideIslands {
         windows.add_child(windowList);
         sections.push(windows);
 
+        // Work modes: from a JSON file, run by the "calisma-modu" program (only where both exist).
+        const modes = panel.section(_('Modes'), 'dynada-side-modes');
+        const modeRow = new St.BoxLayout({style_class: 'dynada-side-chips', x_expand: true});
+        modes.add_child(modeRow);
+        sections.push(modes);
+
         // Focus
         const focus = panel.section(_('Focus'), 'dynada-side-focus');
         this._buildFocus(focus);
@@ -812,11 +828,41 @@ export class SideIslands {
 
         panel.refresh = () => {
             search.text = '';
+            this._fillModes(modes, modeRow);
             this._fillApps(grid);
             this._fillWindows(windows, windowList);
             this._fillRecent(recent, recentList);
         };
         return panel;
+    }
+
+    _fillModes(section, row) {
+        row.destroy_all_children();
+        const program = GLib.find_program_in_path('calisma-modu');
+        let list = {};
+        try {
+            list = JSON.parse(readText(GLib.build_filenamev([GLib.get_user_config_dir(), 'calisma-modu.json'])) ?? '{}');
+        } catch {
+            list = {};
+        }
+        const ids = Object.keys(list);
+        section.visible = !!program && ids.length > 0;
+        for (const id of ids) {
+            const b = new St.Button({style_class: 'dynada-pill-button dynada-side-mode', can_focus: true,
+                label: list[id].ad ?? id});
+            b.connect('clicked', () => {
+                this.close(true);
+                GLib.spawn_async(null, [program, id], null, GLib.SpawnFlags.DEFAULT, null);
+            });
+            row.add_child(b);
+        }
+        const stop = new St.Button({style_class: 'dynada-pill-button dynada-side-mode dynada-side-mode-stop', can_focus: true,
+            label: _('End')});
+        stop.connect('clicked', () => {
+            this.close(true);
+            GLib.spawn_async(null, [program, 'bitir'], null, GLib.SpawnFlags.DEFAULT, null);
+        });
+        row.add_child(stop);
     }
 
     _row(icon, title, subtitle, onClick, {onClose} = {}) {
@@ -992,6 +1038,9 @@ export class SideIslands {
         this._timer.text = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
         this._focusButton.label = running ? _('Stop') : _('Start');
         this._focusButton.checked = running;
+        // A session started from outside (a work mode) shows its own topic.
+        if (running && this._topicButtons?.some(b => b.label === this._focus.session.topic))
+            this._topicButtons.forEach(b => (b.checked = b.label === this._focus.session.topic));
         if (running)
             this._timer.add_style_pseudo_class('running');
         else

@@ -1821,3 +1821,14 @@
   width: 22px;
   height: 22px;
 }
+
+/* Modes */
+.dynada-side-mode {
+  padding: 7px 14px;
+  font-weight: bold;
+}
+
+.dynada-side-mode-stop {
+  color: rgba(245, 245, 247, 0.6);
+  font-weight: normal;
+}

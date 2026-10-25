@@ -57,6 +57,10 @@ const IFACE = `
     <method name="Side">
       <arg type="s" direction="in" name="side"/>
     </method>
+    <method name="Focus">
+      <arg type="u" direction="in" name="minutes"/>
+      <arg type="s" direction="in" name="topic"/>
+    </method>
     <method name="Timer">
       <arg type="u" direction="in" name="seconds"/>
       <arg type="s" direction="in" name="label"/>
@@ -238,6 +242,11 @@ export class Activities {
     // A side island from outside (the touchpad edge swipe): left, right, or toggle-left / toggle-right.
     Side(side) {
         this._onSide?.(side);
+    }
+
+    // The side island's focus timer from outside (work modes): minutes 0 stops it.
+    Focus(minutes, topic) {
+        this._onSide?.(minutes ? `focus:${minutes}:${topic}` : 'focus:0:');
     }
 
     Timer(seconds, label) {

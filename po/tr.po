@@ -797,3 +797,9 @@ msgstr "Renk kopyalandı"
 
 msgid "Ask the screen"
 msgstr "Ekrana sor"
+
+msgid "Modes"
+msgstr "Modlar"
+
+msgid "End"
+msgstr "Bitir"
