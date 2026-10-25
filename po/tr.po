@@ -683,3 +683,84 @@ msgstr "%s temizle"
 
 msgid "Something went wrong"
 msgstr "Bir sorun çıktı"
+
+msgid "Launch"
+msgstr "Başlat"
+
+msgid "Search apps, or ask Harvis…"
+msgstr "Uygulama ara ya da Harvis'e sor…"
+
+msgid "Ask Harvis: %s"
+msgstr "Harvis'e sor: %s"
+
+msgid "Save as a quick note"
+msgstr "Hızlı not olarak kaydet"
+
+msgid "Into the inbox of the notes folder"
+msgstr "Not klasörünün gelen kutusuna"
+
+msgid "Apps"
+msgstr "Uygulamalar"
+
+msgid "All apps"
+msgstr "Tümü"
+
+msgid "Open windows"
+msgstr "Açık pencereler"
+
+msgid "Open windows · %s"
+msgstr "Açık pencereler · %s"
+
+msgid "No open windows"
+msgstr "Açık pencere yok"
+
+msgid "Recent files"
+msgstr "Son dosyalar"
+
+msgid "Focus"
+msgstr "Odak"
+
+msgid "Today %s"
+msgstr "Bugün %s"
+
+msgid "Close"
+msgstr "Kapat"
+
+msgid "Quick settings"
+msgstr "Hızlı ayarlar"
+
+msgid "System"
+msgstr "Sistem"
+
+msgid "Notifications · %s"
+msgstr "Bildirimler · %s"
+
+msgid "Play"
+msgstr "Oynat"
+
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+msgid "Bluetooth"
+msgstr "Bluetooth"
+
+msgid "Dark style"
+msgstr "Karanlık"
+
+msgid "Night light"
+msgstr "Gece ışığı"
+
+msgid "Stay awake"
+msgstr "Uyanık tut"
+
+msgid "Screenshot"
+msgstr "Ekran görüntüsü"
+
+msgid "Lock"
+msgstr "Kilitle"
+
+msgid "Settings"
+msgstr "Ayarlar"
+
+msgid "On"
+msgstr "Açık"

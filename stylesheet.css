@@ -1443,16 +1443,167 @@
   border-radius: 30px;
 }
 
-.dynada-side-content {
-  padding: 20px 18px 18px 18px;
+.dynada-side-column {
+  padding: 18px 0 10px 0;
   spacing: 12px;
 }
 
 .dynada-side-header {
-  padding: 0 4px 2px 4px;
+  padding: 0 22px;
+  spacing: 12px;
+}
+
+.dynada-side-title {
+  font-size: 17pt;
+  font-weight: 800;
+}
+
+.dynada-side-header-note {
+  font-size: 9pt;
+  color: rgba(245, 245, 247, 0.5);
+}
+
+.dynada-side-scroll {
+  -st-vfade-offset: 24px;
+}
+
+.dynada-side-content {
+  padding: 2px 16px 12px 16px;
+  spacing: 12px;
 }
 
 .dynada-side-card {
+  padding: 14px;
+  spacing: 10px;
+  border-radius: 20px;
+}
+
+.dynada-side-section-head {
+  padding: 0 2px;
+}
+
+.dynada-side-section-title {
+  font-size: 10.5pt;
+  font-weight: bold;
+  color: rgba(245, 245, 247, 0.92);
+}
+
+.dynada-side-link {
+  font-size: 9pt;
+  color: #c9b6ff;
+  padding: 2px 6px;
+  border-radius: 8px;
+}
+
+.dynada-side-link:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-side-empty {
+  color: rgba(245, 245, 247, 0.45);
+}
+
+/* Search */
+.dynada-side-search {
+  margin: 0 16px;
+  padding: 4px 14px;
+  spacing: 10px;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(190, 160, 255, 0.18);
+}
+
+.dynada-side-search-icon {
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.dynada-side-search-entry,
+.dynada-side-search-entry:focus,
+.dynada-side-search-entry:hover {
+  font-size: 12pt;
+  padding: 8px 0;
+}
+
+.dynada-side-entry,
+.dynada-side-entry:focus,
+.dynada-side-entry:hover {
+  font-size: 11pt;
+  padding: 4px 2px;
+}
+
+/* Rows (results, windows, files, notifications) */
+.dynada-side-list {
+  spacing: 4px;
+}
+
+.dynada-side-row-item {
+  border-radius: 12px;
+  spacing: 4px;
+}
+
+.dynada-side-row-item:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-side-row-button {
+  padding: 6px 8px;
+  border-radius: 12px;
+  text-align: left;
+  color: #f5f5f7;
+}
+
+.dynada-side-row-box {
+  spacing: 12px;
+}
+
+.dynada-side-row-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.dynada-side-row-title {
+  font-size: 10pt;
+  font-weight: bold;
+}
+
+.dynada-side-row-subtitle {
+  font-size: 8.5pt;
+  color: rgba(245, 245, 247, 0.55);
+}
+
+.dynada-side-dismiss {
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+}
+
+/* Apps */
+.dynada-side-app {
+  padding: 8px 2px 4px 2px;
+  border-radius: 16px;
+  color: #f5f5f7;
+}
+
+.dynada-side-app:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-side-app-name {
+  font-size: 8.5pt;
+  padding-top: 6px;
+  max-width: 70px;
+}
+
+.dynada-side-app-dot {
+  width: 4px;
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background-color: #c9b6ff;
+}
+
+/* Focus */
+.dynada-side-focus-top {
   spacing: 8px;
 }
 
@@ -1481,10 +1632,6 @@
   spacing: 5px;
 }
 
-.dynada-side-focus > StBoxLayout:first-child {
-  spacing: 8px;
-}
-
 .dynada-side-chip {
   padding: 4px 11px;
   font-size: 9pt;
@@ -1495,24 +1642,162 @@
   background-color: rgba(123, 92, 240, 0.4);
 }
 
-.dynada-side-list {
+/* Harvis */
+.dynada-side-harvis-header .dynada-side-title {
+  font-size: 15pt;
+}
+
+.dynada-side-status {
+  font-size: 9pt;
+  color: #c9b6ff;
+}
+
+.dynada-side-ask {
+  background-gradient-direction: vertical;
+  background-gradient-start: rgba(123, 92, 240, 0.24);
+  background-gradient-end: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(190, 160, 255, 0.22);
+}
+
+.dynada-side-ask-row {
   spacing: 6px;
 }
 
-.dynada-side-row {
-  spacing: 10px;
+.dynada-side-round {
+  width: 32px;
+  height: 32px;
+  border-radius: 99px;
+  color: rgba(245, 245, 247, 0.85);
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.dynada-side-when {
+.dynada-side-round:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.dynada-side-send {
+  color: #ffffff;
+  background-color: rgba(123, 92, 240, 0.85);
+}
+
+.dynada-side-send:hover {
+  background-color: rgba(143, 112, 255, 1);
+}
+
+.dynada-side-last {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background-color: rgba(0, 0, 0, 0.18);
+}
+
+.dynada-side-last:hover {
+  background-color: rgba(0, 0, 0, 0.28);
+}
+
+.dynada-side-last-text {
+  font-size: 9.5pt;
+  color: rgba(245, 245, 247, 0.75);
+}
+
+/* Now playing */
+.dynada-side-media-row {
+  spacing: 14px;
+}
+
+.dynada-side-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.08);
+  background-size: cover;
+}
+
+.dynada-side-media-title {
+  font-size: 11pt;
+  font-weight: bold;
+}
+
+.dynada-side-media-controls {
+  spacing: 18px;
+}
+
+.dynada-side-media-button {
+  width: 38px;
+  height: 38px;
+  background-color: transparent;
+}
+
+.dynada-side-media-play {
+  width: 46px;
+  height: 46px;
+  color: #1b162c;
+  background-color: #f5f5f7;
+}
+
+.dynada-side-media-play:hover {
+  background-color: #ffffff;
+}
+
+/* Quick settings */
+.dynada-side-toggle {
+  padding: 10px 12px;
+  border-radius: 16px;
+  text-align: left;
+  color: #f5f5f7;
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+.dynada-side-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.13);
+}
+
+.dynada-side-toggle:checked {
+  background-color: rgba(123, 92, 240, 0.7);
+}
+
+.dynada-side-toggle:checked:hover {
+  background-color: rgba(143, 112, 255, 0.8);
+}
+
+.dynada-side-toggle-icon {
+  padding-bottom: 6px;
+}
+
+.dynada-side-toggle-name {
   font-size: 9pt;
   font-weight: bold;
-  font-feature-settings: "tnum";
-  color: #ffb4a8;
-  min-width: 38px;
 }
 
+.dynada-side-toggle-state {
+  font-size: 8pt;
+  color: rgba(245, 245, 247, 0.6);
+}
+
+/* Sliders */
+.dynada-side-sliders {
+  spacing: 14px;
+}
+
+.dynada-side-slider-row {
+  spacing: 12px;
+}
+
+.dynada-side-slider-icon {
+  color: rgba(245, 245, 247, 0.75);
+}
+
+.dynada-side-slider {
+  -barlevel-height: 22px;
+  -barlevel-background-color: rgba(255, 255, 255, 0.1);
+  -barlevel-active-background-color: #f5f5f7;
+  -slider-handle-radius: 0;
+  -barlevel-border-width: 0;
+}
+
+/* System */
 .dynada-side-stats {
-  spacing: 10px;
+  spacing: 12px;
 }
 
 .dynada-side-stat {
@@ -1541,108 +1826,15 @@
   background-color: #ff7a6b;
 }
 
-.dynada-side-entry,
-.dynada-side-entry:focus,
-.dynada-side-entry:hover {
-  font-size: 11pt;
-  padding: 4px 2px;
+/* Coming up */
+.dynada-side-agenda-row {
+  spacing: 10px;
 }
 
-.dynada-side-harvis-header {
-  spacing: 12px;
-  padding: 2px 4px 6px 2px;
-}
-
-.dynada-side-status {
+.dynada-side-when {
   font-size: 9pt;
-  color: #c9b6ff;
-}
-
-.dynada-side-ask {
-  spacing: 10px;
-  background-gradient-direction: vertical;
-  background-gradient-start: rgba(123, 92, 240, 0.22);
-  background-gradient-end: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(190, 160, 255, 0.22);
-}
-
-.dynada-side-ask-row {
-  spacing: 6px;
-}
-
-.dynada-side-round {
-  width: 30px;
-  height: 30px;
-  border-radius: 99px;
-  color: rgba(245, 245, 247, 0.85);
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-.dynada-side-round:hover {
-  background-color: rgba(255, 255, 255, 0.16);
-}
-
-.dynada-side-send {
-  color: #ffffff;
-  background-color: rgba(123, 92, 240, 0.85);
-}
-
-.dynada-side-send:hover {
-  background-color: rgba(143, 112, 255, 1);
-}
-
-.dynada-side-last {
-  text-align: left;
-  spacing: 4px;
-}
-
-.dynada-side-chevron {
-  color: rgba(245, 245, 247, 0.4);
-}
-
-.dynada-side-note-icon {
-  color: rgba(245, 245, 247, 0.55);
-  padding-left: 2px;
-}
-
-.dynada-side-empty {
-  color: rgba(245, 245, 247, 0.45);
-}
-
-.dynada-side-notification {
-  spacing: 10px;
-  padding: 8px 8px 8px 8px;
-  border-radius: 14px;
-  background-color: rgba(255, 255, 255, 0.04);
-}
-
-.dynada-side-notification:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.dynada-side-notification-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-.dynada-side-notification-open {
-  text-align: left;
-  color: #f5f5f7;
-  padding: 0;
-}
-
-.dynada-side-dismiss {
-  width: 22px;
-  height: 22px;
-}
-
-.dynada-side-notification-title {
-  font-size: 10pt;
   font-weight: bold;
-}
-
-.dynada-side-harvis-header .dynada-center-month {
-  padding-left: 0;
+  font-feature-settings: "tnum";
+  color: #ffb4a8;
+  min-width: 38px;
 }

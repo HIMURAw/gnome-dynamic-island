@@ -12,31 +12,47 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PressureBarrier} from 'resource:///org/gnome/shell/ui/layout.js';
 import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.js';
 
+import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
+import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
+
 import {Glass, snapshotExclude} from './glass.js';
 import {NotificationCenter} from './center.js';
+import {TileGridLayout} from './layouts.js';
+import {MediaWatcher, squareArt} from './media.js';
 import {spring, stopSpring} from './spring.js';
 
 // Side islands (Umut, 2026-10-25): push the pointer against the left or right edge of the
-// screen and a glass island grows out of it. Left, "Today": a focus timer that logs to the
-// notes folder, what is coming up, and the machine at a glance. Right, "Harvis": ask the
-// assistant, drop a quick note, the latest notifications.
+// screen and a tall glass island grows out of it. Left, the launcher: search (apps, a question
+// for Harvis, a quick note), favourite and most used apps, open windows, recent files, a focus
+// timer that logs to the notes folder. Right, the control center: Harvis, now playing, nine
+// quick settings, volume and brightness, the machine, what is coming up, notifications.
 //
 // Cheap on purpose. Closed, there is nothing on screen and nothing running: the edges are two
 // pressure barriers (the same mechanism as GNOME's hot corner), which only wake up when the
 // pointer pushes into them and never take a click from a scrollbar at the edge. A panel's
-// content is built the first time it opens. While open, the pointer is checked ten times a
-// second and the system figures every two seconds; both stop the moment it closes. The focus
-// timer keeps a single timeout for its end, not a ticking clock.
+// content is built the first time it opens and refreshed on each open. While open, the pointer
+// is checked ten times a second, the system figures every two seconds and the media players are
+// watched; all of it stops the moment the island closes. The focus timer keeps a single
+// timeout for its end, not a ticking clock.
 
-const WIDTH = 340;          // px, logical
+const WIDTH = 420;          // px, logical
+const TOP_ROOM = 64;        // below the island
+const BOTTOM_ROOM = 96;     // above the dock
 const EDGE_GAP = 14;        // from the screen edge
 const SPAN = 0.7;           // middle share of the edge that reacts: corners stay the island's and the dock's
 const PRESSURE = 70;        // px of push before the island opens (hot corner uses 100)
 const GRACE = 56;           // px the pointer may stray outside before it counts as leaving
 const CLOSE_DELAY = 380;    // ms outside before closing
-const STATS_EVERY = 2000;   // ms, system figures while the left island is open
-const MAX_NOTIFICATIONS = 5;
+const STATS_EVERY = 2000;   // ms, system figures while the right island is open
+const MAX_NOTIFICATIONS = 6;
 const MAX_AGENDA = 4;
+const MAX_WINDOWS = 7;
+const MAX_RECENT = 5;
+const APP_COLUMNS = 5;
+const APP_ROWS = 3;
+const APP_ICON = 44;
+const APP_TILE_HEIGHT = 86;
+const TOGGLE_HEIGHT = 78;
 
 const decoder = new TextDecoder();
 const fmt = (str, ...args) => str.replace(/%s/g, () => String(args.shift()));
@@ -264,6 +280,7 @@ class FocusTimer {
 
 // ---------- One island ----------
 
+// A tall glass column: a fixed header, then the sections in a scroll view.
 class SidePanel {
     constructor(side, title) {
         this.side = side;
@@ -276,19 +293,35 @@ class SidePanel {
             opacity: 0,
             pivot_point: new Graphene.Point({x: side === 'left' ? 0 : 1, y: 0.5}),
         });
+        this.column = new St.BoxLayout({
+            style_class: 'dynada-side-column',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            y_expand: true,
+        });
+        this.header = new St.BoxLayout({style_class: 'dynada-side-header', x_expand: true});
+        this.title = label(title, 'dynada-side-title', {x_expand: true});
+        this.header.add_child(this.title);
+        this.headerNote = label('', 'dynada-side-header-note');
+        this.header.add_child(this.headerNote);
+        this.column.add_child(this.header);
+
         this.content = new St.BoxLayout({
             style_class: 'dynada-side-content',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        const header = new St.BoxLayout({style_class: 'dynada-side-header', x_expand: true});
-        this.header = header;
-        this.title = label(title, 'dynada-center-month', {x_expand: true});
-        header.add_child(this.title);
-        this.headerNote = label('', 'dynada-card-time');
-        header.add_child(this.headerNote);
-        this.content.add_child(header);
-        this.actor.add_child(this.content);
+        this.scroll = new St.ScrollView({
+            style_class: 'dynada-side-scroll vfade',
+            hscrollbar_policy: St.PolicyType.NEVER,
+            vscrollbar_policy: St.PolicyType.AUTOMATIC,
+            overlay_scrollbars: true,
+            x_expand: true,
+            y_expand: true,
+            child: this.content,
+        });
+        this.column.add_child(this.scroll);
+        this.actor.add_child(this.column);
         snapshotExclude.add(this.actor);
         Main.layoutManager.addChrome(this.actor, {affectsStruts: false, trackFullscreen: true});
     }
@@ -299,15 +332,78 @@ class SidePanel {
         this.actor.destroy();
     }
 
-    card(styleClass = '') {
+    // A titled section: a card in the column, optional action button on the title's right.
+    section(title, styleClass = '', {action, onAction} = {}) {
         const box = new St.BoxLayout({
             style_class: `dynada-card dynada-side-card ${styleClass}`,
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
+        if (title) {
+            const head = new St.BoxLayout({style_class: 'dynada-side-section-head', x_expand: true});
+            box.titleLabel = label(title, 'dynada-side-section-title', {x_expand: true});
+            head.add_child(box.titleLabel);
+            if (action) {
+                box.actionButton = new St.Button({style_class: 'dynada-side-link', label: action, can_focus: true});
+                box.actionButton.connect('clicked', onAction);
+                head.add_child(box.actionButton);
+            }
+            box.add_child(head);
+        }
         this.content.add_child(box);
         return box;
     }
+}
+
+// ---------- Quick settings (right island) ----------
+
+// Each toggle reads its state when the island opens and flips it on click; nothing is watched
+// while the island is closed.
+function settingsToggle(schema, key, on, off = null) {
+    let settings = null;
+    try {
+        settings = new Gio.Settings({schema_id: schema});
+    } catch {
+        return null;
+    }
+    return {
+        get: () => (off === null ? settings.get_boolean(key) : settings.get_string(key) === on),
+        set: value => (off === null ? settings.set_boolean(key, value) : settings.set_string(key, value ? on : off)),
+    };
+}
+
+function run(argv) {
+    return new Promise(resolve => {
+        try {
+            const proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                try {
+                    const [, out] = p.communicate_utf8_finish(res);
+                    resolve(out ?? '');
+                } catch {
+                    resolve('');
+                }
+            });
+        } catch {
+            resolve('');
+        }
+    });
+}
+
+function dbusProperty(bus, name, path, iface, prop, value = undefined) {
+    return new Promise(resolve => {
+        const set = value !== undefined;
+        bus.call(name, path, 'org.freedesktop.DBus.Properties', set ? 'Set' : 'Get',
+            set ? new GLib.Variant('(ssv)', [iface, prop, value]) : new GLib.Variant('(ss)', [iface, prop]),
+            null, Gio.DBusCallFlags.NONE, 2000, null, (conn, res) => {
+                try {
+                    const reply = conn.call_finish(res);
+                    resolve(set ? true : reply.deepUnpack()[0].deepUnpack());
+                } catch {
+                    resolve(null);
+                }
+            });
+    });
 }
 
 // ---------- The two islands and their edges ----------
@@ -326,6 +422,7 @@ export class SideIslands {
         this._closeId = 0;
         this._statsId = 0;
         this._tickId = 0;
+        this._inhibitCookie = 0;
         this._stats = new SystemStats();
         this._focus = new FocusTimer(settings, () => this._syncFocus());
         this._monitorsId = Main.layoutManager.connect('monitors-changed', () => {
@@ -340,6 +437,8 @@ export class SideIslands {
         this._clearEdges();
         Main.layoutManager.disconnect(this._monitorsId);
         this._focus.destroy();
+        if (this._inhibitCookie)
+            this._uninhibit();
         for (const panel of Object.values(this._panels))
             panel.destroy();
         this._panels = {};
@@ -382,8 +481,7 @@ export class SideIslands {
 
     _onEdge(side) {
         const mon = Main.layoutManager.primaryMonitor;
-        // Not over a fullscreen video or game, and not in the middle of dragging a window
-        // (Desktop Cube switches workspaces on the same edges then).
+        // Not over a fullscreen video or game, not over the overview, not over another menu.
         if (global.display.get_monitor_in_fullscreen(mon.index) || Main.overview.visible)
             return;
         if (Main.modalCount > 0 && !this._grab)
@@ -397,7 +495,7 @@ export class SideIslands {
 
     _panel(side) {
         if (!this._panels[side])
-            this._panels[side] = side === 'left' ? this._buildToday() : this._buildHarvis();
+            this._panels[side] = side === 'left' ? this._buildLauncher() : this._buildControl();
         return this._panels[side];
     }
 
@@ -406,50 +504,49 @@ export class SideIslands {
             this.close(true);
         const panel = this._panel(side);
         this._open = side;
-        this._refresh(panel);
 
+        // A tall column between the island at the top and the dock at the bottom.
         const mon = Main.layoutManager.primaryMonitor;
+        const height = Math.round(mon.height - TOP_ROOM - BOTTOM_ROOM);
         const actor = panel.actor;
-        actor.visible = true;
-        const [, natural] = actor.get_preferred_height(WIDTH);
-        const height = Math.min(natural, mon.height - 2 * 72);
         actor.set_size(WIDTH, height);
         actor.set_position(
             side === 'left' ? mon.x + EDGE_GAP : mon.x + mon.width - WIDTH - EDGE_GAP,
-            Math.round(mon.y + (mon.height - height) / 2));
+            mon.y + TOP_ROOM);
+        actor.visible = true;
         Main.layoutManager.uiGroup.set_child_above_sibling(actor, null);
+        this._refresh(panel);
+        panel.scroll.vadjustment.value = 0;
 
-        // Grows out of the edge with a spring, the way the island opens; the cards follow a beat later.
+        // Grows out of the edge with a spring, the way the island opens; the sections follow.
         stopSpring(actor);
         actor.remove_all_transitions();
-        actor.set({scale_x: 0.3, scale_y: 0.82, opacity: 0});
+        actor.set({scale_x: 0.3, scale_y: 0.9, opacity: 0});
         actor.ease({opacity: 255, duration: 140, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
-        spring(actor, {scale_x: 1, scale_y: 1}, {response: 0.46, damping: 0.76});
-        const from = side === 'left' ? -14 : 14;
-        panel.content.get_children().forEach((child, i) => {
+        spring(actor, {scale_x: 1, scale_y: 1}, {response: 0.48, damping: 0.78});
+        const from = side === 'left' ? -16 : 16;
+        [panel.header, ...panel.content.get_children()].forEach((child, i) => {
             child.remove_all_transitions();
             child.set({opacity: 0, translation_x: from});
             child.ease({
                 opacity: 255,
                 translation_x: 0,
-                delay: 60 + i * 40,
+                delay: 50 + Math.min(i, 8) * 35,
                 duration: 260,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
             });
         });
 
         this._watch = getPointerWatcher().addWatch(100, (x, y) => this._onPointer(x, y));
-        if (side === 'left') {
+        if (side === 'right') {
             this._stats.reset();
             this._stats.read();
             this._statsId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 400, () => {
                 this._syncStats();
-                this._statsId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, STATS_EVERY, () => {
-                    this._syncStats();
-                    return GLib.SOURCE_CONTINUE;
-                });
+                this._statsId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, STATS_EVERY, () => this._syncStats());
                 return GLib.SOURCE_REMOVE;
             });
+        } else {
             this._syncFocus();
         }
     }
@@ -467,6 +564,7 @@ export class SideIslands {
                 GLib.source_remove(this[id]);
             this[id] = 0;
         }
+        panel.closed?.();
         const actor = panel.actor;
         stopSpring(actor);
         actor.remove_all_transitions();
@@ -477,7 +575,7 @@ export class SideIslands {
         actor.ease({
             opacity: 0,
             scale_x: 0.55,
-            scale_y: 0.9,
+            scale_y: 0.94,
             duration: 180,
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
             onComplete: () => {
@@ -541,9 +639,9 @@ export class SideIslands {
         this._grab = null;
     }
 
-    _entry(panel, hint, onSubmit) {
+    _entry(panel, hint, onSubmit, styleClass = '') {
         const entry = new St.Entry({
-            style_class: 'dynada-palette-entry dynada-side-entry',
+            style_class: `dynada-palette-entry dynada-side-entry ${styleClass}`,
             hint_text: hint,
             can_focus: true,
             x_expand: true,
@@ -560,45 +658,239 @@ export class SideIslands {
         return entry;
     }
 
+    _round(icon, name, styleClass, onClick, size = 15) {
+        const b = new St.Button({
+            style_class: `dynada-side-round ${styleClass}`,
+            can_focus: true,
+            accessible_name: name,
+            y_align: Clutter.ActorAlign.CENTER,
+            child: new St.Icon({icon_name: icon, icon_size: size}),
+        });
+        b.connect('clicked', onClick);
+        return b;
+    }
+
     _refresh(panel) {
         panel.headerNote.text = GLib.DateTime.new_now_local().format(panel.side === 'left' ? '%A, %e %B' : '%H:%M').trim();
         panel.refresh?.();
     }
 
-    // ---------- Left: Today ----------
+    // ---------- Left: launcher ----------
 
-    _buildToday() {
-        const panel = new SidePanel('left', _('Today'));
+    _buildLauncher() {
+        const panel = new SidePanel('left', _('Launch'));
+
+        // Search: apps as you type; Enter opens the first; nothing found offers Harvis.
+        const searchCard = new St.BoxLayout({style_class: 'dynada-side-search', x_expand: true});
+        searchCard.add_child(new St.Icon({icon_name: 'system-search-symbolic', icon_size: 18,
+            style_class: 'dynada-side-search-icon', y_align: Clutter.ActorAlign.CENTER}));
+        const results = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list',
+            x_expand: true, visible: false});
+        let first = null;
+        const search = this._entry(panel, _('Search apps, or ask Harvis…'), text => {
+            if (first)
+                first();
+            else {
+                this.close(true);
+                this._onAsk(text);
+            }
+        }, 'dynada-side-search-entry');
+        searchCard.add_child(search);
+        panel.column.insert_child_at_index(searchCard, 1);
+
+        const sections = [];
+        search.clutter_text.connect('text-changed', () => {
+            const q = search.text.trim();
+            sections.forEach(s => (s.visible = !q));
+            results.visible = !!q;
+            first = null;
+            results.destroy_all_children();
+            if (!q)
+                return;
+            const system = Shell.AppSystem.get_default();
+            const apps = Shell.AppSystem.search(q).flat().map(id => system.lookup_app(id)).filter(Boolean).slice(0, 7);
+            for (const app of apps) {
+                const launch = () => {
+                    this.close(true);
+                    app.activate();
+                };
+                first ??= launch;
+                results.add_child(this._row(app.create_icon_texture(28), app.get_name(), app.get_description() ?? '', launch));
+            }
+            results.add_child(this._row(new St.Icon({icon_name: 'dialog-question-symbolic', icon_size: 20}),
+                fmt(_('Ask Harvis: %s'), q), '', () => {
+                    this.close(true);
+                    this._onAsk(q);
+                }));
+            results.add_child(this._row(new St.Icon({icon_name: 'document-edit-symbolic', icon_size: 20}),
+                _('Save as a quick note'), _('Into the inbox of the notes folder'), () => {
+                    search.text = '';
+                    search.hint_text = this._saveNote(q) ? _('Saved ✓') : _('Could not save the note');
+                }));
+        });
+        panel.content.add_child(results);
+
+        // Apps: favourites first, then the most used, three rows of five.
+        const apps = panel.section(_('Apps'), 'dynada-side-apps', {
+            action: _('All apps'),
+            onAction: () => {
+                this.close(true);
+                Main.overview.showApps();
+            },
+        });
+        const grid = new St.Widget({layout_manager: new TileGridLayout(APP_COLUMNS, APP_TILE_HEIGHT, 6, 1), x_expand: true});
+        apps.add_child(grid);
+        sections.push(apps);
+
+        // Open windows, most recent first.
+        const windows = panel.section(_('Open windows'), 'dynada-side-windows');
+        const windowList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
+        windows.add_child(windowList);
+        sections.push(windows);
 
         // Focus
-        const focus = panel.card('dynada-side-focus');
-        const top = new St.BoxLayout({x_expand: true});
+        const focus = panel.section(_('Focus'), 'dynada-side-focus');
+        this._buildFocus(focus);
+        sections.push(focus);
+
+        // Recent files (GTK's list, which Files and most apps write).
+        const recent = panel.section(_('Recent files'), 'dynada-side-recent');
+        const recentList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
+        recent.add_child(recentList);
+        sections.push(recent);
+
+        panel.refresh = () => {
+            search.text = '';
+            this._fillApps(grid);
+            this._fillWindows(windows, windowList);
+            this._fillRecent(recent, recentList);
+        };
+        return panel;
+    }
+
+    _row(icon, title, subtitle, onClick, {onClose} = {}) {
+        const row = new St.BoxLayout({style_class: 'dynada-side-row-item', x_expand: true, reactive: true, track_hover: true});
+        const button = new St.Button({style_class: 'dynada-side-row-button', can_focus: true, x_expand: true});
+        const box = new St.BoxLayout({style_class: 'dynada-side-row-box', x_expand: true});
+        const bin = new St.Bin({style_class: 'dynada-side-row-icon', child: icon, y_align: Clutter.ActorAlign.CENTER});
+        box.add_child(bin);
+        const text = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true, y_align: Clutter.ActorAlign.CENTER});
+        text.add_child(label(title, 'dynada-side-row-title'));
+        if (subtitle)
+            text.add_child(label(subtitle, 'dynada-side-row-subtitle'));
+        box.add_child(text);
+        button.set_child(box);
+        button.connect('clicked', onClick);
+        row.add_child(button);
+        if (onClose) {
+            const close = this._round('window-close-symbolic', _('Close'), 'dynada-side-dismiss', onClose, 12);
+            close.opacity = 0;
+            row.connect('notify::hover', () => close.ease({opacity: row.hover ? 255 : 0, duration: 120}));
+            row.add_child(close);
+        }
+        return row;
+    }
+
+    _fillApps(grid) {
+        grid.destroy_all_children();
+        const system = Shell.AppSystem.get_default();
+        const seen = new Set();
+        const list = [];
+        const add = app => {
+            if (app && !seen.has(app.get_id()) && list.length < APP_COLUMNS * APP_ROWS) {
+                seen.add(app.get_id());
+                list.push(app);
+            }
+        };
+        for (const id of global.settings.get_strv('favorite-apps'))
+            add(system.lookup_app(id));
+        for (const app of Shell.AppUsage.get_default().get_most_used())
+            add(app);
+        for (const app of list) {
+            const tile = new St.Button({style_class: 'dynada-side-app', can_focus: true, accessible_name: app.get_name()});
+            const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
+            const icon = new St.Bin({child: app.create_icon_texture(APP_ICON), x_align: Clutter.ActorAlign.CENTER});
+            box.add_child(icon);
+            const name = label(app.get_name(), 'dynada-side-app-name', {x_align: Clutter.ActorAlign.CENTER});
+            box.add_child(name);
+            const dot = new St.Widget({style_class: 'dynada-side-app-dot', x_align: Clutter.ActorAlign.CENTER,
+                opacity: app.state === Shell.AppState.RUNNING ? 255 : 0});
+            box.add_child(dot);
+            tile.set_child(box);
+            tile.connect('clicked', () => {
+                this.close(true);
+                app.activate();
+            });
+            grid.add_child(tile);
+        }
+    }
+
+    _fillWindows(section, list) {
+        list.destroy_all_children();
+        const tracker = Shell.WindowTracker.get_default();
+        const windows = global.display.get_tab_list(Meta.TabList.NORMAL_ALL, null)
+            .filter(w => !w.skip_taskbar).slice(0, MAX_WINDOWS);
+        section.titleLabel.text = windows.length ? fmt(_('Open windows · %s'), windows.length) : _('Open windows');
+        if (!windows.length)
+            list.add_child(label(_('No open windows'), 'dynada-card-body dynada-side-empty'));
+        for (const w of windows) {
+            const app = tracker.get_window_app(w);
+            const icon = app ? app.create_icon_texture(24) : new St.Icon({icon_name: 'application-x-executable-symbolic', icon_size: 20});
+            list.add_child(this._row(icon, w.get_title() || app?.get_name() || '', app?.get_name() ?? '', () => {
+                this.close(true);
+                Main.activateWindow(w);
+            }, {
+                onClose: () => {
+                    w.delete(global.get_current_time());
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+                        if (this._open === 'left')
+                            this._fillWindows(section, list);
+                        return GLib.SOURCE_REMOVE;
+                    });
+                },
+            }));
+        }
+    }
+
+    _fillRecent(section, list) {
+        list.destroy_all_children();
+        const xbel = readText(GLib.build_filenamev([GLib.get_user_data_dir(), 'recently-used.xbel'])) ?? '';
+        const items = [];
+        for (const m of xbel.matchAll(/<bookmark href="(file:\/\/[^"]+)"[^>]*?modified="([^"]+)"/g))
+            items.push({uri: m[1], modified: m[2]});
+        items.sort((a, b) => b.modified.localeCompare(a.modified));
+        const shown = [];
+        for (const {uri} of items) {
+            if (shown.length >= MAX_RECENT)
+                break;
+            const file = Gio.File.new_for_uri(uri);
+            const path = file.get_path();
+            if (!path || !GLib.file_test(path, GLib.FileTest.EXISTS) || shown.some(s => s.uri === uri))
+                continue;
+            shown.push({uri, file, path});
+        }
+        section.visible = shown.length > 0;
+        for (const {uri, file, path} of shown) {
+            const [type] = Gio.content_type_guess(path, null);
+            const icon = new St.Icon({gicon: Gio.content_type_get_icon(type), icon_size: 22});
+            const dir = GLib.path_get_dirname(path).replace(GLib.get_home_dir(), '~');
+            list.add_child(this._row(icon, file.get_basename(), dir, () => {
+                this.close(true);
+                try {
+                    Gio.AppInfo.launch_default_for_uri(uri, global.create_app_launch_context(0, -1));
+                } catch (e) {
+                    console.error('Dynamic Island: could not open the file', e);
+                }
+            }));
+        }
+    }
+
+    _buildFocus(focus) {
+        const top = new St.BoxLayout({x_expand: true, style_class: 'dynada-side-focus-top'});
         this._timer = label('25:00', 'dynada-side-timer', {x_expand: true});
         top.add_child(this._timer);
-        this._focusButton = new St.Button({style_class: 'dynada-pill-button dynada-side-go', can_focus: true});
-        this._focusButton.connect('clicked', () => {
-            if (this._focus.session)
-                this._focus.stop();
-            else
-                this._focus.start(this._minutes, this._topic);
-        });
-        top.add_child(this._focusButton);
-        focus.add_child(top);
-
-        const chips = new St.BoxLayout({style_class: 'dynada-side-chips', x_expand: true});
-        this._topic = _('Study');
-        this._minutes = 25;
-        this._topicButtons = [_('Study'), _('Code'), _('Other')].map(topic => {
-            const b = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: topic,
-                toggle_mode: true, can_focus: true, checked: topic === this._topic});
-            b.connect('clicked', () => {
-                this._topic = topic;
-                this._topicButtons.forEach(o => (o.checked = o === b));
-            });
-            chips.add_child(b);
-            return b;
-        });
         const lengths = new St.BoxLayout({style_class: 'dynada-side-chips', y_align: Clutter.ActorAlign.CENTER});
+        this._minutes = 25;
         this._minuteButtons = [25, 50].map(m => {
             const b = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: String(m),
                 toggle_mode: true, can_focus: true, checked: m === this._minutes});
@@ -610,62 +902,34 @@ export class SideIslands {
             lengths.add_child(b);
             return b;
         });
-        top.insert_child_at_index(lengths, 1);
+        top.add_child(lengths);
+        this._focusButton = new St.Button({style_class: 'dynada-pill-button dynada-side-go', can_focus: true,
+            y_align: Clutter.ActorAlign.CENTER});
+        this._focusButton.connect('clicked', () => {
+            if (this._focus.session)
+                this._focus.stop();
+            else
+                this._focus.start(this._minutes, this._topic);
+        });
+        top.add_child(this._focusButton);
+        focus.add_child(top);
+
+        const chips = new St.BoxLayout({style_class: 'dynada-side-chips', x_expand: true});
+        this._topic = _('Study');
+        this._topicButtons = [_('Study'), _('Code'), _('Other')].map(topic => {
+            const b = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: topic,
+                toggle_mode: true, can_focus: true, checked: topic === this._topic});
+            b.connect('clicked', () => {
+                this._topic = topic;
+                this._topicButtons.forEach(o => (o.checked = o === b));
+            });
+            chips.add_child(b);
+            return b;
+        });
+        chips.add_child(new St.Widget({x_expand: true}));
+        this._focusToday = label('', 'dynada-card-time', {y_align: Clutter.ActorAlign.CENTER});
+        chips.add_child(this._focusToday);
         focus.add_child(chips);
-        this._focusToday = label('', 'dynada-card-time');
-        focus.add_child(this._focusToday);
-
-        // Coming up (the agenda file is plain text, one item per line; Brain writes it nightly)
-        const agenda = panel.card('dynada-side-agenda');
-        agenda.add_child(label(_('Coming up'), 'dynada-card-title'));
-        const agendaList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list'});
-        agenda.add_child(agendaList);
-
-        // The machine
-        const system = panel.card('dynada-side-system');
-        const grid = new St.BoxLayout({style_class: 'dynada-side-stats', x_expand: true});
-        this._statTiles = {};
-        for (const [key, name] of [['cpu', _('CPU')], ['memory', _('Memory')], ['temperature', _('Heat')], ['battery', _('Battery')]]) {
-            const tile = new St.BoxLayout({style_class: 'dynada-side-stat', orientation: Clutter.Orientation.VERTICAL, x_expand: true});
-            const value = label('—', 'dynada-side-stat-value');
-            const track = new St.Widget({style_class: 'dynada-side-bar-track', x_expand: true});
-            const bar = new St.Widget({style_class: 'dynada-side-bar', width: 0});
-            track.add_child(bar);
-            tile.add_child(value);
-            tile.add_child(track);
-            tile.add_child(label(name, 'dynada-card-time'));
-            grid.add_child(tile);
-            this._statTiles[key] = {value, bar, track};
-        }
-        system.add_child(grid);
-
-        panel.refresh = () => {
-            agendaList.destroy_all_children();
-            const path = expandPath(this._settings.get_string('agenda-file'));
-            const notes = expandPath(this._settings.get_string('notes-folder'));
-            const full = path && !GLib.path_is_absolute(path) && notes ? GLib.build_filenamev([notes, path]) : path;
-            const items = (full ? readText(full) ?? '' : '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, MAX_AGENDA);
-            agenda.visible = items.length > 0;
-            for (const item of items) {
-                // "2026-11-01 (7 gün) · Note: text" or "KARAR · Note: text": a short tag in front
-                // (the date as day.month, otherwise the first word), two lines of the rest.
-                const cut = item.indexOf(' · ');
-                const head = cut > 0 ? item.slice(0, cut) : '';
-                const rest = cut > 0 ? item.slice(cut + 3) : item;
-                const date = head.match(/(\d{4})-(\d\d)-(\d\d)/);
-                const tag = date ? `${date[3]}.${date[2]}` : head.split(/\s+/)[0]?.slice(0, 7) ?? '';
-                const row = new St.BoxLayout({style_class: 'dynada-side-row', x_expand: true});
-                if (tag)
-                    row.add_child(label(tag, 'dynada-side-when'));
-                const short = rest.length > 84 ? `${rest.slice(0, 82).trimEnd()}…` : rest;
-                const text = label(short, 'dynada-card-body', {x_expand: true});
-                text.clutter_text.line_wrap = true;
-                text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
-                row.add_child(text);
-                agendaList.add_child(row);
-            }
-        };
-        return panel;
     }
 
     _syncFocus() {
@@ -681,9 +945,7 @@ export class SideIslands {
             this._timer.add_style_pseudo_class('running');
         else
             this._timer.remove_style_pseudo_class('running');
-        this._focusToday.text = running
-            ? fmt(_('%s · today %s'), this._focus.session.topic, minutesText(this._focus.todayMinutes()))
-            : fmt(_('Today %s of focus'), minutesText(this._focus.todayMinutes()));
+        this._focusToday.text = fmt(_('Today %s'), minutesText(this._focus.todayMinutes()));
         // The clock ticks only while the island is open and a session runs.
         const want = running && this._open === 'left';
         if (want && !this._tickId) {
@@ -697,29 +959,9 @@ export class SideIslands {
         }
     }
 
-    _syncStats() {
-        const s = this._stats.read();
-        const set = (key, fraction, text, hot) => {
-            const tile = this._statTiles[key];
-            tile.value.text = text;
-            const w = tile.track.width || 50;
-            tile.bar.width = Math.round(Math.max(0, Math.min(1, fraction ?? 0)) * w);
-            if (hot)
-                tile.bar.add_style_pseudo_class('hot');
-            else
-                tile.bar.remove_style_pseudo_class('hot');
-        };
-        set('cpu', s.cpu / 100, s.cpu === null ? '—' : `${Math.round(s.cpu)}%`, s.cpu > 85);
-        set('memory', s.memory / 100, s.memory === null ? '—' : `${Math.round(s.memory)}%`, s.memory > 90);
-        set('temperature', (s.temperature - 30) / 70, s.temperature === null ? '—' : `${Math.round(s.temperature)}°`, s.temperature > 85);
-        set('battery', s.battery?.percent / 100, s.battery ? `${s.battery.charging ? '⚡' : ''}${s.battery.percent}%` : '—',
-            s.battery && !s.battery.charging && s.battery.percent <= 15);
-        return GLib.SOURCE_CONTINUE;
-    }
+    // ---------- Right: control ----------
 
-    // ---------- Right: Harvis ----------
-
-    _buildHarvis() {
+    _buildControl() {
         const panel = new SidePanel('right', _('Harvis'));
 
         // Header: the live robot (it moves only while on screen), the name, what it is doing.
@@ -736,8 +978,8 @@ export class SideIslands {
         names.add_child(this._harvisStatus);
         panel.header.insert_child_at_index(names, this._avatar ? 1 : 0);
 
-        // Ask: type and Enter, the arrow, or the microphone to say it.
-        const ask = panel.card('dynada-side-ask');
+        // Ask: type and Enter, the arrow, or the microphone to say it; three one-tap questions.
+        const ask = panel.section(null, 'dynada-side-ask');
         const askRow = new St.BoxLayout({style_class: 'dynada-side-ask-row', x_expand: true});
         const askEntry = this._entry(panel, _('Ask Harvis…'), (text, entry) => {
             entry.text = '';
@@ -758,8 +1000,6 @@ export class SideIslands {
             this._onAsk(text);
         }));
         ask.add_child(askRow);
-
-        // One tap questions. The label is short; what is sent is the whole question.
         const quick = new St.BoxLayout({style_class: 'dynada-side-chips', x_expand: true});
         for (const [text, prompt] of [
             [_('Today'), _('What is on today? Deadlines, open threads and what I should do first.')],
@@ -774,140 +1014,386 @@ export class SideIslands {
             quick.add_child(b);
         }
         ask.add_child(quick);
-
-        // The last answer, so a glance is enough; a click opens the whole chat.
-        const last = new St.Button({style_class: 'dynada-card dynada-side-card dynada-side-last', can_focus: true,
-            x_expand: true});
-        const lastBox = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
-        const lastHead = new St.BoxLayout({x_expand: true});
-        lastHead.add_child(label(_('Last answer'), 'dynada-card-time', {x_expand: true}));
-        lastHead.add_child(new St.Icon({icon_name: 'go-next-symbolic', icon_size: 12, style_class: 'dynada-side-chevron'}));
-        lastBox.add_child(lastHead);
-        const lastText = label('', 'dynada-card-body');
-        lastText.clutter_text.line_wrap = true;
-        lastText.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
-        lastBox.add_child(lastText);
-        last.set_child(lastBox);
+        this._lastAnswerLabel = label('', 'dynada-side-last-text');
+        this._lastAnswerLabel.clutter_text.line_wrap = true;
+        this._lastAnswerLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        const last = new St.Button({style_class: 'dynada-side-last', can_focus: true, x_expand: true,
+            child: this._lastAnswerLabel});
         last.connect('clicked', () => {
             this.close(true);
             this._onOpenChat();
         });
-        panel.content.add_child(last);
+        ask.add_child(last);
 
-        // Quick note to the inbox.
-        const note = panel.card('dynada-side-note');
-        const noteRow = new St.BoxLayout({style_class: 'dynada-side-ask-row', x_expand: true});
-        const noteIcon = new St.Icon({icon_name: 'document-edit-symbolic', icon_size: 16, style_class: 'dynada-side-note-icon',
-            y_align: Clutter.ActorAlign.CENTER});
-        noteRow.add_child(noteIcon);
-        noteRow.add_child(this._entry(panel, _('Quick note to the inbox…'), (text, entry) => {
-            entry.text = '';
-            const ok = this._saveNote(text);
-            entry.hint_text = ok ? _('Saved ✓') : _('Could not save the note');
-            noteIcon.icon_name = ok ? 'object-select-symbolic' : 'dialog-error-symbolic';
-            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1600, () => {
-                try {
-                    entry.hint_text = _('Quick note to the inbox…');
-                    noteIcon.icon_name = 'document-edit-symbolic';
-                } catch {
-                    // the island was rebuilt meanwhile
+        // Now playing: watched only while this island is open.
+        const media = panel.section(null, 'dynada-side-media');
+        this._buildMedia(media);
+
+        // Quick settings: nine tiles.
+        const toggles = panel.section(_('Quick settings'), 'dynada-side-toggles');
+        const tiles = new St.Widget({layout_manager: new TileGridLayout(3, TOGGLE_HEIGHT, 8, 1), x_expand: true});
+        toggles.add_child(tiles);
+        this._toggles = this._makeToggles().map(t => {
+            const button = new St.Button({style_class: 'dynada-side-toggle', can_focus: true, toggle_mode: !!t.get,
+                accessible_name: t.name});
+            const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
+            box.add_child(new St.Icon({icon_name: t.icon, icon_size: 20, style_class: 'dynada-side-toggle-icon',
+                x_align: Clutter.ActorAlign.START}));
+            box.add_child(label(t.name, 'dynada-side-toggle-name'));
+            t.state = label('', 'dynada-side-toggle-state');
+            box.add_child(t.state);
+            button.set_child(box);
+            button.connect('clicked', async () => {
+                if (t.get) {
+                    await t.set(!t.on);
+                    await this._syncToggle(t);
+                } else {
+                    this.close(true);
+                    t.run();
                 }
-                return GLib.SOURCE_REMOVE;
             });
-        }));
-        note.add_child(noteRow);
+            t.button = button;
+            tiles.add_child(button);
+            return t;
+        });
 
-        // Notifications, newest first, each with its app's icon; one or all can be dismissed.
-        const notifications = panel.card('dynada-side-notifications');
-        const notifHead = new St.BoxLayout({x_expand: true});
-        notifHead.add_child(label(_('Notifications'), 'dynada-card-title', {x_expand: true}));
-        const clearAll = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: _('Clear'), can_focus: true});
-        notifHead.add_child(clearAll);
-        notifications.add_child(notifHead);
-        const list = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
-        notifications.add_child(list);
+        // Volume and brightness.
+        const sliders = panel.section(null, 'dynada-side-sliders');
+        this._volume = this._sliderRow(sliders, 'audio-volume-high-symbolic', value => {
+            const sink = getMixerControl().get_default_sink();
+            if (!sink)
+                return;
+            const max = getMixerControl().get_vol_max_norm();
+            sink.volume = value * max;
+            sink.push_volume();
+            if (sink.is_muted && value > 0)
+                sink.change_is_muted(false);
+        });
+        this._brightness = this._sliderRow(sliders, 'display-brightness-symbolic', value => {
+            const scale = Main.brightnessManager?.globalScale;
+            if (scale)
+                scale.value = value;
+        });
+
+        // The machine
+        const system = panel.section(_('System'), 'dynada-side-system');
+        const grid = new St.BoxLayout({style_class: 'dynada-side-stats', x_expand: true});
+        this._statTiles = {};
+        for (const [key, name] of [['cpu', _('CPU')], ['memory', _('Memory')], ['temperature', _('Heat')], ['battery', _('Battery')]]) {
+            const tile = new St.BoxLayout({style_class: 'dynada-side-stat', orientation: Clutter.Orientation.VERTICAL, x_expand: true});
+            const value = label('—', 'dynada-side-stat-value');
+            const track = new St.Widget({style_class: 'dynada-side-bar-track', x_expand: true});
+            const bar = new St.Widget({style_class: 'dynada-side-bar', width: 0});
+            track.add_child(bar);
+            tile.add_child(value);
+            tile.add_child(track);
+            tile.add_child(label(name, 'dynada-card-time'));
+            grid.add_child(tile);
+            this._statTiles[key] = {value, bar, track};
+        }
+        system.add_child(grid);
+
+        // Coming up (the agenda file: plain text, one item per line; Brain writes it nightly)
+        const agenda = panel.section(_('Coming up'), 'dynada-side-agenda');
+        const agendaList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list'});
+        agenda.add_child(agendaList);
+
+        // Notifications
+        const notifications = panel.section(_('Notifications'), 'dynada-side-notifications', {
+            action: _('Clear'),
+            onAction: () => {
+                for (const n of NotificationCenter.notifications()) {
+                    try {
+                        n.destroy();
+                    } catch {
+                        // already gone
+                    }
+                }
+                this._fillNotifications(notifications, notifList);
+            },
+        });
+        const notifList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
+        notifications.add_child(notifList);
 
         panel.refresh = () => {
             const answer = this._lastAnswer();
             last.visible = !!answer;
-            lastText.text = answer.length > 180 ? `${answer.slice(0, 178).trimEnd()}…` : answer;
-
-            list.destroy_all_children();
-            const all = NotificationCenter.notifications();
-            clearAll.visible = all.length > 0;
-            clearAll.label = all.length > MAX_NOTIFICATIONS ? fmt(_('Clear %s'), all.length) : _('Clear');
-            if (!all.length)
-                list.add_child(label(_('Nothing new'), 'dynada-card-body dynada-side-empty'));
-            for (const n of all.slice(0, MAX_NOTIFICATIONS))
-                list.add_child(this._notificationRow(n, () => panel.refresh()));
+            this._lastAnswerLabel.text = answer.length > 160 ? `${answer.slice(0, 158).trimEnd()}…` : answer;
+            this._media = new MediaWatcher(() => this._syncMedia());
+            this._syncMedia();
+            for (const t of this._toggles)
+                this._syncToggle(t);
+            const sink = getMixerControl().get_default_sink();
+            this._volume.row.visible = !!sink;
+            if (sink)
+                this._volume.set(sink.is_muted ? 0 : sink.volume / getMixerControl().get_vol_max_norm());
+            const scale = Main.brightnessManager?.globalScale;
+            this._brightness.row.visible = !!scale;
+            if (scale)
+                this._brightness.set(scale.value);
+            this._fillAgenda(agenda, agendaList);
+            this._fillNotifications(notifications, notifList);
         };
-        clearAll.connect('clicked', () => {
-            for (const n of NotificationCenter.notifications()) {
-                try {
-                    n.destroy();
-                } catch {
-                    // already gone
-                }
-            }
-            panel.refresh();
-        });
+        panel.closed = () => {
+            this._media?.destroy();
+            this._media = null;
+        };
         return panel;
     }
 
-    _round(icon, name, styleClass, onClick) {
-        const b = new St.Button({
-            style_class: `dynada-side-round ${styleClass}`,
-            can_focus: true,
-            accessible_name: name,
-            y_align: Clutter.ActorAlign.CENTER,
-            child: new St.Icon({icon_name: icon, icon_size: 15}),
+    _sliderRow(section, icon, onChange) {
+        const row = new St.BoxLayout({style_class: 'dynada-side-slider-row', x_expand: true});
+        row.add_child(new St.Icon({icon_name: icon, icon_size: 18, style_class: 'dynada-side-slider-icon',
+            y_align: Clutter.ActorAlign.CENTER}));
+        const slider = new Slider(0);
+        slider.add_style_class_name('dynada-side-slider');
+        slider.x_expand = true;
+        slider.y_align = Clutter.ActorAlign.CENTER;
+        let quiet = false;
+        slider.connect('notify::value', () => {
+            if (!quiet)
+                onChange(slider.value);
         });
-        b.connect('clicked', onClick);
-        return b;
+        row.add_child(slider);
+        section.add_child(row);
+        return {
+            row,
+            set: value => {
+                quiet = true;
+                slider.value = Math.max(0, Math.min(1, value));
+                quiet = false;
+            },
+        };
     }
 
-    _notificationRow(n, onDismissed) {
-        const row = new St.BoxLayout({style_class: 'dynada-side-notification', x_expand: true, reactive: true,
-            track_hover: true});
-        const gicon = n.gicon ?? n.source?.icon ?? new Gio.ThemedIcon({name: 'dialog-information-symbolic'});
-        const symbolic = gicon instanceof Gio.ThemedIcon && gicon.get_names().some(i => i.endsWith('-symbolic'));
-        row.add_child(new St.Bin({
-            style_class: 'dynada-side-notification-icon',
-            y_align: Clutter.ActorAlign.START,
-            child: new St.Icon({gicon, icon_size: symbolic ? 16 : 28}),
-        }));
-        const open = new St.Button({style_class: 'dynada-side-notification-open', can_focus: true, x_expand: true});
-        const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
-        const head = new St.BoxLayout({x_expand: true});
-        head.add_child(label(n.source?.title ?? '', 'dynada-card-time', {x_expand: true}));
-        head.add_child(label(n.datetime ? n.datetime.format('%H:%M') : '', 'dynada-card-time'));
-        box.add_child(head);
-        box.add_child(label(n.title ?? '', 'dynada-side-notification-title'));
-        if (n.body)
-            box.add_child(label(n.body.replace(/\s+/g, ' '), 'dynada-card-body'));
-        open.set_child(box);
-        open.connect('clicked', () => {
-            this.close(true);
-            try {
-                n.activate();
-            } catch (e) {
-                console.error('Dynamic Island: could not open the notification', e);
+    _buildMedia(section) {
+        const row = new St.BoxLayout({style_class: 'dynada-side-media-row', x_expand: true});
+        this._art = new St.Button({style_class: 'dynada-side-art', can_focus: true});
+        this._art.connect('clicked', () => {
+            const entry = this._media?.current();
+            if (entry) {
+                this.close(true);
+                this._media.raise(entry);
             }
         });
-        row.add_child(open);
-        const dismiss = this._round('window-close-symbolic', _('Dismiss'), 'dynada-side-dismiss', () => {
-            try {
-                n.destroy();
-            } catch {
-                // already gone
-            }
-            onDismissed();
+        row.add_child(this._art);
+        const text = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true, y_align: Clutter.ActorAlign.CENTER});
+        this._mediaApp = label('', 'dynada-card-time');
+        this._mediaTitle = label('', 'dynada-side-media-title');
+        this._mediaArtist = label('', 'dynada-card-body');
+        text.add_child(this._mediaApp);
+        text.add_child(this._mediaTitle);
+        text.add_child(this._mediaArtist);
+        row.add_child(text);
+        section.add_child(row);
+        const controls = new St.BoxLayout({style_class: 'dynada-side-media-controls', x_align: Clutter.ActorAlign.CENTER});
+        const act = fn => () => {
+            const entry = this._media?.current();
+            if (entry)
+                fn(entry);
+        };
+        this._prev = this._round('media-skip-backward-symbolic', _('Previous'), 'dynada-side-media-button',
+            act(e => this._media.previous(e)), 18);
+        this._play = this._round('media-playback-start-symbolic', _('Play'), 'dynada-side-media-play',
+            act(e => this._media.playPause(e)), 22);
+        this._next = this._round('media-skip-forward-symbolic', _('Next'), 'dynada-side-media-button',
+            act(e => this._media.next(e)), 18);
+        controls.add_child(this._prev);
+        controls.add_child(this._play);
+        controls.add_child(this._next);
+        section.add_child(controls);
+        this._mediaSection = section;
+    }
+
+    _syncMedia() {
+        if (!this._mediaSection)
+            return;
+        const entry = this._media?.current();
+        this._mediaSection.visible = !!entry;
+        if (!entry)
+            return;
+        const info = this._media.info(entry);
+        this._mediaApp.text = info.appName;
+        this._mediaTitle.text = info.title || info.appName;
+        this._mediaArtist.text = info.artist;
+        this._play.child.icon_name = info.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
+        this._prev.reactive = info.canPrevious;
+        this._next.reactive = info.canNext;
+        this._prev.opacity = info.canPrevious ? 255 : 90;
+        this._next.opacity = info.canNext ? 255 : 90;
+        const art = squareArt(info.artUrl);
+        if (art) {
+            this._art.child = null;
+            this._art.style = `background-image: url("${art}");`;
+        } else {
+            this._art.style = null;
+            this._art.child = info.app ? info.app.create_icon_texture(36)
+                : new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: 26});
+        }
+    }
+
+    _makeToggles() {
+        const notifications = settingsToggle('org.gnome.desktop.notifications', 'show-banners');
+        const dark = settingsToggle('org.gnome.desktop.interface', 'color-scheme', 'prefer-dark', 'default');
+        const night = settingsToggle('org.gnome.settings-daemon.plugins.color', 'night-light-enabled');
+        const toggles = [
+            {
+                name: _('Wi-Fi'), icon: 'network-wireless-signal-excellent-symbolic',
+                get: async () => (await run(['nmcli', '-t', 'radio', 'wifi'])).trim() === 'enabled',
+                set: on => run(['nmcli', 'radio', 'wifi', on ? 'on' : 'off']),
+            },
+            {
+                name: _('Bluetooth'), icon: 'bluetooth-active-symbolic',
+                get: async () => (await dbusProperty(Gio.DBus.session, 'org.gnome.SettingsDaemon.Rfkill',
+                    '/org/gnome/SettingsDaemon/Rfkill', 'org.gnome.SettingsDaemon.Rfkill', 'BluetoothAirplaneMode')) === false,
+                set: on => dbusProperty(Gio.DBus.session, 'org.gnome.SettingsDaemon.Rfkill', '/org/gnome/SettingsDaemon/Rfkill',
+                    'org.gnome.SettingsDaemon.Rfkill', 'BluetoothAirplaneMode', new GLib.Variant('b', !on)),
+            },
+            notifications && {
+                name: _('Do Not Disturb'), icon: 'notifications-disabled-symbolic',
+                get: () => !notifications.get(), set: on => notifications.set(!on),
+            },
+            dark && {name: _('Dark style'), icon: 'dark-mode-symbolic', get: () => dark.get(), set: on => dark.set(on)},
+            night && {name: _('Night light'), icon: 'night-light-symbolic', get: () => night.get(), set: on => night.set(on)},
+            {
+                name: _('Stay awake'), icon: 'view-reveal-symbolic',
+                get: () => !!this._inhibitCookie,
+                set: on => (on ? this._inhibit() : this._uninhibit()),
+            },
+            {name: _('Screenshot'), icon: 'camera-photo-symbolic', run: () => Main.screenshotUI.open()},
+            {name: _('Lock'), icon: 'system-lock-screen-symbolic', run: () => Main.screenShield.lock(true)},
+            {
+                name: _('Settings'), icon: 'emblem-system-symbolic',
+                run: () => Shell.AppSystem.get_default().lookup_app('org.gnome.Settings.desktop')?.activate(),
+            },
+        ].filter(Boolean);
+        return toggles;
+    }
+
+    async _syncToggle(t) {
+        if (!t.get) {
+            t.state.text = '';
+            return;
+        }
+        try {
+            t.on = !!(await t.get());
+        } catch {
+            t.on = false;
+        }
+        if (!t.button)
+            return;
+        t.button.checked = t.on;
+        t.state.text = t.on ? _('On') : _('Off');
+    }
+
+    // Stay awake: GNOME's own session inhibitor (idle and suspend), released when switched off
+    // or when the extension stops.
+    _inhibit() {
+        return new Promise(resolve => {
+            Gio.DBus.session.call('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager',
+                'Inhibit', new GLib.Variant('(susu)', ['dynamic-island', 0, 'Stay awake (side island)', 4 | 8]),
+                null, Gio.DBusCallFlags.NONE, 2000, null, (conn, res) => {
+                    try {
+                        [this._inhibitCookie] = conn.call_finish(res).deepUnpack();
+                    } catch (e) {
+                        console.error('Dynamic Island: could not keep the screen awake', e);
+                    }
+                    resolve();
+                });
         });
-        dismiss.y_align = Clutter.ActorAlign.START;
-        dismiss.opacity = 0;
-        row.connect('notify::hover', () => dismiss.ease({opacity: row.hover ? 255 : 0, duration: 120}));
-        row.add_child(dismiss);
-        return row;
+    }
+
+    _uninhibit() {
+        const cookie = this._inhibitCookie;
+        this._inhibitCookie = 0;
+        if (!cookie)
+            return Promise.resolve();
+        return new Promise(resolve => {
+            Gio.DBus.session.call('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager',
+                'Uninhibit', new GLib.Variant('(u)', [cookie]), null, Gio.DBusCallFlags.NONE, 2000, null, () => resolve());
+        });
+    }
+
+    _fillAgenda(section, list) {
+        list.destroy_all_children();
+        const path = expandPath(this._settings.get_string('agenda-file'));
+        const notes = expandPath(this._settings.get_string('notes-folder'));
+        const full = path && !GLib.path_is_absolute(path) && notes ? GLib.build_filenamev([notes, path]) : path;
+        const items = (full ? readText(full) ?? '' : '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, MAX_AGENDA);
+        section.visible = items.length > 0;
+        for (const item of items) {
+            // "2026-11-01 (7 gün) · Note: text" or "KARAR · Note: text": a short tag in front
+            // (the date as day.month, otherwise the first word), two lines of the rest.
+            const cut = item.indexOf(' · ');
+            const head = cut > 0 ? item.slice(0, cut) : '';
+            const rest = cut > 0 ? item.slice(cut + 3) : item;
+            const date = head.match(/(\d{4})-(\d\d)-(\d\d)/);
+            const tag = date ? `${date[3]}.${date[2]}` : head.split(/\s+/)[0]?.slice(0, 7) ?? '';
+            const row = new St.BoxLayout({style_class: 'dynada-side-agenda-row', x_expand: true});
+            if (tag)
+                row.add_child(label(tag, 'dynada-side-when'));
+            const short = rest.length > 96 ? `${rest.slice(0, 94).trimEnd()}…` : rest;
+            const text = label(short, 'dynada-card-body', {x_expand: true});
+            text.clutter_text.line_wrap = true;
+            text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+            row.add_child(text);
+            list.add_child(row);
+        }
+    }
+
+    _fillNotifications(section, list) {
+        list.destroy_all_children();
+        const all = NotificationCenter.notifications();
+        section.actionButton.visible = all.length > 0;
+        section.titleLabel.text = all.length ? fmt(_('Notifications · %s'), all.length) : _('Notifications');
+        if (!all.length)
+            list.add_child(label(_('Nothing new'), 'dynada-card-body dynada-side-empty'));
+        for (const n of all.slice(0, MAX_NOTIFICATIONS)) {
+            const gicon = n.gicon ?? n.source?.icon ?? new Gio.ThemedIcon({name: 'dialog-information-symbolic'});
+            const symbolic = gicon instanceof Gio.ThemedIcon && gicon.get_names().some(i => i.endsWith('-symbolic'));
+            const time = n.datetime ? n.datetime.format('%H:%M') : '';
+            const body = (n.body ?? '').replace(/\s+/g, ' ');
+            list.add_child(this._row(new St.Icon({gicon, icon_size: symbolic ? 18 : 28}),
+                n.title ?? '', [n.source?.title, time, body].filter(Boolean).join(' · '), () => {
+                    this.close(true);
+                    try {
+                        n.activate();
+                    } catch (e) {
+                        console.error('Dynamic Island: could not open the notification', e);
+                    }
+                }, {
+                    onClose: () => {
+                        try {
+                            n.destroy();
+                        } catch {
+                            // already gone
+                        }
+                        this._fillNotifications(section, list);
+                    },
+                }));
+        }
+    }
+
+    _syncStats() {
+        if (!this._statTiles)
+            return GLib.SOURCE_REMOVE;
+        const s = this._stats.read();
+        const set = (key, fraction, text, hot) => {
+            const tile = this._statTiles[key];
+            tile.value.text = text;
+            const w = tile.track.width || 50;
+            tile.bar.width = Math.round(Math.max(0, Math.min(1, fraction ?? 0)) * w);
+            if (hot)
+                tile.bar.add_style_pseudo_class('hot');
+            else
+                tile.bar.remove_style_pseudo_class('hot');
+        };
+        set('cpu', s.cpu / 100, s.cpu === null ? '—' : `${Math.round(s.cpu)}%`, s.cpu > 85);
+        set('memory', s.memory / 100, s.memory === null ? '—' : `${Math.round(s.memory)}%`, s.memory > 90);
+        set('temperature', (s.temperature - 30) / 70, s.temperature === null ? '—' : `${Math.round(s.temperature)}°`, s.temperature > 85);
+        set('battery', s.battery?.percent / 100, s.battery ? `${s.battery.charging ? '⚡' : ''}${s.battery.percent}%` : '—',
+            s.battery && !s.battery.charging && s.battery.percent <= 15);
+        return GLib.SOURCE_CONTINUE;
     }
 
     // The newest assistant message of the island's chat (chat.js keeps the last 60).
