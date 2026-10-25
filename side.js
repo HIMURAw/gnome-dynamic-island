@@ -10,15 +10,11 @@ import St from 'gi://St';
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PressureBarrier} from 'resource:///org/gnome/shell/ui/layout.js';
-import {getPointerWatcher} from 'resource:///org/gnome/shell/ui/pointerWatcher.js';
 
-import {Slider} from 'resource:///org/gnome/shell/ui/slider.js';
-import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 
 import {Glass, snapshotExclude} from './glass.js';
-import {NotificationCenter} from './center.js';
 import {TileGridLayout} from './layouts.js';
-import {MediaWatcher, squareArt} from './media.js';
+import {calculate, convert, formatNumber} from './calc.js';
 import {spring, stopSpring} from './spring.js';
 
 // Side islands (Umut, 2026-10-25): push the pointer against the left or right edge of the
@@ -41,10 +37,8 @@ const BOTTOM_ROOM = 96;     // above the dock
 const EDGE_GAP = 14;        // from the screen edge
 const SPAN = 0.7;           // middle share of the edge that reacts: corners stay the island's and the dock's
 const PRESSURE = 70;        // px of push before the island opens (hot corner uses 100)
-const GRACE = 56;           // px the pointer may stray outside before it counts as leaving
-const CLOSE_DELAY = 380;    // ms outside before closing
+const CLOSE_DELAY = 350;    // ms off the island before closing
 const STATS_EVERY = 2000;   // ms, system figures while the right island is open
-const MAX_NOTIFICATIONS = 6;
 const MAX_AGENDA = 4;
 const MAX_WINDOWS = 7;
 const MAX_RECENT = 5;
@@ -52,7 +46,10 @@ const APP_COLUMNS = 5;
 const APP_ROWS = 3;
 const APP_ICON = 44;
 const APP_TILE_HEIGHT = 86;
-const TOGGLE_HEIGHT = 78;
+const TOOL_HEIGHT = 74;
+const MAX_CLIPS = 8;
+const MAX_PROCESSES = 5;
+const OPEN_GRACE = 1500;    // ms: opened by a push and never entered, it closes
 
 const decoder = new TextDecoder();
 const fmt = (str, ...args) => str.replace(/%s/g, () => String(args.shift()));
@@ -147,6 +144,64 @@ class SystemStats {
 
     reset() {
         this._prevCpu = null;
+    }
+}
+
+// ---------- Processes (read only while the right island is open) ----------
+
+class ProcessStats {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this._prev = null;
+        this._prevTotal = 0;
+    }
+
+    _total() {
+        const lines = (readText('/proc/stat') ?? '').split('\n');
+        const total = lines[0].trim().split(/\s+/).slice(1).map(Number).reduce((a, b) => a + b, 0);
+        const cpus = lines.filter(l => /^cpu\d/.test(l)).length || 1;
+        return {total, cpus};
+    }
+
+    // [{pid, name, cpu (% of one core), rss (bytes)}], or null on the first look (no delta yet).
+    top(n) {
+        const {total, cpus} = this._total();
+        const now = new Map();
+        let dir;
+        try {
+            dir = GLib.Dir.open('/proc', 0);
+        } catch {
+            return null;
+        }
+        for (let name; (name = dir.read_name()) !== null;) {
+            if (!/^\d+$/.test(name))
+                continue;
+            const stat = readText(`/proc/${name}/stat`);
+            if (!stat)
+                continue;
+            const close = stat.lastIndexOf(')');
+            const comm = stat.slice(stat.indexOf('(') + 1, close);
+            const f = stat.slice(close + 2).split(' ');
+            now.set(name, {name: comm, ticks: Number(f[11]) + Number(f[12]), rss: Number(f[21]) * 4096});
+        }
+        dir.close();
+        const prev = this._prev;
+        const dt = total - this._prevTotal;
+        this._prev = now;
+        this._prevTotal = total;
+        if (!prev || dt <= 0)
+            return null;
+        const out = [];
+        for (const [pid, p] of now) {
+            const before = prev.get(pid);
+            if (!before)
+                continue;
+            out.push({pid, name: p.name, rss: p.rss, cpu: 100 * (p.ticks - before.ticks) / (dt / cpus)});
+        }
+        return out.sort((a, b) => b.cpu - a.cpu).slice(0, n);
     }
 }
 
@@ -355,57 +410,6 @@ class SidePanel {
     }
 }
 
-// ---------- Quick settings (right island) ----------
-
-// Each toggle reads its state when the island opens and flips it on click; nothing is watched
-// while the island is closed.
-function settingsToggle(schema, key, on, off = null) {
-    let settings = null;
-    try {
-        settings = new Gio.Settings({schema_id: schema});
-    } catch {
-        return null;
-    }
-    return {
-        get: () => (off === null ? settings.get_boolean(key) : settings.get_string(key) === on),
-        set: value => (off === null ? settings.set_boolean(key, value) : settings.set_string(key, value ? on : off)),
-    };
-}
-
-function run(argv) {
-    return new Promise(resolve => {
-        try {
-            const proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
-            proc.communicate_utf8_async(null, null, (p, res) => {
-                try {
-                    const [, out] = p.communicate_utf8_finish(res);
-                    resolve(out ?? '');
-                } catch {
-                    resolve('');
-                }
-            });
-        } catch {
-            resolve('');
-        }
-    });
-}
-
-function dbusProperty(bus, name, path, iface, prop, value = undefined) {
-    return new Promise(resolve => {
-        const set = value !== undefined;
-        bus.call(name, path, 'org.freedesktop.DBus.Properties', set ? 'Set' : 'Get',
-            set ? new GLib.Variant('(ssv)', [iface, prop, value]) : new GLib.Variant('(ss)', [iface, prop]),
-            null, Gio.DBusCallFlags.NONE, 2000, null, (conn, res) => {
-                try {
-                    const reply = conn.call_finish(res);
-                    resolve(set ? true : reply.deepUnpack()[0].deepUnpack());
-                } catch {
-                    resolve(null);
-                }
-            });
-    });
-}
-
 // ---------- The two islands and their edges ----------
 
 export class SideIslands {
@@ -422,9 +426,11 @@ export class SideIslands {
         this._closeId = 0;
         this._statsId = 0;
         this._tickId = 0;
-        this._inhibitCookie = 0;
         this._stats = new SystemStats();
+        this._processes = new ProcessStats();
+        this._clips = [];
         this._focus = new FocusTimer(settings, () => this._syncFocus());
+        this._watchClipboard();
         this._monitorsId = Main.layoutManager.connect('monitors-changed', () => {
             this.close(true);
             this._buildEdges();
@@ -437,8 +443,9 @@ export class SideIslands {
         this._clearEdges();
         Main.layoutManager.disconnect(this._monitorsId);
         this._focus.destroy();
-        if (this._inhibitCookie)
-            this._uninhibit();
+        if (this._clipId)
+            global.display.get_selection().disconnect(this._clipId);
+        this._clips = [];
         for (const panel of Object.values(this._panels))
             panel.destroy();
         this._panels = {};
@@ -537,7 +544,10 @@ export class SideIslands {
             });
         });
 
-        this._watch = getPointerWatcher().addWatch(100, (x, y) => this._onPointer(x, y));
+        // Closes when the pointer leaves it: the island's own hover, no polling. Opened by a push
+        // at the edge and never entered, it closes too.
+        this._hoverId = actor.connect('notify::hover', () => this._onHover());
+        this._scheduleClose(OPEN_GRACE);
         if (side === 'right') {
             this._stats.reset();
             this._stats.read();
@@ -557,14 +567,14 @@ export class SideIslands {
         const panel = this._panels[this._open];
         this._open = null;
         this._ungrab();
-        this._watch?.remove();
-        this._watch = null;
+        if (this._hoverId)
+            panel.actor.disconnect(this._hoverId);
+        this._hoverId = 0;
         for (const id of ['_closeId', '_statsId', '_tickId']) {
             if (this[id])
                 GLib.source_remove(this[id]);
             this[id] = 0;
         }
-        panel.closed?.();
         const actor = panel.actor;
         stopSpring(actor);
         actor.remove_all_transitions();
@@ -585,26 +595,48 @@ export class SideIslands {
         });
     }
 
-    _onPointer(x, y) {
+    _onHover() {
         const panel = this._panels[this._open];
-        if (!panel || this._grab)
+        if (!panel)
             return;
-        const [ax, ay] = panel.actor.get_transformed_position();
-        const [w, h] = panel.actor.get_size();
-        const mon = Main.layoutManager.primaryMonitor;
-        const atEdge = this._open === 'left' ? x <= mon.x + 2 : x >= mon.x + mon.width - 3;
-        const inside = atEdge || (x >= ax - GRACE && x <= ax + w + GRACE && y >= ay - GRACE && y <= ay + h + GRACE);
-        if (inside) {
+        if (panel.actor.hover) {
             if (this._closeId)
                 GLib.source_remove(this._closeId);
             this._closeId = 0;
-        } else if (!this._closeId) {
-            this._closeId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, CLOSE_DELAY, () => {
-                this._closeId = 0;
-                this.close();
-                return GLib.SOURCE_REMOVE;
-            });
+        } else {
+            this._scheduleClose(CLOSE_DELAY);
         }
+    }
+
+    _scheduleClose(delay) {
+        if (this._closeId)
+            GLib.source_remove(this._closeId);
+        this._closeId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
+            this._closeId = 0;
+            const panel = this._panels[this._open];
+            if (!panel)
+                return GLib.SOURCE_REMOVE;
+            // Still on it, or resting against the screen edge it came from: stay.
+            const [x, y] = global.get_pointer();
+            const [ax, ay] = panel.actor.get_transformed_position();
+            const [w, h] = panel.actor.get_size();
+            const mon = Main.layoutManager.primaryMonitor;
+            const atEdge = this._open === 'left' ? x <= mon.x + EDGE_GAP : x >= mon.x + mon.width - EDGE_GAP;
+            const over = x >= ax && x <= ax + w && y >= ay && y <= ay + h;
+            // Typing: stays while the entry has text; Escape or a click outside closes.
+            const typing = this._grab && global.stage.get_key_focus()?.get_text?.()?.trim();
+            if (over || (atEdge && y >= ay && y <= ay + h) || typing) {
+                this._closeId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, CLOSE_DELAY, () => {
+                    this._closeId = 0;
+                    if (!panel.actor.hover)
+                        this._scheduleClose(0);
+                    return GLib.SOURCE_REMOVE;
+                });
+                return GLib.SOURCE_REMOVE;
+            }
+            this.close();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     // Typing needs the keyboard, which a chrome actor only gets inside a modal grab: taken
@@ -959,7 +991,9 @@ export class SideIslands {
         }
     }
 
-    // ---------- Right: control ----------
+    // ---------- Right: tools ----------
+    // Nothing here repeats the island (Wi-Fi, sliders, music and notifications live there):
+    // Harvis, a calculator, the clipboard history, small tools, what uses the machine, what is coming up.
 
     _buildControl() {
         const panel = new SidePanel('right', _('Harvis'));
@@ -1014,7 +1048,7 @@ export class SideIslands {
             quick.add_child(b);
         }
         ask.add_child(quick);
-        this._lastAnswerLabel = label('', 'dynada-side-last-text');
+        this._lastAnswerLabel = label('', 'dynada-side-last-text', {x_expand: true, x_align: Clutter.ActorAlign.START});
         this._lastAnswerLabel.clutter_text.line_wrap = true;
         this._lastAnswerLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         const last = new St.Button({style_class: 'dynada-side-last', can_focus: true, x_expand: true,
@@ -1025,57 +1059,73 @@ export class SideIslands {
         });
         ask.add_child(last);
 
-        // Now playing: watched only while this island is open.
-        const media = panel.section(null, 'dynada-side-media');
-        this._buildMedia(media);
+        // Calculator: arithmetic, units and durations as you type (calc.js); Enter copies.
+        const calc = panel.section(_('Calculate'), 'dynada-side-calc');
+        const calcRow = new St.BoxLayout({style_class: 'dynada-side-ask-row', x_expand: true});
+        const calcResult = label('', 'dynada-side-calc-result', {x_align: Clutter.ActorAlign.END});
+        const calcEntry = this._entry(panel, _('12*7, 5 km mi, 90 min h…'), () => {
+            if (calcResult.text) {
+                St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, calcResult.text.replace(/^= /, ''));
+                calcEntry.hint_text = _('Copied ✓');
+                calcEntry.text = '';
+            }
+        });
+        calcEntry.clutter_text.connect('text-changed', () => {
+            const q = calcEntry.text.trim();
+            let out = null;
+            if (q) {
+                const value = calculate(q);
+                if (value !== null && Number.isFinite(value))
+                    out = `= ${formatNumber(value)}`;
+                else
+                    out = convert(q);
+            }
+            calcResult.text = out ? String(out) : '';
+            calcResult.visible = !!out;
+        });
+        calcRow.add_child(calcEntry);
+        calc.add_child(calcRow);
+        calcResult.visible = false;
+        calc.add_child(calcResult);
 
-        // Quick settings: nine tiles.
-        const toggles = panel.section(_('Quick settings'), 'dynada-side-toggles');
-        const tiles = new St.Widget({layout_manager: new TileGridLayout(3, TOGGLE_HEIGHT, 8, 1), x_expand: true});
-        toggles.add_child(tiles);
-        this._toggles = this._makeToggles().map(t => {
-            const button = new St.Button({style_class: 'dynada-side-toggle', can_focus: true, toggle_mode: !!t.get,
-                accessible_name: t.name});
+        // Clipboard history: kept in memory only, the last few texts.
+        const clips = panel.section(_('Clipboard'), 'dynada-side-clips', {
+            action: _('Clear'),
+            onAction: () => {
+                this._clips = [];
+                this._fillClips(clips, clipList);
+            },
+        });
+        const clipList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
+        clips.add_child(clipList);
+
+        // Tools
+        const tools = panel.section(_('Tools'), 'dynada-side-tools');
+        const tiles = new St.Widget({layout_manager: new TileGridLayout(3, TOOL_HEIGHT, 8, 1), x_expand: true});
+        tools.add_child(tiles);
+        this._colorTile = null;
+        for (const t of [
+            {name: _('Pick a color'), icon: 'color-select-symbolic', run: tile => this._pickColor(tile)},
+            {name: _('Record screen'), icon: 'media-record-symbolic', run: () => {
+                this.close(true);
+                Main.screenshotUI.open(1).catch(e => console.error('Dynamic Island: could not start a recording', e));
+            }},
+            {name: _('Password'), icon: 'dialog-password-symbolic', run: tile => this._makePassword(tile)},
+        ]) {
+            const button = new St.Button({style_class: 'dynada-side-toggle', can_focus: true, accessible_name: t.name});
             const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
             box.add_child(new St.Icon({icon_name: t.icon, icon_size: 20, style_class: 'dynada-side-toggle-icon',
                 x_align: Clutter.ActorAlign.START}));
             box.add_child(label(t.name, 'dynada-side-toggle-name'));
-            t.state = label('', 'dynada-side-toggle-state');
-            box.add_child(t.state);
+            const note = label('', 'dynada-side-toggle-state');
+            box.add_child(note);
             button.set_child(box);
-            button.connect('clicked', async () => {
-                if (t.get) {
-                    await t.set(!t.on);
-                    await this._syncToggle(t);
-                } else {
-                    this.close(true);
-                    t.run();
-                }
-            });
-            t.button = button;
+            const tile = {button, note};
+            button.connect('clicked', () => t.run(tile));
             tiles.add_child(button);
-            return t;
-        });
+        }
 
-        // Volume and brightness.
-        const sliders = panel.section(null, 'dynada-side-sliders');
-        this._volume = this._sliderRow(sliders, 'audio-volume-high-symbolic', value => {
-            const sink = getMixerControl().get_default_sink();
-            if (!sink)
-                return;
-            const max = getMixerControl().get_vol_max_norm();
-            sink.volume = value * max;
-            sink.push_volume();
-            if (sink.is_muted && value > 0)
-                sink.change_is_muted(false);
-        });
-        this._brightness = this._sliderRow(sliders, 'display-brightness-symbolic', value => {
-            const scale = Main.brightnessManager?.globalScale;
-            if (scale)
-                scale.value = value;
-        });
-
-        // The machine
+        // The machine, and what uses it most.
         const system = panel.section(_('System'), 'dynada-side-system');
         const grid = new St.BoxLayout({style_class: 'dynada-side-stats', x_expand: true});
         this._statTiles = {};
@@ -1092,225 +1142,128 @@ export class SideIslands {
             this._statTiles[key] = {value, bar, track};
         }
         system.add_child(grid);
+        this._processList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
+        system.add_child(this._processList);
 
         // Coming up (the agenda file: plain text, one item per line; Brain writes it nightly)
         const agenda = panel.section(_('Coming up'), 'dynada-side-agenda');
         const agendaList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list'});
         agenda.add_child(agendaList);
 
-        // Notifications
-        const notifications = panel.section(_('Notifications'), 'dynada-side-notifications', {
-            action: _('Clear'),
-            onAction: () => {
-                for (const n of NotificationCenter.notifications()) {
-                    try {
-                        n.destroy();
-                    } catch {
-                        // already gone
-                    }
-                }
-                this._fillNotifications(notifications, notifList);
-            },
-        });
-        const notifList = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
-        notifications.add_child(notifList);
-
         panel.refresh = () => {
             const answer = this._lastAnswer();
             last.visible = !!answer;
             this._lastAnswerLabel.text = answer.length > 160 ? `${answer.slice(0, 158).trimEnd()}…` : answer;
-            this._media = new MediaWatcher(() => this._syncMedia());
-            this._syncMedia();
-            for (const t of this._toggles)
-                this._syncToggle(t);
-            const sink = getMixerControl().get_default_sink();
-            this._volume.row.visible = !!sink;
-            if (sink)
-                this._volume.set(sink.is_muted ? 0 : sink.volume / getMixerControl().get_vol_max_norm());
-            const scale = Main.brightnessManager?.globalScale;
-            this._brightness.row.visible = !!scale;
-            if (scale)
-                this._brightness.set(scale.value);
+            calcEntry.text = '';
+            calcEntry.hint_text = _('12*7, 5 km mi, 90 min h…');
+            this._fillClips(clips, clipList);
+            this._processes.reset();
+            this._processList.destroy_all_children();
             this._fillAgenda(agenda, agendaList);
-            this._fillNotifications(notifications, notifList);
-        };
-        panel.closed = () => {
-            this._media?.destroy();
-            this._media = null;
         };
         return panel;
     }
 
-    _sliderRow(section, icon, onChange) {
-        const row = new St.BoxLayout({style_class: 'dynada-side-slider-row', x_expand: true});
-        row.add_child(new St.Icon({icon_name: icon, icon_size: 18, style_class: 'dynada-side-slider-icon',
-            y_align: Clutter.ActorAlign.CENTER}));
-        const slider = new Slider(0);
-        slider.add_style_class_name('dynada-side-slider');
-        slider.x_expand = true;
-        slider.y_align = Clutter.ActorAlign.CENTER;
-        let quiet = false;
-        slider.connect('notify::value', () => {
-            if (!quiet)
-                onChange(slider.value);
+    // ---------- Clipboard ----------
+
+    // Watched always (an event, no polling) so the history is there when the island opens.
+    // Texts a password manager marks as secret are not kept; nothing is written to disk.
+    _watchClipboard() {
+        const selection = global.display.get_selection();
+        this._clipId = selection.connect('owner-changed', (_sel, type, source) => {
+            if (type !== Meta.SelectionType.SELECTION_CLIPBOARD || !source)
+                return;
+            const types = source.get_mimetypes?.() ?? [];
+            if (types.some(t => /password|secret|x-kde-passwordManagerHint/i.test(t)))
+                return;
+            St.Clipboard.get_default().get_text(St.ClipboardType.CLIPBOARD, (_c, text) => {
+                text = text?.trim();
+                if (!text || text.length > 5000 || text === this._skipClip)
+                    return;
+                this._clips = [{text, time: GLib.DateTime.new_now_local()},
+                    ...this._clips.filter(c => c.text !== text)].slice(0, MAX_CLIPS);
+            });
         });
-        row.add_child(slider);
-        section.add_child(row);
-        return {
-            row,
-            set: value => {
-                quiet = true;
-                slider.value = Math.max(0, Math.min(1, value));
-                quiet = false;
-            },
-        };
     }
 
-    _buildMedia(section) {
-        const row = new St.BoxLayout({style_class: 'dynada-side-media-row', x_expand: true});
-        this._art = new St.Button({style_class: 'dynada-side-art', can_focus: true});
-        this._art.connect('clicked', () => {
-            const entry = this._media?.current();
-            if (entry) {
-                this.close(true);
-                this._media.raise(entry);
+    _fillClips(section, list) {
+        list.destroy_all_children();
+        section.actionButton.visible = this._clips.length > 0;
+        if (!this._clips.length)
+            list.add_child(label(_('Copied text shows up here'), 'dynada-card-body dynada-side-empty'));
+        for (const clip of this._clips) {
+            const oneLine = clip.text.replace(/\s+/g, ' ');
+            const icon = new St.Icon({icon_name: /^https?:\/\//.test(clip.text) ? 'web-browser-symbolic' : 'edit-paste-symbolic',
+                icon_size: 16});
+            list.add_child(this._row(icon, oneLine, clip.time.format('%H:%M'), () => {
+                St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, clip.text);
+                this.close();
+            }, {
+                onClose: () => {
+                    this._clips = this._clips.filter(c => c !== clip);
+                    this._fillClips(section, list);
+                },
+            }));
+        }
+    }
+
+    // ---------- Tools ----------
+
+    // The desktop portal's colour picker: the island steps aside, the pick lands on the clipboard as hex.
+    _pickColor(tile) {
+        this.close(true);
+        const bus = Gio.DBus.session;
+        const token = `dynada${Math.floor(Math.random() * 1e8)}`;
+        const sender = bus.get_unique_name().slice(1).replace(/\./g, '_');
+        const handle = `/org/freedesktop/portal/desktop/request/${sender}/${token}`;
+        const subId = bus.signal_subscribe('org.freedesktop.portal.Desktop', 'org.freedesktop.portal.Request', 'Response',
+            handle, null, Gio.DBusSignalFlags.NO_MATCH_RULE, (_c, _s, _p, _i, _n, params) => {
+                bus.signal_unsubscribe(subId);
+                const [code, results] = params.deepUnpack();
+                if (code !== 0)
+                    return;
+                const [r, g, b] = results.color.deepUnpack();
+                const hex = `#${[r, g, b].map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+                St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, hex);
+                tile.note.text = hex;
+                tile.button.style = `background-color: ${hex}40;`;
+                Main.notify(_('Color copied'), hex);
+            });
+        bus.call('org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop', 'org.freedesktop.portal.Screenshot',
+            'PickColor', new GLib.Variant('(sa{sv})', ['', {handle_token: new GLib.Variant('s', token)}]),
+            null, Gio.DBusCallFlags.NONE, -1, null, (conn, res) => {
+                try {
+                    conn.call_finish(res);
+                } catch (e) {
+                    bus.signal_unsubscribe(subId);
+                    console.error('Dynamic Island: could not pick a color', e);
+                }
+            });
+    }
+
+    // 20 characters from letters, digits and symbols, straight to the clipboard; never shown in full.
+    _makePassword(tile) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?-_=+';
+        let out = '';
+        const stream = Gio.File.new_for_path('/dev/urandom').read(null);
+        const random = stream.read_bytes(64, null).toArray();
+        stream.close(null);
+        for (const b of random) {
+            if (b < 256 - (256 % chars.length))
+                out += chars[b % chars.length];
+            if (out.length === 20)
+                break;
+        }
+        this._skipClip = out; // not into the history
+        St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, out);
+        tile.note.text = _('Copied ✓');
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1800, () => {
+            try {
+                tile.note.text = '';
+            } catch {
+                // the island was rebuilt meanwhile
             }
-        });
-        row.add_child(this._art);
-        const text = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true, y_align: Clutter.ActorAlign.CENTER});
-        this._mediaApp = label('', 'dynada-card-time');
-        this._mediaTitle = label('', 'dynada-side-media-title');
-        this._mediaArtist = label('', 'dynada-card-body');
-        text.add_child(this._mediaApp);
-        text.add_child(this._mediaTitle);
-        text.add_child(this._mediaArtist);
-        row.add_child(text);
-        section.add_child(row);
-        const controls = new St.BoxLayout({style_class: 'dynada-side-media-controls', x_align: Clutter.ActorAlign.CENTER});
-        const act = fn => () => {
-            const entry = this._media?.current();
-            if (entry)
-                fn(entry);
-        };
-        this._prev = this._round('media-skip-backward-symbolic', _('Previous'), 'dynada-side-media-button',
-            act(e => this._media.previous(e)), 18);
-        this._play = this._round('media-playback-start-symbolic', _('Play'), 'dynada-side-media-play',
-            act(e => this._media.playPause(e)), 22);
-        this._next = this._round('media-skip-forward-symbolic', _('Next'), 'dynada-side-media-button',
-            act(e => this._media.next(e)), 18);
-        controls.add_child(this._prev);
-        controls.add_child(this._play);
-        controls.add_child(this._next);
-        section.add_child(controls);
-        this._mediaSection = section;
-    }
-
-    _syncMedia() {
-        if (!this._mediaSection)
-            return;
-        const entry = this._media?.current();
-        this._mediaSection.visible = !!entry;
-        if (!entry)
-            return;
-        const info = this._media.info(entry);
-        this._mediaApp.text = info.appName;
-        this._mediaTitle.text = info.title || info.appName;
-        this._mediaArtist.text = info.artist;
-        this._play.child.icon_name = info.playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
-        this._prev.reactive = info.canPrevious;
-        this._next.reactive = info.canNext;
-        this._prev.opacity = info.canPrevious ? 255 : 90;
-        this._next.opacity = info.canNext ? 255 : 90;
-        const art = squareArt(info.artUrl);
-        if (art) {
-            this._art.child = null;
-            this._art.style = `background-image: url("${art}");`;
-        } else {
-            this._art.style = null;
-            this._art.child = info.app ? info.app.create_icon_texture(36)
-                : new St.Icon({icon_name: 'audio-x-generic-symbolic', icon_size: 26});
-        }
-    }
-
-    _makeToggles() {
-        const notifications = settingsToggle('org.gnome.desktop.notifications', 'show-banners');
-        const dark = settingsToggle('org.gnome.desktop.interface', 'color-scheme', 'prefer-dark', 'default');
-        const night = settingsToggle('org.gnome.settings-daemon.plugins.color', 'night-light-enabled');
-        const toggles = [
-            {
-                name: _('Wi-Fi'), icon: 'network-wireless-signal-excellent-symbolic',
-                get: async () => (await run(['nmcli', '-t', 'radio', 'wifi'])).trim() === 'enabled',
-                set: on => run(['nmcli', 'radio', 'wifi', on ? 'on' : 'off']),
-            },
-            {
-                name: _('Bluetooth'), icon: 'bluetooth-active-symbolic',
-                get: async () => (await dbusProperty(Gio.DBus.session, 'org.gnome.SettingsDaemon.Rfkill',
-                    '/org/gnome/SettingsDaemon/Rfkill', 'org.gnome.SettingsDaemon.Rfkill', 'BluetoothAirplaneMode')) === false,
-                set: on => dbusProperty(Gio.DBus.session, 'org.gnome.SettingsDaemon.Rfkill', '/org/gnome/SettingsDaemon/Rfkill',
-                    'org.gnome.SettingsDaemon.Rfkill', 'BluetoothAirplaneMode', new GLib.Variant('b', !on)),
-            },
-            notifications && {
-                name: _('Do Not Disturb'), icon: 'notifications-disabled-symbolic',
-                get: () => !notifications.get(), set: on => notifications.set(!on),
-            },
-            dark && {name: _('Dark style'), icon: 'dark-mode-symbolic', get: () => dark.get(), set: on => dark.set(on)},
-            night && {name: _('Night light'), icon: 'night-light-symbolic', get: () => night.get(), set: on => night.set(on)},
-            {
-                name: _('Stay awake'), icon: 'view-reveal-symbolic',
-                get: () => !!this._inhibitCookie,
-                set: on => (on ? this._inhibit() : this._uninhibit()),
-            },
-            {name: _('Screenshot'), icon: 'camera-photo-symbolic', run: () => Main.screenshotUI.open()},
-            {name: _('Lock'), icon: 'system-lock-screen-symbolic', run: () => Main.screenShield.lock(true)},
-            {
-                name: _('Settings'), icon: 'emblem-system-symbolic',
-                run: () => Shell.AppSystem.get_default().lookup_app('org.gnome.Settings.desktop')?.activate(),
-            },
-        ].filter(Boolean);
-        return toggles;
-    }
-
-    async _syncToggle(t) {
-        if (!t.get) {
-            t.state.text = '';
-            return;
-        }
-        try {
-            t.on = !!(await t.get());
-        } catch {
-            t.on = false;
-        }
-        if (!t.button)
-            return;
-        t.button.checked = t.on;
-        t.state.text = t.on ? _('On') : _('Off');
-    }
-
-    // Stay awake: GNOME's own session inhibitor (idle and suspend), released when switched off
-    // or when the extension stops.
-    _inhibit() {
-        return new Promise(resolve => {
-            Gio.DBus.session.call('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager',
-                'Inhibit', new GLib.Variant('(susu)', ['dynamic-island', 0, 'Stay awake (side island)', 4 | 8]),
-                null, Gio.DBusCallFlags.NONE, 2000, null, (conn, res) => {
-                    try {
-                        [this._inhibitCookie] = conn.call_finish(res).deepUnpack();
-                    } catch (e) {
-                        console.error('Dynamic Island: could not keep the screen awake', e);
-                    }
-                    resolve();
-                });
-        });
-    }
-
-    _uninhibit() {
-        const cookie = this._inhibitCookie;
-        this._inhibitCookie = 0;
-        if (!cookie)
-            return Promise.resolve();
-        return new Promise(resolve => {
-            Gio.DBus.session.call('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager',
-                'Uninhibit', new GLib.Variant('(u)', [cookie]), null, Gio.DBusCallFlags.NONE, 2000, null, () => resolve());
+            return GLib.SOURCE_REMOVE;
         });
     }
 
@@ -1341,39 +1294,6 @@ export class SideIslands {
         }
     }
 
-    _fillNotifications(section, list) {
-        list.destroy_all_children();
-        const all = NotificationCenter.notifications();
-        section.actionButton.visible = all.length > 0;
-        section.titleLabel.text = all.length ? fmt(_('Notifications · %s'), all.length) : _('Notifications');
-        if (!all.length)
-            list.add_child(label(_('Nothing new'), 'dynada-card-body dynada-side-empty'));
-        for (const n of all.slice(0, MAX_NOTIFICATIONS)) {
-            const gicon = n.gicon ?? n.source?.icon ?? new Gio.ThemedIcon({name: 'dialog-information-symbolic'});
-            const symbolic = gicon instanceof Gio.ThemedIcon && gicon.get_names().some(i => i.endsWith('-symbolic'));
-            const time = n.datetime ? n.datetime.format('%H:%M') : '';
-            const body = (n.body ?? '').replace(/\s+/g, ' ');
-            list.add_child(this._row(new St.Icon({gicon, icon_size: symbolic ? 18 : 28}),
-                n.title ?? '', [n.source?.title, time, body].filter(Boolean).join(' · '), () => {
-                    this.close(true);
-                    try {
-                        n.activate();
-                    } catch (e) {
-                        console.error('Dynamic Island: could not open the notification', e);
-                    }
-                }, {
-                    onClose: () => {
-                        try {
-                            n.destroy();
-                        } catch {
-                            // already gone
-                        }
-                        this._fillNotifications(section, list);
-                    },
-                }));
-        }
-    }
-
     _syncStats() {
         if (!this._statTiles)
             return GLib.SOURCE_REMOVE;
@@ -1393,7 +1313,48 @@ export class SideIslands {
         set('temperature', (s.temperature - 30) / 70, s.temperature === null ? '—' : `${Math.round(s.temperature)}°`, s.temperature > 85);
         set('battery', s.battery?.percent / 100, s.battery ? `${s.battery.charging ? '⚡' : ''}${s.battery.percent}%` : '—',
             s.battery && !s.battery.charging && s.battery.percent <= 15);
+        this._syncProcesses();
         return GLib.SOURCE_CONTINUE;
+    }
+
+    // The processes using the most CPU since the last look; your own can be stopped (two clicks).
+    _syncProcesses() {
+        const list = this._processList;
+        if (!list)
+            return;
+        const top = this._processes.top(MAX_PROCESSES);
+        if (!top)
+            return;
+        list.destroy_all_children();
+        const uid = (readText('/proc/self/status') ?? '').match(/^Uid:\s+(\d+)/m)?.[1];
+        for (const p of top) {
+            const row = new St.BoxLayout({style_class: 'dynada-side-process', x_expand: true, reactive: true, track_hover: true});
+            row.add_child(label(p.name, 'dynada-side-process-name', {x_expand: true}));
+            row.add_child(label(`${Math.round(p.cpu)}%`, 'dynada-side-process-cpu'));
+            row.add_child(label(`${Math.round(p.rss / 1048576)} MB`, 'dynada-side-process-mem'));
+            const own = (readText(`/proc/${p.pid}/status`) ?? '').match(/^Uid:\s+(\d+)/m)?.[1] === uid;
+            if (own) {
+                let armed = false;
+                const stop = this._round('process-stop-symbolic', _('Stop'), 'dynada-side-dismiss dynada-side-kill', () => {
+                    if (!armed) {
+                        armed = true;
+                        stop.add_style_pseudo_class('armed');
+                        stop.child.icon_name = 'object-select-symbolic';
+                        return;
+                    }
+                    try {
+                        Gio.Subprocess.new(['kill', String(p.pid)], Gio.SubprocessFlags.NONE);
+                    } catch (e) {
+                        console.error('Dynamic Island: could not stop the process', e);
+                    }
+                    row.opacity = 100;
+                }, 12);
+                stop.opacity = 0;
+                row.connect('notify::hover', () => stop.ease({opacity: row.hover || armed ? 255 : 0, duration: 120}));
+                row.add_child(stop);
+            }
+            list.add_child(row);
+        }
     }
 
     // The newest assistant message of the island's chat (chat.js keeps the last 60).

@@ -1700,46 +1700,7 @@
   color: rgba(245, 245, 247, 0.75);
 }
 
-/* Now playing */
-.dynada-side-media-row {
-  spacing: 14px;
-}
-
-.dynada-side-art {
-  width: 64px;
-  height: 64px;
-  border-radius: 14px;
-  background-color: rgba(255, 255, 255, 0.08);
-  background-size: cover;
-}
-
-.dynada-side-media-title {
-  font-size: 11pt;
-  font-weight: bold;
-}
-
-.dynada-side-media-controls {
-  spacing: 18px;
-}
-
-.dynada-side-media-button {
-  width: 38px;
-  height: 38px;
-  background-color: transparent;
-}
-
-.dynada-side-media-play {
-  width: 46px;
-  height: 46px;
-  color: #1b162c;
-  background-color: #f5f5f7;
-}
-
-.dynada-side-media-play:hover {
-  background-color: #ffffff;
-}
-
-/* Quick settings */
+/* Tools */
 .dynada-side-toggle {
   padding: 10px 12px;
   border-radius: 16px;
@@ -1772,27 +1733,6 @@
 .dynada-side-toggle-state {
   font-size: 8pt;
   color: rgba(245, 245, 247, 0.6);
-}
-
-/* Sliders */
-.dynada-side-sliders {
-  spacing: 14px;
-}
-
-.dynada-side-slider-row {
-  spacing: 12px;
-}
-
-.dynada-side-slider-icon {
-  color: rgba(245, 245, 247, 0.75);
-}
-
-.dynada-side-slider {
-  -barlevel-height: 22px;
-  -barlevel-background-color: rgba(255, 255, 255, 0.1);
-  -barlevel-active-background-color: #f5f5f7;
-  -slider-handle-radius: 0;
-  -barlevel-border-width: 0;
 }
 
 /* System */
@@ -1837,4 +1777,47 @@
   font-feature-settings: "tnum";
   color: #ffb4a8;
   min-width: 38px;
+}
+
+/* Calculator */
+.dynada-side-calc-result {
+  font-size: 16pt;
+  font-weight: bold;
+  font-feature-settings: "tnum";
+  color: #c9b6ff;
+  padding: 0 4px;
+}
+
+/* Processes */
+.dynada-side-process {
+  spacing: 10px;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+
+.dynada-side-process:hover {
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+.dynada-side-process-name {
+  font-size: 9.5pt;
+}
+
+.dynada-side-process-cpu,
+.dynada-side-process-mem {
+  font-size: 9pt;
+  font-feature-settings: "tnum";
+  color: rgba(245, 245, 247, 0.6);
+  min-width: 46px;
+  text-align: right;
+}
+
+.dynada-side-kill:armed {
+  color: #ffffff;
+  background-color: rgba(255, 90, 90, 0.75);
+}
+
+.dynada-side-round.dynada-side-dismiss {
+  width: 22px;
+  height: 22px;
 }

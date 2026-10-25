@@ -764,3 +764,33 @@ msgstr "Ayarlar"
 
 msgid "On"
 msgstr "Açık"
+
+msgid "Calculate"
+msgstr "Hesapla"
+
+msgid "12*7, 5 km mi, 90 min h…"
+msgstr "12*7, 5 km mi, 90 dk sa…"
+
+msgid "Copied ✓"
+msgstr "Kopyalandı ✓"
+
+msgid "Clipboard"
+msgstr "Pano"
+
+msgid "Copied text shows up here"
+msgstr "Kopyaladıkların burada görünür"
+
+msgid "Tools"
+msgstr "Araçlar"
+
+msgid "Pick a color"
+msgstr "Renk seç"
+
+msgid "Record screen"
+msgstr "Ekran kaydı"
+
+msgid "Password"
+msgstr "Şifre üret"
+
+msgid "Color copied"
+msgstr "Renk kopyalandı"
