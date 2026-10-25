@@ -1548,11 +1548,71 @@
   padding: 4px 2px;
 }
 
-.dynada-side-notification {
-  padding: 8px 10px;
-  border-radius: 14px;
+.dynada-side-harvis-header {
+  spacing: 12px;
+  padding: 2px 4px 6px 2px;
+}
+
+.dynada-side-status {
+  font-size: 9pt;
+  color: #c9b6ff;
+}
+
+.dynada-side-ask {
+  spacing: 10px;
+  background-gradient-direction: vertical;
+  background-gradient-start: rgba(123, 92, 240, 0.22);
+  background-gradient-end: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(190, 160, 255, 0.22);
+}
+
+.dynada-side-ask-row {
+  spacing: 6px;
+}
+
+.dynada-side-round {
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  color: rgba(245, 245, 247, 0.85);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-side-round:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.dynada-side-send {
+  color: #ffffff;
+  background-color: rgba(123, 92, 240, 0.85);
+}
+
+.dynada-side-send:hover {
+  background-color: rgba(143, 112, 255, 1);
+}
+
+.dynada-side-last {
   text-align: left;
-  color: #f5f5f7;
+  spacing: 4px;
+}
+
+.dynada-side-chevron {
+  color: rgba(245, 245, 247, 0.4);
+}
+
+.dynada-side-note-icon {
+  color: rgba(245, 245, 247, 0.55);
+  padding-left: 2px;
+}
+
+.dynada-side-empty {
+  color: rgba(245, 245, 247, 0.45);
+}
+
+.dynada-side-notification {
+  spacing: 10px;
+  padding: 8px 8px 8px 8px;
+  border-radius: 14px;
   background-color: rgba(255, 255, 255, 0.04);
 }
 
@@ -1560,7 +1620,29 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+.dynada-side-notification-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.dynada-side-notification-open {
+  text-align: left;
+  color: #f5f5f7;
+  padding: 0;
+}
+
+.dynada-side-dismiss {
+  width: 22px;
+  height: 22px;
+}
+
 .dynada-side-notification-title {
   font-size: 10pt;
   font-weight: bold;
+}
+
+.dynada-side-harvis-header .dynada-center-month {
+  padding-left: 0;
 }

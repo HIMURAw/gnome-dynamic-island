@@ -175,10 +175,25 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('desktop icons', () => this._setupDesktopIcons());
         this._safely('palette shortcut', () => this._setupPaletteShortcut());
         if (this._settings.get_boolean('side-islands'))
-            this._safely('side islands', () => (this._side = new SideIslands({
-                settings: this._settings,
-                onAsk: text => this._askFromSide(text),
-            })));
+            this._safely('side islands', () => {
+                this._voiceEnvelope ??= new VoiceEnvelope();
+                this._side = new SideIslands({
+                    settings: this._settings,
+                    onAsk: text => this._askFromSide(text),
+                    onTalk: () => {
+                        if (this._mode !== 'chat')
+                            this._toggleChat();
+                        this._chat?._listen();
+                    },
+                    onOpenChat: () => {
+                        if (this._mode !== 'chat')
+                            this._toggleChat();
+                    },
+                    avatar: new AvatarGlyph(mode => mode === 'speaking'
+                        ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6, {scale: 2}),
+                });
+                this._side.setMode(this._harvisState().mode);
+            });
         if (this._settings.get_boolean('show-privacy-bubble'))
             this._safely('privacy bubble', () => {
                 this._privacyWatcher = new PrivacyWatcher(() => this._syncPrivacy());
@@ -1415,6 +1430,7 @@ export default class DynamicIslandExtension extends Extension {
         this._compactBrain.setMode(mode);
         this._chatAvatar?.setMode(mode);
         this._mindAvatar?.setMode(mode);
+        this._side?.setMode(mode);
         if (harvis)
             this._sleepHarvis(false);
         // Small reactions: a wave at the first morning meeting, a surprised hop when

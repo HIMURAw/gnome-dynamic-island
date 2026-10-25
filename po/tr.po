@@ -653,3 +653,33 @@ msgstr "Yan adalar"
 
 msgid "Push the pointer against the left or right edge: today and focus on the left, Harvis on the right"
 msgstr "İşaretçiyi sol ya da sağ kenara it: solda bugün ve odak, sağda Harvis"
+
+msgid "Ready"
+msgstr "Hazır"
+
+msgid "Say it"
+msgstr "Söyle"
+
+msgid "Deadlines"
+msgstr "Son tarihler"
+
+msgid "Where was I?"
+msgstr "Nerede kaldım?"
+
+msgid "What is on today? Deadlines, open threads and what I should do first."
+msgstr "Bugün ne var? Son tarihler, açık işler ve ilk ne yapmalıyım."
+
+msgid "Which deadlines and decisions are coming up?"
+msgstr "Yaklaşan son tarihler ve kararlar neler?"
+
+msgid "Where did I leave off last time, and what is the next step?"
+msgstr "En son nerede kaldım, sıradaki adım ne?"
+
+msgid "Last answer"
+msgstr "Son cevap"
+
+msgid "Clear %s"
+msgstr "%s temizle"
+
+msgid "Something went wrong"
+msgstr "Bir sorun çıktı"

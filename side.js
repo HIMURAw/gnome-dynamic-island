@@ -282,7 +282,9 @@ class SidePanel {
             x_expand: true,
         });
         const header = new St.BoxLayout({style_class: 'dynada-side-header', x_expand: true});
-        header.add_child(label(title, 'dynada-center-month', {x_expand: true}));
+        this.header = header;
+        this.title = label(title, 'dynada-center-month', {x_expand: true});
+        header.add_child(this.title);
         this.headerNote = label('', 'dynada-card-time');
         header.add_child(this.headerNote);
         this.content.add_child(header);
@@ -311,10 +313,14 @@ class SidePanel {
 // ---------- The two islands and their edges ----------
 
 export class SideIslands {
-    // onAsk(text): send to the island's chat and show it.
-    constructor({settings, onAsk}) {
+    // onAsk(text): send to the island's chat and show it. onTalk(): ask Harvis to listen.
+    // onOpenChat(): show the island's chat. avatar: a live AvatarGlyph for the right island's header.
+    constructor({settings, onAsk, onTalk, onOpenChat, avatar}) {
         this._settings = settings;
         this._onAsk = onAsk;
+        this._onTalk = onTalk;
+        this._onOpenChat = onOpenChat;
+        this._avatar = avatar;
         this._panels = {};
         this._open = null;
         this._closeId = 0;
@@ -337,6 +343,9 @@ export class SideIslands {
         for (const panel of Object.values(this._panels))
             panel.destroy();
         this._panels = {};
+        // Never opened: the robot was never put on the stage.
+        if (this._avatar && !this._avatar.actor.get_parent())
+            this._avatar.actor.destroy();
     }
 
     // ---------- Edges ----------
@@ -713,61 +722,217 @@ export class SideIslands {
     _buildHarvis() {
         const panel = new SidePanel('right', _('Harvis'));
 
+        // Header: the live robot (it moves only while on screen), the name, what it is doing.
+        panel.header.add_style_class_name('dynada-side-harvis-header');
+        if (this._avatar) {
+            this._avatar.actor.y_align = Clutter.ActorAlign.CENTER;
+            panel.header.insert_child_at_index(this._avatar.actor, 0);
+        }
+        const names = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER});
+        panel.header.remove_child(panel.title);
+        names.add_child(panel.title);
+        this._harvisStatus = label(_('Ready'), 'dynada-side-status');
+        names.add_child(this._harvisStatus);
+        panel.header.insert_child_at_index(names, this._avatar ? 1 : 0);
+
+        // Ask: type and Enter, the arrow, or the microphone to say it.
         const ask = panel.card('dynada-side-ask');
-        ask.add_child(this._entry(panel, _('Ask Harvis…'), (text, entry) => {
+        const askRow = new St.BoxLayout({style_class: 'dynada-side-ask-row', x_expand: true});
+        const askEntry = this._entry(panel, _('Ask Harvis…'), (text, entry) => {
             entry.text = '';
             this.close(true);
             this._onAsk(text);
+        });
+        askRow.add_child(askEntry);
+        askRow.add_child(this._round('audio-input-microphone-symbolic', _('Say it'), 'dynada-side-mic', () => {
+            this.close(true);
+            this._onTalk();
         }));
+        askRow.add_child(this._round('go-up-symbolic', _('Send'), 'dynada-side-send', () => {
+            const text = askEntry.text.trim();
+            if (!text)
+                return;
+            askEntry.text = '';
+            this.close(true);
+            this._onAsk(text);
+        }));
+        ask.add_child(askRow);
 
+        // One tap questions. The label is short; what is sent is the whole question.
+        const quick = new St.BoxLayout({style_class: 'dynada-side-chips', x_expand: true});
+        for (const [text, prompt] of [
+            [_('Today'), _('What is on today? Deadlines, open threads and what I should do first.')],
+            [_('Deadlines'), _('Which deadlines and decisions are coming up?')],
+            [_('Where was I?'), _('Where did I leave off last time, and what is the next step?')],
+        ]) {
+            const b = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: text, can_focus: true});
+            b.connect('clicked', () => {
+                this.close(true);
+                this._onAsk(prompt);
+            });
+            quick.add_child(b);
+        }
+        ask.add_child(quick);
+
+        // The last answer, so a glance is enough; a click opens the whole chat.
+        const last = new St.Button({style_class: 'dynada-card dynada-side-card dynada-side-last', can_focus: true,
+            x_expand: true});
+        const lastBox = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
+        const lastHead = new St.BoxLayout({x_expand: true});
+        lastHead.add_child(label(_('Last answer'), 'dynada-card-time', {x_expand: true}));
+        lastHead.add_child(new St.Icon({icon_name: 'go-next-symbolic', icon_size: 12, style_class: 'dynada-side-chevron'}));
+        lastBox.add_child(lastHead);
+        const lastText = label('', 'dynada-card-body');
+        lastText.clutter_text.line_wrap = true;
+        lastText.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        lastBox.add_child(lastText);
+        last.set_child(lastBox);
+        last.connect('clicked', () => {
+            this.close(true);
+            this._onOpenChat();
+        });
+        panel.content.add_child(last);
+
+        // Quick note to the inbox.
         const note = panel.card('dynada-side-note');
-        const noteEntry = this._entry(panel, _('Quick note to the inbox…'), (text, entry) => {
+        const noteRow = new St.BoxLayout({style_class: 'dynada-side-ask-row', x_expand: true});
+        const noteIcon = new St.Icon({icon_name: 'document-edit-symbolic', icon_size: 16, style_class: 'dynada-side-note-icon',
+            y_align: Clutter.ActorAlign.CENTER});
+        noteRow.add_child(noteIcon);
+        noteRow.add_child(this._entry(panel, _('Quick note to the inbox…'), (text, entry) => {
             entry.text = '';
-            entry.hint_text = this._saveNote(text) ? _('Saved ✓') : _('Could not save the note');
+            const ok = this._saveNote(text);
+            entry.hint_text = ok ? _('Saved ✓') : _('Could not save the note');
+            noteIcon.icon_name = ok ? 'object-select-symbolic' : 'dialog-error-symbolic';
             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1600, () => {
                 try {
                     entry.hint_text = _('Quick note to the inbox…');
+                    noteIcon.icon_name = 'document-edit-symbolic';
                 } catch {
                     // the island was rebuilt meanwhile
                 }
                 return GLib.SOURCE_REMOVE;
             });
-        });
-        note.add_child(noteEntry);
+        }));
+        note.add_child(noteRow);
 
-        const list = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
+        // Notifications, newest first, each with its app's icon; one or all can be dismissed.
         const notifications = panel.card('dynada-side-notifications');
-        notifications.add_child(label(_('Notifications'), 'dynada-card-title'));
+        const notifHead = new St.BoxLayout({x_expand: true});
+        notifHead.add_child(label(_('Notifications'), 'dynada-card-title', {x_expand: true}));
+        const clearAll = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: _('Clear'), can_focus: true});
+        notifHead.add_child(clearAll);
+        notifications.add_child(notifHead);
+        const list = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list', x_expand: true});
         notifications.add_child(list);
 
         panel.refresh = () => {
+            const answer = this._lastAnswer();
+            last.visible = !!answer;
+            lastText.text = answer.length > 180 ? `${answer.slice(0, 178).trimEnd()}…` : answer;
+
             list.destroy_all_children();
-            const all = NotificationCenter.notifications().slice(0, MAX_NOTIFICATIONS);
+            const all = NotificationCenter.notifications();
+            clearAll.visible = all.length > 0;
+            clearAll.label = all.length > MAX_NOTIFICATIONS ? fmt(_('Clear %s'), all.length) : _('Clear');
             if (!all.length)
-                list.add_child(label(_('Nothing new'), 'dynada-card-body'));
-            for (const n of all) {
-                const row = new St.Button({style_class: 'dynada-side-notification', can_focus: true, x_expand: true});
-                const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
-                const head = new St.BoxLayout({x_expand: true});
-                head.add_child(label(n.source?.title ?? '', 'dynada-card-time', {x_expand: true}));
-                head.add_child(label(n.datetime ? n.datetime.format('%H:%M') : '', 'dynada-card-time'));
-                box.add_child(head);
-                box.add_child(label(n.title ?? '', 'dynada-side-notification-title'));
-                if (n.body)
-                    box.add_child(label(n.body.replace(/\s+/g, ' '), 'dynada-card-body'));
-                row.set_child(box);
-                row.connect('clicked', () => {
-                    this.close(true);
-                    try {
-                        n.activate();
-                    } catch (e) {
-                        console.error('Dynamic Island: could not open the notification', e);
-                    }
-                });
-                list.add_child(row);
-            }
+                list.add_child(label(_('Nothing new'), 'dynada-card-body dynada-side-empty'));
+            for (const n of all.slice(0, MAX_NOTIFICATIONS))
+                list.add_child(this._notificationRow(n, () => panel.refresh()));
         };
+        clearAll.connect('clicked', () => {
+            for (const n of NotificationCenter.notifications()) {
+                try {
+                    n.destroy();
+                } catch {
+                    // already gone
+                }
+            }
+            panel.refresh();
+        });
         return panel;
+    }
+
+    _round(icon, name, styleClass, onClick) {
+        const b = new St.Button({
+            style_class: `dynada-side-round ${styleClass}`,
+            can_focus: true,
+            accessible_name: name,
+            y_align: Clutter.ActorAlign.CENTER,
+            child: new St.Icon({icon_name: icon, icon_size: 15}),
+        });
+        b.connect('clicked', onClick);
+        return b;
+    }
+
+    _notificationRow(n, onDismissed) {
+        const row = new St.BoxLayout({style_class: 'dynada-side-notification', x_expand: true, reactive: true,
+            track_hover: true});
+        const gicon = n.gicon ?? n.source?.icon ?? new Gio.ThemedIcon({name: 'dialog-information-symbolic'});
+        const symbolic = gicon instanceof Gio.ThemedIcon && gicon.get_names().some(i => i.endsWith('-symbolic'));
+        row.add_child(new St.Bin({
+            style_class: 'dynada-side-notification-icon',
+            y_align: Clutter.ActorAlign.START,
+            child: new St.Icon({gicon, icon_size: symbolic ? 16 : 28}),
+        }));
+        const open = new St.Button({style_class: 'dynada-side-notification-open', can_focus: true, x_expand: true});
+        const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
+        const head = new St.BoxLayout({x_expand: true});
+        head.add_child(label(n.source?.title ?? '', 'dynada-card-time', {x_expand: true}));
+        head.add_child(label(n.datetime ? n.datetime.format('%H:%M') : '', 'dynada-card-time'));
+        box.add_child(head);
+        box.add_child(label(n.title ?? '', 'dynada-side-notification-title'));
+        if (n.body)
+            box.add_child(label(n.body.replace(/\s+/g, ' '), 'dynada-card-body'));
+        open.set_child(box);
+        open.connect('clicked', () => {
+            this.close(true);
+            try {
+                n.activate();
+            } catch (e) {
+                console.error('Dynamic Island: could not open the notification', e);
+            }
+        });
+        row.add_child(open);
+        const dismiss = this._round('window-close-symbolic', _('Dismiss'), 'dynada-side-dismiss', () => {
+            try {
+                n.destroy();
+            } catch {
+                // already gone
+            }
+            onDismissed();
+        });
+        dismiss.y_align = Clutter.ActorAlign.START;
+        dismiss.opacity = 0;
+        row.connect('notify::hover', () => dismiss.ease({opacity: row.hover ? 255 : 0, duration: 120}));
+        row.add_child(dismiss);
+        return row;
+    }
+
+    // The newest assistant message of the island's chat (chat.js keeps the last 60).
+    _lastAnswer() {
+        try {
+            const path = GLib.build_filenamev([GLib.get_user_data_dir(), 'dynamic-island', 'chat.json']);
+            const messages = JSON.parse(readText(path) ?? '[]');
+            const m = [...messages].reverse().find(x => x.role === 'assistant' && x.text);
+            return m ? m.text.replace(/\s+/g, ' ').trim() : '';
+        } catch {
+            return '';
+        }
+    }
+
+    // Harvis's state from the island (idle, listening, thinking, speaking, failed).
+    setMode(mode) {
+        this._avatar?.setMode(mode);
+        if (this._harvisStatus) {
+            this._harvisStatus.text = {
+                listening: _('Listening'),
+                thinking: _('Thinking'),
+                speaking: _('Speaking'),
+                failed: _('Something went wrong'),
+            }[mode] ?? _('Ready');
+        }
     }
 
     // Same place and form as the palette's quick notes (palette.js).
