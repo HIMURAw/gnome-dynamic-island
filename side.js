@@ -1130,7 +1130,12 @@ export class SideIslands {
                 Main.screenshotUI.open(1).catch(e => console.error('Dynamic Island: could not start a recording', e));
             }},
             {name: _('Password'), icon: 'dialog-password-symbolic', run: tile => this._makePassword(tile)},
-        ]) {
+            // Only where an "ekrana-sor" program is installed (Umut's: select a region, Gemini answers in the island).
+            GLib.find_program_in_path('ekrana-sor') && {name: _('Ask the screen'), icon: 'zoom-in-symbolic', run: () => {
+                this.close(true);
+                GLib.spawn_command_line_async('ekrana-sor');
+            }},
+        ].filter(Boolean)) {
             const button = new St.Button({style_class: 'dynada-side-toggle', can_focus: true, accessible_name: t.name});
             const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
             box.add_child(new St.Icon({icon_name: t.icon, icon_size: 20, style_class: 'dynada-side-toggle-icon',

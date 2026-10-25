@@ -794,3 +794,6 @@ msgstr "Şifre üret"
 
 msgid "Color copied"
 msgstr "Renk kopyalandı"
+
+msgid "Ask the screen"
+msgstr "Ekrana sor"
