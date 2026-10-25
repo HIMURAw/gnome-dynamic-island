@@ -26,6 +26,7 @@ import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher, squareArt} from './media.js';
 import {ChatView} from './chat.js';
+import {SideIslands} from './side.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
 import {MindView, VoiceEnvelope} from './mind.js';
@@ -173,6 +174,11 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('auto-hide', () => this._setupAutoHide());
         this._safely('desktop icons', () => this._setupDesktopIcons());
         this._safely('palette shortcut', () => this._setupPaletteShortcut());
+        if (this._settings.get_boolean('side-islands'))
+            this._safely('side islands', () => (this._side = new SideIslands({
+                settings: this._settings,
+                onAsk: text => this._askFromSide(text),
+            })));
         if (this._settings.get_boolean('show-privacy-bubble'))
             this._safely('privacy bubble', () => {
                 this._privacyWatcher = new PrivacyWatcher(() => this._syncPrivacy());
@@ -201,6 +207,8 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('releasing privacy bubble', () => this._privacyWatcher?.destroy());
         this._safely('removing edge glow', () => this._edgeGlow?.destroy());
         this._edgeGlow = null;
+        this._safely('removing side islands', () => this._side?.destroy());
+        this._side = null;
         this._privacyWatcher = null;
         this._safely('releasing desktop icons', () => this._releaseDesktopIcons());
         this._safely('releasing auto-hide', () => this._releaseAutoHide());
@@ -1206,6 +1214,13 @@ export default class DynamicIslandExtension extends Extension {
     // Views that take the keyboard while open.
     _typing(mode) {
         return mode === 'palette' || mode === 'chat';
+    }
+
+    // A question typed into the right side island: into the chat, which opens to show the answer.
+    _askFromSide(text) {
+        this._chat?.sendText(text);
+        if (this._mode !== 'chat')
+            this._toggleChat();
     }
 
     _toggleChat() {

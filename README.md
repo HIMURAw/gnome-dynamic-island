@@ -68,6 +68,14 @@ the middle of the screen, with a control center, notifications and what is playi
 - **Charge limit** (ASUS laptops with `asusctl`): stop charging at 60 or 80 % to keep the
   battery healthy, charge to full once before a trip, and see battery health and cycles.
   Hidden on other machines.
+- **Side islands:** push the pointer against the left or right edge of the screen and a glass
+  island grows out of it. Left, *Today*: a focus timer (study / code / other, 25 or 50 min) that
+  logs finished sessions to a CSV, the first lines of an agenda file ("Coming up"), and CPU,
+  memory, heat and battery. Right, *Harvis*: ask the assistant (the answer opens in the chat),
+  a quick note to the inbox, the latest notifications. Closed they cost nothing: the edges are
+  pressure barriers like GNOME's hot corner, so a scrollbar at the edge still works; the
+  figures are read only while the left island is open. The agenda file and the focus log can
+  be set with `gsettings` (`agenda-file`, `focus-log`; paths may be inside the notes folder).
 
 The text follows your system language.
 

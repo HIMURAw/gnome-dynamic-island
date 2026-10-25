@@ -584,3 +584,72 @@ msgstr "Harvis'e bir komut…"
 
 msgid "Harvis stopped and asleep"
 msgstr "Harvis durdu ve uykuda"
+
+msgid "Today"
+msgstr "Bugün"
+
+msgid "Coming up"
+msgstr "Yaklaşanlar"
+
+msgid "Study"
+msgstr "Ders"
+
+msgid "Code"
+msgstr "Kod"
+
+msgid "Other"
+msgstr "Diğer"
+
+msgid "%s min"
+msgstr "%s dk"
+
+msgid "%s h %s min"
+msgstr "%s sa %s dk"
+
+msgid "Start"
+msgstr "Başlat"
+
+msgid "Stop"
+msgstr "Durdur"
+
+msgid "%s · today %s"
+msgstr "%s · bugün %s"
+
+msgid "Today %s of focus"
+msgstr "Bugün %s odak"
+
+msgid "Focus session done"
+msgstr "Odak oturumu bitti"
+
+msgid "%s of %s. Today: %s"
+msgstr "%s %s. Bugün: %s"
+
+msgid "CPU"
+msgstr "İşlemci"
+
+msgid "Memory"
+msgstr "Bellek"
+
+msgid "Heat"
+msgstr "Isı"
+
+msgid "Battery"
+msgstr "Pil"
+
+msgid "Ask Harvis…"
+msgstr "Harvis'e sor…"
+
+msgid "Quick note to the inbox…"
+msgstr "Gelen kutusuna hızlı not…"
+
+msgid "Saved ✓"
+msgstr "Kaydedildi ✓"
+
+msgid "Nothing new"
+msgstr "Yeni bir şey yok"
+
+msgid "Side islands"
+msgstr "Yan adalar"
+
+msgid "Push the pointer against the left or right edge: today and focus on the left, Harvis on the right"
+msgstr "İşaretçiyi sol ya da sağ kenara it: solda bugün ve odak, sağda Harvis"
