@@ -54,6 +54,9 @@ const IFACE = `
       <arg type="b" direction="out" name="ok"/>
       <arg type="s" direction="out" name="info"/>
     </method>
+    <method name="Side">
+      <arg type="s" direction="in" name="side"/>
+    </method>
     <method name="Timer">
       <arg type="u" direction="in" name="seconds"/>
       <arg type="s" direction="in" name="label"/>
@@ -83,11 +86,13 @@ export class Activities {
     // onChanged(): the list or a countdown changed.
     // onAnswer(question, answer): a voice assistant has an answer to show.
     // onScreenshot(): a screenshot was taken for the assistant (the island flashes).
-    constructor({onChanged, onAnswer, onScreenshot, onCard}) {
+    // onSide(side): open or close a side island (side.js).
+    constructor({onChanged, onAnswer, onScreenshot, onCard, onSide}) {
         this._onChanged = onChanged;
         this._onAnswer = onAnswer;
         this._onCard = onCard;
         this._onScreenshot = onScreenshot;
+        this._onSide = onSide;
         this._items = new Map();
         this._timerCount = 0;
         this._dbus = Gio.DBusExportedObject.wrapJSObject(IFACE, this);
@@ -228,6 +233,11 @@ export class Activities {
             console.error('Dynamic Island: control failed', e);
             return reply(false, String(e));
         }
+    }
+
+    // A side island from outside (the touchpad edge swipe): left, right, or toggle-left / toggle-right.
+    Side(side) {
+        this._onSide?.(side);
     }
 
     Timer(seconds, label) {

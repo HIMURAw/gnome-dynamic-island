@@ -96,6 +96,7 @@ export default class DynamicIslandExtension extends Extension {
             onAnswer: (question, answer) => this._showAnswer(question, answer),
             onScreenshot: phase => this._flashShot(phase),
             onCard: card => (this._cards ??= new Cards()).show(card),
+            onSide: side => this._side?.fromOutside(side),
         });
         // Any change rebuilds the island: disable() puts everything back, so
         // building again with the new settings is the simplest safe way.

@@ -50,6 +50,7 @@ const TOOL_HEIGHT = 74;
 const MAX_CLIPS = 8;
 const MAX_PROCESSES = 5;
 const OPEN_GRACE = 1500;    // ms: opened by a push and never entered, it closes
+const OUTSIDE_GRACE = 6000; // ms: opened from the touchpad, the pointer may be anywhere
 
 const decoder = new TextDecoder();
 const fmt = (str, ...args) => str.replace(/%s/g, () => String(args.shift()));
@@ -496,6 +497,24 @@ export class SideIslands {
         if (this._open === side)
             return;
         this.open(side);
+    }
+
+    // From outside (the touchpad service over D-Bus): "left"/"right" open, "toggle-…" also closes.
+    fromOutside(request) {
+        const toggle = request.startsWith('toggle-');
+        const side = request.replace('toggle-', '');
+        if (side !== 'left' && side !== 'right')
+            return;
+        if (toggle && this._open === side) {
+            this.close();
+            return;
+        }
+        const mon = Main.layoutManager.primaryMonitor;
+        if (global.display.get_monitor_in_fullscreen(mon.index) || Main.overview.visible)
+            return;
+        this.open(side);
+        // Opened without the pointer on it: it stays until the pointer comes and leaves, or a few seconds pass.
+        this._scheduleClose(OUTSIDE_GRACE);
     }
 
     // ---------- Open / close ----------
