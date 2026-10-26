@@ -720,7 +720,9 @@ export class SideIslands {
             scale_y: 0.94,
             duration: 180,
             mode: Clutter.AnimationMode.EASE_IN_QUAD,
-            onComplete: () => {
+            // onStopped, not onComplete: an interrupted fade skips onComplete, and the island then
+            // stayed shown at opacity 0, eating clicks along the screen edges (2026-10-26).
+            onStopped: () => {
                 if (this._panels[panel.side] === panel && this._open !== panel.side)
                     actor.visible = false;
             },
