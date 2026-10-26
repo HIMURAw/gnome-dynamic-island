@@ -803,3 +803,6 @@ msgstr "Modlar"
 
 msgid "End"
 msgstr "Bitir"
+
+msgid "Summarize page"
+msgstr "Sayfayı özetle"

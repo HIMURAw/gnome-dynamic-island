@@ -1307,6 +1307,11 @@ export class SideIslands {
                 this.close(true);
                 GLib.spawn_command_line_async('ekrana-sor');
             }},
+            // And a "sayfa-sor" program: the browser's open page, summarised or asked about.
+            GLib.find_program_in_path('sayfa-sor') && {name: _('Summarize page'), icon: 'web-browser-symbolic', run: () => {
+                this.close(true);
+                GLib.spawn_command_line_async('sayfa-sor --ozet');
+            }},
         ].filter(Boolean)) {
             const button = new St.Button({style_class: 'dynada-side-toggle', can_focus: true, accessible_name: t.name});
             const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
