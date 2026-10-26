@@ -82,6 +82,10 @@
       <default>true</default>
       <summary>Side islands: push the pointer against the left or right screen edge to open them</summary>
     </key>
+    <key name="side-edge-skip" type="as">
+      <default>[]</default>
+      <summary>Apps whose focused window owns a screen edge (app id, or "id:left" / "id:right"): pushing that edge does not open a side island</summary>
+    </key>
     <key name="agenda-file" type="s">
       <default>''</default>
       <summary>Plain text file whose first lines the left side island shows as "Coming up" (a path, or a file inside the notes folder; empty: hidden)</summary>

@@ -51,6 +51,7 @@ const MAX_CLIPS = 8;
 const MAX_PROCESSES = 5;
 const OPEN_GRACE = 1500;    // ms: opened by a push and never entered, it closes
 const OUTSIDE_GRACE = 6000; // ms: opened from the touchpad, the pointer may be anywhere
+const PREBUILD_AFTER = 8;   // s after start: build both islands once, while nothing else is happening
 
 const decoder = new TextDecoder();
 const fmt = (str, ...args) => str.replace(/%s/g, () => String(args.shift()));
@@ -437,9 +438,22 @@ export class SideIslands {
             this._buildEdges();
         });
         this._buildEdges();
+        // Both islands are built once, a few seconds after the session settles, so the first open
+        // is as light as any other: building them on the first push dropped its animation.
+        this._prebuildId = GLib.timeout_add_seconds(GLib.PRIORITY_LOW, PREBUILD_AFTER, () => {
+            this._prebuildId = 0;
+            for (const side of ['left', 'right'])
+                this._panel(side).prepare?.();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     destroy() {
+        for (const id of ['_prebuildId', '_prepareId']) {
+            if (this[id])
+                GLib.source_remove(this[id]);
+            this[id] = 0;
+        }
         this.close(true);
         this._clearEdges();
         Main.layoutManager.disconnect(this._monitorsId);
@@ -457,14 +471,28 @@ export class SideIslands {
 
     // ---------- Edges ----------
 
+    // The monitor whose edge on that side is an outer edge of the whole layout: the primary if it
+    // has one there, otherwise the outermost. A barrier between two monitors would catch the
+    // pointer on its way to the other screen.
+    _edgeMonitor(side) {
+        const monitors = Main.layoutManager.monitors;
+        const outer = m => !monitors.some(o => o !== m &&
+            (side === 'left' ? o.x + o.width === m.x : o.x === m.x + m.width) &&
+            o.y < m.y + m.height && o.y + o.height > m.y);
+        const primary = Main.layoutManager.primaryMonitor;
+        if (primary && outer(primary))
+            return primary;
+        return monitors.filter(outer)
+            .sort((a, b) => (side === 'left' ? a.x - b.x : b.x + b.width - (a.x + a.width)))[0] ?? null;
+    }
+
     _buildEdges() {
         this._clearEdges();
-        const mon = Main.layoutManager.primaryMonitor;
-        if (!mon)
-            return;
-        const y1 = Math.round(mon.y + mon.height * (1 - SPAN) / 2);
-        const y2 = Math.round(mon.y + mon.height * (1 + SPAN) / 2);
-        this._edges = ['left', 'right'].map(side => {
+        this._edgeMons = {left: this._edgeMonitor('left'), right: this._edgeMonitor('right')};
+        this._edges = ['left', 'right'].filter(side => this._edgeMons[side]).map(side => {
+            const mon = this._edgeMons[side];
+            const y1 = Math.round(mon.y + mon.height * (1 - SPAN) / 2);
+            const y2 = Math.round(mon.y + mon.height * (1 + SPAN) / 2);
             const x = side === 'left' ? mon.x : mon.x + mon.width;
             const barrier = new Meta.Barrier({
                 backend: global.backend,
@@ -488,15 +516,36 @@ export class SideIslands {
     }
 
     _onEdge(side) {
-        const mon = Main.layoutManager.primaryMonitor;
+        const mon = this._edgeMons[side];
         // Not over a fullscreen video or game, not over the overview, not over another menu.
-        if (global.display.get_monitor_in_fullscreen(mon.index) || Main.overview.visible)
+        if (!mon || global.display.get_monitor_in_fullscreen(mon.index) || Main.overview.visible)
             return;
         if (Main.modalCount > 0 && !this._grab)
+            return;
+        if (this._appOwnsEdge(side, mon))
             return;
         if (this._open === side)
             return;
         this.open(side);
+    }
+
+    // An app that uses this screen edge itself (Zen's compact mode shows its tabs at the left edge):
+    // while its window is focused and reaches the edge, a push there is the app's. "side-edge-skip"
+    // lists app ids, alone for both edges or as "id:left" / "id:right".
+    _appOwnsEdge(side, mon) {
+        const win = global.display.focus_window;
+        if (!win || win.get_monitor() !== mon.index)
+            return false;
+        const app = Shell.WindowTracker.get_default().get_window_app(win);
+        const id = (app?.get_id() ?? '').replace(/\.desktop$/, '');
+        const listed = this._settings.get_strv('side-edge-skip').some(entry => {
+            const [app_, only] = entry.split(':');
+            return app_ === id && (!only || only === side);
+        });
+        if (!listed)
+            return false;
+        const rect = win.get_frame_rect();
+        return side === 'left' ? rect.x <= mon.x + 4 : rect.x + rect.width >= mon.x + mon.width - 4;
     }
 
     // From outside (the touchpad service over D-Bus): "left"/"right" open, "toggle-…" also closes.
@@ -519,7 +568,7 @@ export class SideIslands {
             this.close();
             return;
         }
-        const mon = Main.layoutManager.primaryMonitor;
+        const mon = this._edgeMons[side] ?? Main.layoutManager.primaryMonitor;
         if (global.display.get_monitor_in_fullscreen(mon.index) || Main.overview.visible)
             return;
         this.open(side);
@@ -542,7 +591,7 @@ export class SideIslands {
         this._open = side;
 
         // A tall column between the island at the top and the dock at the bottom.
-        const mon = Main.layoutManager.primaryMonitor;
+        const mon = this._edgeMons[side] ?? Main.layoutManager.primaryMonitor;
         const height = Math.round(mon.height - TOP_ROOM - BOTTOM_ROOM);
         const actor = panel.actor;
         actor.set_size(WIDTH, height);
@@ -555,22 +604,31 @@ export class SideIslands {
         panel.scroll.vadjustment.value = 0;
 
         // Grows out of the edge with a spring, the way the island opens; the sections follow.
+        // The first frame after showing lays out and maps the whole column (30-50 ms); an animation
+        // started in it lost its opening frames and the island just appeared ("bazen animasyon
+        // çalışmıyor"). So that frame is drawn with the island transparent, and the animation starts
+        // once it has been painted, with its full length.
         stopSpring(actor);
         actor.remove_all_transitions();
-        actor.set({scale_x: 0.3, scale_y: 0.9, opacity: 0});
-        actor.ease({opacity: 255, duration: 140, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
-        spring(actor, {scale_x: 1, scale_y: 1}, {response: 0.48, damping: 0.78});
         const from = side === 'left' ? -16 : 16;
-        [panel.header, ...panel.content.get_children()].forEach((child, i) => {
+        const parts = [panel.header, ...panel.content.get_children()];
+        actor.set({scale_x: 0.3, scale_y: 0.9, opacity: 0});
+        for (const child of parts) {
             child.remove_all_transitions();
             child.set({opacity: 0, translation_x: from});
-            child.ease({
+        }
+        this._afterNextFrame(() => {
+            if (this._open !== side)
+                return;
+            actor.ease({opacity: 255, duration: 140, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            spring(actor, {scale_x: 1, scale_y: 1}, {response: 0.48, damping: 0.78});
+            parts.forEach((child, i) => child.ease({
                 opacity: 255,
                 translation_x: 0,
-                delay: 50 + Math.min(i, 8) * 35,
+                delay: 30 + Math.min(i, 8) * 35,
                 duration: 260,
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
-            });
+            }));
         });
 
         // Closes when the pointer leaves it: the island's own hover, no polling. Opened by a push
@@ -590,11 +648,47 @@ export class SideIslands {
         }
     }
 
+    // Runs fn once the stage has painted its next frame (or after 60 ms if nothing paints).
+    _afterNextFrame(fn) {
+        this._cancelFrameWait();
+        const run = () => {
+            this._cancelFrameWait();
+            fn();
+        };
+        this._paintId = global.stage.connect_after('after-paint', () => {
+            // Let the paint finish before starting transitions.
+            this._frameIdle = GLib.idle_add(GLib.PRIORITY_HIGH, () => {
+                this._frameIdle = 0;
+                run();
+                return GLib.SOURCE_REMOVE;
+            });
+            global.stage.disconnect(this._paintId);
+            this._paintId = 0;
+        });
+        this._frameTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 60, () => {
+            this._frameTimeout = 0;
+            run();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _cancelFrameWait() {
+        if (this._paintId)
+            global.stage.disconnect(this._paintId);
+        this._paintId = 0;
+        for (const id of ['_frameIdle', '_frameTimeout']) {
+            if (this[id])
+                GLib.source_remove(this[id]);
+            this[id] = 0;
+        }
+    }
+
     close(now = false) {
         if (!this._open)
             return;
         const panel = this._panels[this._open];
         this._open = null;
+        this._cancelFrameWait();
         this._ungrab();
         if (this._hoverId)
             panel.actor.disconnect(this._hoverId);
@@ -607,6 +701,15 @@ export class SideIslands {
         const actor = panel.actor;
         stopSpring(actor);
         actor.remove_all_transitions();
+        // The heavy part (app grid, recent files, modes) is redone while hidden, for the next open.
+        if (panel.prepare && !this._prepareId) {
+            this._prepareId = GLib.timeout_add(GLib.PRIORITY_LOW, 600, () => {
+                this._prepareId = 0;
+                if (this._open !== panel.side)
+                    panel.prepare();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
         if (now) {
             actor.set({visible: false, opacity: 0});
             return;
@@ -649,7 +752,7 @@ export class SideIslands {
             const [x, y] = global.get_pointer();
             const [ax, ay] = panel.actor.get_transformed_position();
             const [w, h] = panel.actor.get_size();
-            const mon = Main.layoutManager.primaryMonitor;
+            const mon = this._edgeMons[this._open] ?? Main.layoutManager.primaryMonitor;
             const atEdge = this._open === 'left' ? x <= mon.x + EDGE_GAP : x >= mon.x + mon.width - EDGE_GAP;
             const over = x >= ax && x <= ax + w && y >= ay && y <= ay + h;
             // Typing: stays while the entry has text; Escape or a click outside closes.
@@ -826,11 +929,15 @@ export class SideIslands {
         recent.add_child(recentList);
         sections.push(recent);
 
+        // On open only the light part; the rest is prepared while the island is hidden.
         panel.refresh = () => {
             search.text = '';
+            this._syncAppDots(grid);
+            this._fillWindows(windows, windowList);
+        };
+        panel.prepare = () => {
             this._fillModes(modes, modeRow);
             this._fillApps(grid);
-            this._fillWindows(windows, windowList);
             this._fillRecent(recent, recentList);
         };
         return panel;
@@ -889,7 +996,6 @@ export class SideIslands {
     }
 
     _fillApps(grid) {
-        grid.destroy_all_children();
         const system = Shell.AppSystem.get_default();
         const seen = new Set();
         const list = [];
@@ -903,6 +1009,14 @@ export class SideIslands {
             add(system.lookup_app(id));
         for (const app of Shell.AppUsage.get_default().get_most_used())
             add(app);
+        // Same apps as last time: keep the tiles (their icons are the costly part), only the dots move.
+        const ids = list.map(a => a.get_id()).join('|');
+        if (ids === grid._ids) {
+            this._syncAppDots(grid);
+            return;
+        }
+        grid._ids = ids;
+        grid.destroy_all_children();
         for (const app of list) {
             const tile = new St.Button({style_class: 'dynada-side-app', can_focus: true, accessible_name: app.get_name()});
             const box = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true});
@@ -913,12 +1027,21 @@ export class SideIslands {
             const dot = new St.Widget({style_class: 'dynada-side-app-dot', x_align: Clutter.ActorAlign.CENTER,
                 opacity: app.state === Shell.AppState.RUNNING ? 255 : 0});
             box.add_child(dot);
+            tile._app = app;
+            tile._dot = dot;
             tile.set_child(box);
             tile.connect('clicked', () => {
                 this.close(true);
                 app.activate();
             });
             grid.add_child(tile);
+        }
+    }
+
+    _syncAppDots(grid) {
+        for (const tile of grid.get_children()) {
+            if (tile._dot)
+                tile._dot.opacity = tile._app.state === Shell.AppState.RUNNING ? 255 : 0;
         }
     }
 
