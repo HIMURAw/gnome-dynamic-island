@@ -11,7 +11,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 const DIR = GLib.build_filenamev([GLib.get_user_config_dir(), 'tema']);
 const BASE_HUE = 258;
 const THEMES = {
-    turkuaz: {hue: 183, sat: 1.0, lum: 0.70},
+    turkuaz: {hue: 178, sat: 1.0, lum: 0.62},
     yesil: {hue: 150, sat: 0.85, lum: 0.70},
     mavi: {hue: 215, sat: 1.0, lum: 0.90},
     mor: {hue: 258, sat: 1.0, lum: 1.0},
