@@ -26,6 +26,7 @@ import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher, squareArt} from './media.js';
 import {ChatView} from './chat.js';
+import {ThemedStylesheet} from './theme.js';
 import {SideIslands} from './side.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
@@ -91,6 +92,8 @@ function formatTime(microseconds) {
 export default class DynamicIslandExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
+        // The colour theme (tema-rengi), live: the stylesheet is violet, a recoloured copy is loaded.
+        this._theme = new ThemedStylesheet(this);
         this._activities = new Activities({
             onChanged: () => this._syncActivities(),
             onAnswer: (question, answer) => this._showAnswer(question, answer),
@@ -126,6 +129,8 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     disable() {
+        this._theme?.destroy();
+        this._theme = null;
         if (this._rebuildId)
             GLib.source_remove(this._rebuildId);
         this._rebuildId = 0;
