@@ -154,9 +154,12 @@ function takeSnapshot() {
     try {
         for (const actor of [...snapshotExclude, ...[...snapshot.clients].map(b => b.get_parent())]) {
             try {
+                // The paint-only override, not .opacity: setting opacity cancels a running
+                // opacity animation, so every snapshot cut the side islands' and the dock's
+                // fades short (Umut, 2026-10-26: "kapanırken yok oluyor").
                 if (actor && actor.opacity !== 0) {
-                    blanked.push([actor, actor.opacity]);
-                    actor.opacity = 0;
+                    blanked.push([actor, actor.get_opacity_override()]);
+                    actor.set_opacity_override(0);
                 }
             } catch {
                 // a disposed actor: skip it
@@ -175,9 +178,9 @@ function takeSnapshot() {
         console.error('Dynamic Island: snapshot failed', e);
         return;
     } finally {
-        for (const [actor, opacity] of blanked) {
+        for (const [actor, override] of blanked) {
             try {
-                actor.opacity = opacity;
+                actor.set_opacity_override(override);
             } catch {
                 // disposed while blanked: nothing to restore
             }
