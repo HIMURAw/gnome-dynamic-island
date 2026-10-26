@@ -33,7 +33,9 @@ function readPalette() {
         const name = JSON.parse(new TextDecoder().decode(bytes)).name;
         if (THEMES[name])
             return {name, ...THEMES[name]};
-    } catch {}
+    } catch {
+        // No theme chosen yet (or a broken file): the original violet.
+    }
     return {name: 'mor', ...THEMES.mor};
 }
 
@@ -122,7 +124,17 @@ export class ThemedStylesheet {
         }
     }
 
+    // Never lets an error out: the extension must still start (with its violet stylesheet)
+    // if anything here fails.
     _apply() {
+        try {
+            this._swap();
+        } catch (e) {
+            console.error(`${this._ext.uuid}: colour theme not applied, keeping the original colours`, e);
+        }
+    }
+
+    _swap() {
         const record = Main.extensionManager.lookup(this._ext.uuid);
         const source = Gio.File.new_for_path(GLib.build_filenamev([this._ext.path, 'stylesheet.css']));
         if (!record || !source.query_exists(null))
@@ -132,17 +144,22 @@ export class ThemedStylesheet {
         const dir = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'tema']);
         GLib.mkdir_with_parents(dir, 0o700);
         // A new name each time: St keeps parsed stylesheets by file.
-        const out = Gio.File.new_for_path(GLib.build_filenamev([dir, `${this._ext.uuid}-${this._count++}.css`]));
+        const out = Gio.File.new_for_path(GLib.build_filenamev([dir,
+            `${this._ext.uuid}-${GLib.get_monotonic_time()}-${this._count++}.css`]));
         out.replace_contents(new TextEncoder().encode(css), null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
         const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
+        // Load the new one first: if it fails to parse, the old one is still in place.
+        theme.load_stylesheet(out);
         if (record.stylesheet)
             theme.unload_stylesheet(record.stylesheet);
         const old = this._file;
-        theme.load_stylesheet(out);
         record.stylesheet = out;
         this._file = out;
-        if (old)
-            old.delete(null);
+        try {
+            old?.delete(null);
+        } catch {
+            // already gone
+        }
     }
 
     destroy() {
