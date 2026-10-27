@@ -152,12 +152,16 @@ function takeSnapshot() {
     // disposed actor can never leave the rest invisible.
     const blanked = [];
     try {
-        for (const actor of [...snapshotExclude, ...[...snapshot.clients].map(b => b.get_parent())]) {
+        // A Set: an excluded surface can also be a glass's parent. Visited twice, it was
+        // blanked twice and the second restore put back the first blank, leaving it
+        // painted invisible for good (side islands open but unseen, 2026-10-27).
+        const actors = new Set([...snapshotExclude, ...[...snapshot.clients].map(b => b.get_parent())]);
+        for (const actor of actors) {
             try {
                 // The paint-only override, not .opacity: setting opacity cancels a running
                 // opacity animation, so every snapshot cut the side islands' and the dock's
                 // fades short (Umut, 2026-10-26: "kapanırken yok oluyor").
-                if (actor && actor.opacity !== 0) {
+                if (actor && actor.opacity !== 0 && actor.get_opacity_override() !== 0) {
                     blanked.push([actor, actor.get_opacity_override()]);
                     actor.set_opacity_override(0);
                 }
