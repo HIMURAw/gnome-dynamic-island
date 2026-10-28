@@ -15,6 +15,7 @@ const THEMES = {
     yesil: {hue: 150, sat: 0.85, lum: 0.70},
     mavi: {hue: 215, sat: 1.0, lum: 0.90},
     mor: {hue: 258, sat: 1.0, lum: 1.0},
+    cam: {hue: 220, sat: 0.75, lum: 1.0},
     gri: {hue: 0, sat: 0.0, lum: 0.85},
 };
 
