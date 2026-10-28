@@ -1,0 +1,244 @@
+/* cam: the Cam Panel look. Appended (not recoloured) to the stylesheet when the colour theme is
+   cam; glass.js rounds the corners for it. Neutral white frost instead of violet, a white hairline,
+   pill buttons, the soft blue accent (#8fb4ff on #101a33) for what is on. Harvis's robot keeps
+   its violet: nothing here touches face.js or robot.js. */
+
+/* Glass */
+.dynada-glass-tint {
+  background-gradient-direction: vertical;
+  background-gradient-start: rgba(255, 255, 255, 0.15);
+  background-gradient-end: rgba(255, 255, 255, 0.085);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.dynada-glass-solid {
+  background-gradient-direction: none;
+  background-color: rgba(26, 23, 48, 0.92);
+}
+
+.dynada-island,
+.dynada-bubble,
+.dynada-command {
+  color: #f4f1ff;
+  -glass-frame-color: rgba(255, 255, 255, 0.17);
+}
+
+.dynada-bubble:playing {
+  -glass-frame-color: rgba(143, 180, 255, 0.75);
+}
+
+/* Cards and tiles: a lighter frost with a top highlight */
+.dynada-card,
+.dynada-side-card {
+  background-color: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+#panel.dynada-slot {
+  border-radius: 999px;
+}
+
+#panel.dynada-slot:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+#panel.dynada-slot:active {
+  background-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Control center: on is the accent */
+.dynada-expanded .quick-toggle:checked .quick-toggle-icon,
+.dynada-expanded .quick-toggle-has-menu .quick-toggle:checked .quick-toggle-icon {
+  color: #101a33 !important;
+  background-color: #8fb4ff !important;
+}
+
+.dynada-expanded .quick-toggle-has-menu:hover,
+.dynada-expanded .quick-toggle-has-menu:checked:hover,
+.dynada-cc-connect .quick-toggle.button:hover,
+.dynada-cc-connect .quick-toggle.button:checked:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dynada-cc-tiles > .quick-toggle.button,
+.dynada-cc-tiles > .quick-toggle.button:checked,
+.dynada-cc-tiles > .quick-toggle-has-menu,
+.dynada-cc-tiles > .quick-toggle-has-menu:checked,
+.dynada-cc-extra > .quick-toggle.button,
+.dynada-cc-extra > .quick-toggle.button:checked,
+.dynada-cc-extra > .quick-toggle-has-menu,
+.dynada-cc-extra > .quick-toggle-has-menu:checked {
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.dynada-cc-tiles > .quick-toggle.button:hover,
+.dynada-cc-tiles > .quick-toggle.button:checked:hover,
+.dynada-cc-tiles > .quick-toggle-has-menu:hover,
+.dynada-cc-tiles > .quick-toggle-has-menu:checked:hover,
+.dynada-cc-extra > .quick-toggle.button:hover,
+.dynada-cc-extra > .quick-toggle.button:checked:hover,
+.dynada-cc-extra > .quick-toggle-has-menu:hover,
+.dynada-cc-extra > .quick-toggle-has-menu:checked:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.dynada-expanded .quick-slider {
+  border-radius: 999px !important;
+}
+
+.dynada-expanded .quick-slider .slider,
+.dynada-volume .slider,
+.dynada-progress {
+  -barlevel-active-background-color: #8fb4ff;
+}
+
+/* Pressed segmented buttons and today: ink with night text */
+.dynada-pill-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-pill-button:checked {
+  color: #120f24;
+  background-color: #f4f1ff;
+}
+
+.dynada-day:today {
+  background-color: #f4f1ff;
+}
+
+.dynada-day:today .dynada-day-name,
+.dynada-day:today .dynada-day-number {
+  color: #120f24;
+}
+
+/* Lists: selected is a white fill with a top highlight */
+.dynada-palette-row:selected {
+  background-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dynada-palette-entry,
+.dynada-palette-entry:focus,
+.dynada-palette-entry:hover {
+  selection-background-color: rgba(143, 180, 255, 0.45);
+}
+
+/* Menus (radius and hairline: menus.js) */
+.popup-menu .dynada-glass-menu .popup-menu-item {
+  border-radius: 999px;
+}
+
+.popup-menu .dynada-glass-menu .popup-menu-item:hover,
+.popup-menu .dynada-glass-menu .popup-menu-item:focus {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.popup-menu .dynada-glass-menu .popup-menu-item:active,
+.popup-menu .dynada-glass-menu .popup-menu-item:checked {
+  background-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.popup-menu .dynada-glass-menu .message,
+.popup-menu .dynada-glass-menu .message:second-in-stack,
+.popup-menu .dynada-glass-menu .message:lower-in-stack {
+  background-color: rgb(42, 38, 62);
+  border-radius: 14px;
+}
+
+.popup-menu .dynada-glass-menu .message:hover,
+.popup-menu .dynada-glass-menu .message:focus {
+  background-color: rgb(54, 50, 76);
+}
+
+/* Chat */
+.dynada-chat-bubble {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-chat-bubble.dynada-chat-mine {
+  background-color: rgba(143, 180, 255, 0.28);
+}
+
+.dynada-chat-send {
+  color: #101a33;
+  background-color: #8fb4ff;
+}
+
+.dynada-chat-send:hover {
+  background-color: #a9c5ff;
+}
+
+/* Side islands */
+.dynada-side-search {
+  border-radius: 999px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+}
+
+.dynada-side-row-item:hover,
+.dynada-side-app:hover,
+.dynada-side-process:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dynada-side-link,
+.dynada-side-status,
+.dynada-side-timer:running,
+.dynada-side-calc-result {
+  color: #8fb4ff;
+}
+
+.dynada-side-app-dot,
+.dynada-side-bar {
+  background-color: #8fb4ff;
+}
+
+.dynada-side-go:checked {
+  color: #101a33;
+  background-color: #8fb4ff;
+}
+
+.dynada-side-chip:checked {
+  color: #f4f1ff;
+  background-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dynada-side-ask {
+  background-gradient-start: rgba(255, 255, 255, 0.12);
+  background-gradient-end: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+}
+
+.dynada-side-send {
+  color: #101a33;
+  background-color: #8fb4ff;
+}
+
+.dynada-side-send:hover {
+  background-color: #a9c5ff;
+}
+
+.dynada-side-toggle {
+  border-radius: 14px;
+}
+
+.dynada-side-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.dynada-side-toggle:checked {
+  color: #101a33;
+  background-color: #8fb4ff;
+}
+
+.dynada-side-toggle:checked:hover {
+  background-color: #a9c5ff;
+}
+
+.dynada-side-toggle:checked .dynada-side-toggle-state {
+  color: rgba(16, 26, 51, 0.7);
+}

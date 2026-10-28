@@ -24,7 +24,7 @@ locale)
     ;;
 pack)
     # The same zip either way; without GNOME's tools (in CI) it is put together by hand.
-    sources=(metadata.json stylesheet.css LICENSE icons schemas/*.gschema.xml)
+    sources=(metadata.json stylesheet.css LICENSE icons themes schemas/*.gschema.xml)
     for js in *.js; do [[ "$js" == eslint.config.js ]] || sources+=("$js"); done
     if command -v gnome-extensions >/dev/null; then
         extra=()

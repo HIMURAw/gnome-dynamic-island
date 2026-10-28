@@ -1,12 +1,20 @@
 import St from 'gi://St';
 
 import {Glass} from './glass.js';
+import {currentPalette} from './theme.js';
 
 // Replaces the theme's solid menu background with the island's frosted glass.
 // The menu itself stays untouched apart from a transparent background; a Glass
 // actor sits right below it and follows its position, size and fade.
 const MENU_STYLE = 'background-color: transparent; box-shadow: none; ' +
     'border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 22px;';
+// Round themes (cam): the Cam Panel's medium radius and white hairline. Inline, as the menu's own
+// style would win over a stylesheet; picked again each time the menu shows, so a theme switch
+// reaches menus made before it.
+const ROUND_MENU_STYLE = 'background-color: transparent; box-shadow: none; ' +
+    'border: 1px solid rgba(255, 255, 255, 0.17); border-radius: 14px;';
+
+const menuStyle = base => `${base ?? ''} ${currentPalette().round ? ROUND_MENU_STYLE : MENU_STYLE}`;
 
 export class GlassMenus {
     constructor() {
@@ -20,7 +28,7 @@ export class GlassMenus {
             return;
 
         const item = {menu, glass: null, boxStyle: box.style, ids: []};
-        box.style = `${box.style ?? ''} ${MENU_STYLE}`;
+        box.style = menuStyle(item.boxStyle);
         box.add_style_class_name('dynada-glass-menu');
 
         const sync = () => this._sync(item);
@@ -54,6 +62,9 @@ export class GlassMenus {
             return;
         }
         if (!item.glass) {
+            const style = menuStyle(item.boxStyle);
+            if (box.style !== style)
+                box.style = style;
             const parent = actor.get_parent();
             if (!parent)
                 return;

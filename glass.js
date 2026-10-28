@@ -7,6 +7,8 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
+import {currentPalette} from './theme.js';
+
 const BLUR_RADIUS = 18;
 // The windows behind the glass are re-blurred at most this often (ms).
 // 500 since 2026-10-13: the wallpaper is a video now, so what is behind changes every frame and
@@ -26,6 +28,12 @@ const asFloat = v => (Number.isInteger(v) ? v + 1e-4 : v);
 // Corners cut at 45 degrees, this many px (Umut: "ilk baştaki gibi altıgene benzeyen", 2026-10-13);
 // the frame runs along the cut too.
 const CHAMFER = 7;
+// Round themes (cam, the Cam Panel look): true rounded corners at the caller's radius, a brighter
+// frost and a little more blur.
+const ROUND_BLUR = 1.3;
+// Not the full 1.0 of the web page: over the bright dusk horizon white text needs a darker frost.
+const ROUND_BRIGHTNESS = 0.8;
+const isRound = () => Boolean(currentPalette().round);
 
 const MASK_SHADER = `
 uniform sampler2D tex;
@@ -39,6 +47,7 @@ uniform float frame_r;
 uniform float frame_g;
 uniform float frame_b;
 uniform float frame_a;
+uniform float rounded;
 
 void main(void) {
     vec2 uv = cogl_tex_coord_in[0].xy;
@@ -53,6 +62,11 @@ void main(void) {
     float box = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
     float cut = (p.x + p.y - (half_size.x + half_size.y - radius)) * 0.70710678;
     float dist = max(box, cut);
+    // Round themes: a rounded rectangle instead.
+    if (rounded > 0.5) {
+        vec2 q = d + radius;
+        dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    }
     float outer = clamp(0.5 - dist, 0.0, 1.0);
     // The frame is drawn here, along the same rounded edge as the cut, so it follows the
     // corners too (a CSS border is clipped away there by this very mask).
@@ -62,12 +76,15 @@ void main(void) {
     cogl_color_out = color * inner + over * (outer - inner);
 }`;
 
-// Cuts an actor to a rectangle with chamfered corners, antialiased edges.
+// Cuts an actor to a rectangle with chamfered corners (rounded ones in a round theme),
+// antialiased edges.
 export const RoundedMask = GObject.registerClass(
 class RoundedMask extends Clutter.ShaderEffect {
     _init() {
         super._init();
         this.set_shader_source(MASK_SHADER);
+        this._round = false;
+        this.set_uniform_value('rounded', asFloat(0));
     }
 
     setGeometry(width, height, radius) {
@@ -92,6 +109,12 @@ class RoundedMask extends Clutter.ShaderEffect {
             this._th = th;
             this.set_uniform_value('tex_w', asFloat(tw));
             this.set_uniform_value('tex_h', asFloat(th));
+        }
+        // Checked on every paint: a theme switch restyles (and so repaints) every actor.
+        const round = isRound();
+        if (round !== this._round) {
+            this._round = round;
+            this.set_uniform_value('rounded', asFloat(round ? 1 : 0));
         }
         super.vfunc_paint_target(node, paintContext);
     }
@@ -274,6 +297,7 @@ class Backdrop extends St.Widget {
             radius: BLUR_RADIUS,
             brightness: 0.9,
         });
+        this._blurMax = BLUR_RADIUS;
         this.add_effect(this._blur);
         snapshot.clients.add(this);
         this.setSnapshot(snapshot.content);
@@ -283,6 +307,15 @@ class Backdrop extends St.Widget {
             snapshot.clients.delete(this);
             syncSnapshots();
         });
+    }
+
+    // Round themes: the Cam Panel's bright frost, a little more blur.
+    setRound(round) {
+        if (!this._blur)
+            return;
+        this._blur.brightness = round ? ROUND_BRIGHTNESS : 0.9;
+        this._blurMax = round ? Math.round(BLUR_RADIUS * ROUND_BLUR) : BLUR_RADIUS;
+        this.queue_relayout();
     }
 
     setSnapshot(content) {
@@ -313,7 +346,7 @@ class Backdrop extends St.Widget {
         // shrink the texture to nothing.
         const side = Math.min(box.get_width(), box.get_height());
         this._blur.enabled = side >= 4;
-        this._blur.radius = Math.max(1, Math.min(BLUR_RADIUS, Math.floor(side / 3)));
+        this._blur.radius = Math.max(1, Math.min(this._blurMax, Math.floor(side / 3)));
     }
 });
 // Frosted glass container. Children are stacked (BinLayout) on top of the blur,
@@ -331,8 +364,13 @@ class Glass extends St.Widget {
         this.add_child(this.backdrop);
         this._mask = new RoundedMask();
         this.add_effect(this._mask);
-        this.connect('style-changed', () => this._mask.setFrame(...themeFrame(this)));
+        this.connect('style-changed', () => {
+            this._mask.setFrame(...themeFrame(this));
+            this._syncTheme();
+        });
         this._mask.setFrame([0, 0, 0, 0], 0);
+        this._round = null;
+        this._cssRadius = -1;
     }
 
     vfunc_allocate(box) {
@@ -341,7 +379,25 @@ class Glass extends St.Widget {
         const h = box.get_height();
         // Offscreen effects cannot render an empty texture.
         this._mask.enabled = w >= 1 && h >= 1;
-        this._mask.setGeometry(w, h, Math.min(CHAMFER, this._radius, w / 2, h / 2));
+        const r = this._round
+            ? Math.min(this._cssRadius >= 0 ? this._cssRadius : this._radius, w / 2, h / 2)
+            : Math.min(CHAMFER, this._radius, w / 2, h / 2);
+        this._mask.setGeometry(w, h, r);
+    }
+
+    // Round themes may set the radius from the stylesheet (-glass-radius: 999px for a pill);
+    // the theme switches live, and every actor is restyled when it does.
+    _syncTheme() {
+        const round = isRound();
+        const [ok, css] = this.get_theme_node().lookup_length('-glass-radius', false);
+        const radius = ok ? css : -1;
+        if (round === this._round && radius === this._cssRadius)
+            return;
+        if (round !== this._round)
+            this.backdrop.setRound(round);
+        this._round = round;
+        this._cssRadius = radius;
+        this.queue_relayout();
     }
 
     setRadius(radius) {

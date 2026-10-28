@@ -1,5 +1,8 @@
 // Colour themes (tema-rengi): the stylesheet is written in violet; this swaps in a copy recoloured to
 // the chosen theme, and swaps again when ~/.config/tema/current.json changes, live.
+// A theme can also change shape: `round` themes (cam) get rounded corners instead of the 45 degree
+// cut (glass.js reads currentPalette().round), and themes/<name>.css in the extension, if there is
+// one, is appended to the recoloured copy as it is, for overrides colour alone cannot make.
 // Same file in Dynamic Island, Glass Dock, Glass Widgets and Glass Windows; the Python twin is
 // ~/.local/src/mor-theme/tema.py. Keep them identical.
 import Gio from 'gi://Gio';
@@ -15,7 +18,7 @@ const THEMES = {
     yesil: {hue: 150, sat: 0.85, lum: 0.70},
     mavi: {hue: 215, sat: 1.0, lum: 0.90},
     mor: {hue: 258, sat: 1.0, lum: 1.0},
-    cam: {hue: 220, sat: 0.75, lum: 1.0},
+    cam: {hue: 220, sat: 0.75, lum: 1.0, round: true},
     gri: {hue: 0, sat: 0.0, lum: 0.85},
 };
 
@@ -141,7 +144,13 @@ export class ThemedStylesheet {
         if (!record || !source.query_exists(null))
             return;
         const [, bytes] = source.load_contents(null);
-        const css = recolorCss(new TextDecoder().decode(bytes));
+        let css = recolorCss(new TextDecoder().decode(bytes));
+        const extra = Gio.File.new_for_path(GLib.build_filenamev([this._ext.path, 'themes',
+            `${currentPalette().name}.css`]));
+        if (extra.query_exists(null)) {
+            const [, more] = extra.load_contents(null);
+            css += `\n${new TextDecoder().decode(more)}`;
+        }
         const dir = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'tema']);
         GLib.mkdir_with_parents(dir, 0o700);
         // A new name each time: St keeps parsed stylesheets by file.
