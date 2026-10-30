@@ -55,6 +55,8 @@ export default class DynamicIslandPreferences extends ExtensionPreferences {
 
         behaviour.add(switchRow('notifications', _('Notifications in the island'),
             _("In place of GNOME's banners")));
+        behaviour.add(switchRow('osd', _('Volume and brightness in the island'),
+            _("In place of GNOME's on-screen popups")));
 
         // Appearance
         const appearance = new Adw.PreferencesGroup({title: _('Appearance')});
