@@ -17,6 +17,10 @@ A GNOME Shell extension that turns the top bar into a small frosted-glass island
 
 A small pill in the middle of the top edge with the time, date and battery. The normal top bar is hidden and reserves no space, so windows use the whole screen. The notification bell sits on its left and the now playing bubble on its right. A running timer or other live activity shows up in the pill too.
 
+### On-screen popups
+
+Volume, brightness and GNOME's other on-screen popups show as a small card in the island with a gliding level bar. While the island is busy, or hidden in fullscreen, GNOME's own popup appears instead. Turn it off with `osd`.
+
 ### Control center
 
 Click the island and it springs open, its modules drifting in one after another:
@@ -199,6 +203,7 @@ gsettings --schemadir $S reset org.gnome.shell.extensions.dynamic-island blur
 | `show-notification-bubble` | `true` | The bell and notification center on the left. |
 | `show-media-bubble` | `true` | The now playing bubble on the right. |
 | `show-privacy-bubble` | `true` | The microphone and camera bubble. |
+| `osd` | `true` | Volume, brightness and other on-screen popups appear as a small card in the island instead of GNOME's own; while the island is busy or hidden in fullscreen, GNOME shows its own. |
 | `show-connectivity` | `true` | The Wi-Fi, Bluetooth, tethering and VPN card. |
 | `show-apps` | `true` | The open apps card. |
 | `show-sliders` | `true` | The volume, microphone and brightness sliders. |
