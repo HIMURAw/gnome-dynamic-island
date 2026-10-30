@@ -50,6 +50,10 @@ const PAGE_SLIDE = 48;
 const NOTIFICATION_ICON = 44;
 // How long a notification stays in the island (ms). Critical ones stay until dismissed.
 const NOTIFICATION_DURATION = 5000;
+// System OSDs (volume, brightness, keyboard layout…) in the island: a narrower card that
+// stays while keys keep coming and leaves this long after the last one.
+const OSD_WIDTH = 340;
+const OSD_DURATION = 1600;
 // Panel indicators that are not moved into the island: GNOME's calendar menu is
 // replaced by the island's own notification center, and media controls would
 // only repeat the right bubble.
@@ -160,6 +164,8 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('panel icons', () => this._adoptPanel());
         this._safely('calendar menu', () => this._takeOverDateMenu());
         this._safely('notifications', () => this._setupNotifications());
+        if (this._settings.get_boolean('osd'))
+            this._safely('system OSD', () => this._takeOverOsd());
         this._safely('auto-hide', () => this._setupAutoHide());
         this._safely('desktop icons', () => this._setupDesktopIcons());
         this._safely('palette shortcut', () => this._setupPaletteShortcut());
@@ -194,6 +200,7 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('releasing auto-hide', () => this._releaseAutoHide());
         this._safely('releasing calendar menu', () => this._releaseDateMenu());
         this._safely('releasing notifications', () => this._releaseNotifications());
+        this._safely('releasing system OSD', () => this._releaseOsd());
         this._safely('releasing quick settings', () => this._releaseQuickSettings());
         this._safely('releasing charge limit', () => this._charge?.destroy());
         this._charge = null;
@@ -282,6 +289,7 @@ export default class DynamicIslandExtension extends Extension {
         this._detail = this._buildDetail();
         this._mediaView = this._buildMediaView();
         this._notificationView = this._buildNotificationView();
+        this._osdView = this._buildOsdView();
         this._center = new NotificationCenter({
             width: this._contentWidth,
             dir: this.dir,
@@ -293,7 +301,7 @@ export default class DynamicIslandExtension extends Extension {
             width: this._contentWidth,
             onClose: () => this._close(),
         });
-        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor])
+        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._osdView, this._center.actor, this._palette.actor])
             this._island.add_child(view);
 
         this._left = this._buildCenterBubble();
@@ -807,6 +815,8 @@ export default class DynamicIslandExtension extends Extension {
             return this._mediaView;
         case 'notification':
             return this._notificationView;
+        case 'osd':
+            return this._osdView;
         case 'center':
             return this._center.actor;
         case 'palette':
@@ -833,11 +843,13 @@ export default class DynamicIslandExtension extends Extension {
             this._activitiesCard?.sync();
         if (previous === 'notification')
             this._finishNotification();
+        if (previous === 'osd')
+            this._osdTimeout = this._clearTimeout(this._osdTimeout);
 
         const view = this._viewFor(mode);
         const outgoing = previous ? this._viewFor(previous) : this._compact;
         // A view still fading out from an earlier close would keep its height.
-        for (const other of [this._controls, this._detail, this._mediaView, this._notificationView,
+        for (const other of [this._controls, this._detail, this._mediaView, this._notificationView, this._osdView,
             this._center.actor, this._palette.actor]) {
             if (other !== view && other !== outgoing)
                 other.hide();
@@ -883,7 +895,7 @@ export default class DynamicIslandExtension extends Extension {
         const [, height] = view.get_preferred_height(this._contentWidth);
 
         spring(this._island, {
-            width: this._expandedWidth,
+            width: mode === 'osd' ? OSD_WIDTH : this._expandedWidth,
             height: height + 2 * BORDER,
         }, {
             response: 0.5,
@@ -926,6 +938,7 @@ export default class DynamicIslandExtension extends Extension {
         const view = this._viewFor(this._mode);
         if (this._mode === 'notification')
             this._finishNotification();
+        this._osdTimeout = this._clearTimeout(this._osdTimeout);
         if (this._typing(this._mode))
             this._releaseKeyboard();
         this._mode = null;
@@ -1345,6 +1358,123 @@ export default class DynamicIslandExtension extends Extension {
             return;
         this._close();
         notification.activate();
+    }
+
+
+    // ---------- System OSD ----------
+
+    // Volume, brightness and the other on-screen displays as a small card in the
+    // island: icon, a level bar that glides to the new value, and the percent.
+    _buildOsdView() {
+        const row = new St.BoxLayout({style_class: 'dynada-osd-row', x_expand: true});
+        const view = new St.Bin({
+            style_class: 'dynada-osd',
+            width: OSD_WIDTH - 2 * BORDER,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.START,
+            pivot_point: new Graphene.Point({x: 0.5, y: 0}),
+            opacity: 0,
+            visible: false,
+            child: row,
+        });
+        this._osdIcon = new St.Icon({style_class: 'dynada-osd-icon', icon_size: 20,
+            y_align: Clutter.ActorAlign.CENTER, pivot_point: new Graphene.Point({x: 0.5, y: 0.5})});
+        const middle = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER});
+        this._osdLabel = new St.Label({style_class: 'dynada-osd-label'});
+        this._osdTrack = new St.Widget({style_class: 'dynada-osd-track', x_expand: true,
+            layout_manager: new Clutter.BinLayout()});
+        // Scaled, not sized: it needs no laid-out width, so the first value glides in too.
+        this._osdFill = new St.Widget({style_class: 'dynada-osd-fill', x_expand: true, y_expand: true,
+            scale_x: 0, pivot_point: new Graphene.Point({x: 0, y: 0.5})});
+        this._osdTrack.add_child(this._osdFill);
+        middle.add_child(this._osdLabel);
+        middle.add_child(this._osdTrack);
+        this._osdValue = new St.Label({style_class: 'dynada-osd-value', y_align: Clutter.ActorAlign.CENTER});
+        row.add_child(this._osdIcon);
+        row.add_child(middle);
+        row.add_child(this._osdValue);
+        return view;
+    }
+
+    _takeOverOsd() {
+        const manager = Main.osdWindowManager;
+        this._osdOriginal = {show: manager.show, showAll: manager.showAll};
+        const original = this._osdOriginal;
+        const island = this;
+        // showOne goes through show; levels is per monitor.
+        manager.show = function (icon, label, levels) {
+            const own = levels?.[island._monitorIndex()] ?? Object.values(levels ?? {}).find(Boolean);
+            if (!own || !island._showOsd(icon, label, own.level, own.maxLevel))
+                return original.show.call(this, icon, label, levels);
+            return undefined;
+        };
+        manager.showAll = function (icon, label, level, maxLevel) {
+            if (!island._showOsd(icon, label, level, maxLevel))
+                return original.showAll.call(this, icon, label, level, maxLevel);
+            return undefined;
+        };
+    }
+
+    _releaseOsd() {
+        if (!this._osdOriginal)
+            return;
+        // Ours are own properties shadowing the prototype's methods: dropping them restores GNOME's.
+        delete Main.osdWindowManager.show;
+        delete Main.osdWindowManager.showAll;
+        this._osdOriginal = null;
+    }
+
+    // False: GNOME should show it itself (the island is busy or hidden in fullscreen).
+    _showOsd(icon, label, level, maxLevel) {
+        if (!this._island || !icon)
+            return false;
+        if (this._mode && this._mode !== 'osd' && this._mode !== 'notification')
+            return false;
+        if (this._hidden && this._fullscreen)
+            return false;
+
+        const max = maxLevel > 0 ? maxLevel : 1;
+        const hasLevel = typeof level === 'number' && Number.isFinite(level);
+        const fraction = hasLevel ? Math.max(0, Math.min(level / max, 1)) : 0;
+        const fresh = this._mode !== 'osd';
+        const sameIcon = !fresh && this._osdIcon.gicon?.equal?.(icon);
+        this._osdIcon.gicon = icon;
+        this._osdLabel.text = label ?? '';
+        this._osdLabel.visible = !!label;
+        this._osdTrack.visible = hasLevel;
+        this._osdValue.visible = hasLevel;
+        // Past 100 % (volume boost) the number says so, the bar stays full.
+        this._osdValue.text = hasLevel ? `${Math.round(level * 100)}%` : '';
+        if (hasLevel && max > 1 && level > 1)
+            this._osdView.add_style_pseudo_class('boost');
+        else
+            this._osdView.remove_style_pseudo_class('boost');
+
+        if (this._hidden)
+            this._setHidden(false);
+        if (fresh) {
+            this._osdFill.scale_x = 0;
+            this._open('osd');
+        }
+        this._osdFill.remove_transition('scale-x');
+        this._osdFill.ease({scale_x: fraction, duration: fresh ? 420 : 160, delay: fresh ? 120 : 0,
+            mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+        if (fresh || !sameIcon) {
+            this._osdIcon.remove_all_transitions();
+            this._osdIcon.set({scale_x: 0.5, scale_y: 0.5});
+            this._osdIcon.ease({scale_x: 1, scale_y: 1, duration: 360, delay: fresh ? 60 : 0,
+                mode: Clutter.AnimationMode.EASE_OUT_BACK});
+        }
+
+        this._osdTimeout = this._clearTimeout(this._osdTimeout);
+        this._osdTimeout = this._timeout(OSD_DURATION, () => {
+            this._osdTimeout = 0;
+            if (this._mode === 'osd' && !this._anyHover())
+                this._close();
+            return GLib.SOURCE_REMOVE;
+        });
+        return true;
     }
 
     // ---------- Auto-hide ----------

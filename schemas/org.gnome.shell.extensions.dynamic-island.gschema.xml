@@ -33,6 +33,11 @@
       <summary>Show notifications in the island</summary>
       <description>Replace GNOME's notification banners with the island.</description>
     </key>
+    <key name="osd" type="b">
+      <default>true</default>
+      <summary>Show volume, brightness and other OSDs in the island</summary>
+      <description>Replace GNOME's on-screen display popups with a card in the island.</description>
+    </key>
     <key name="show-notification-bubble" type="b">
       <default>true</default>
       <summary>Notification center bubble</summary>
