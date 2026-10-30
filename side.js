@@ -380,7 +380,10 @@ class SidePanel {
         this.column.add_child(this.scroll);
         this.actor.add_child(this.column);
         snapshotExclude.add(this.actor);
-        Main.layoutManager.addChrome(this.actor, {affectsStruts: false, trackFullscreen: true});
+        // No trackFullscreen: the layout manager then sets visible = true on every fullscreen or
+        // overview change, so the closed island came back shown at opacity 0 and ate the clicks
+        // along the screen edges (2026-10-30). A push over a fullscreen window is refused in _onEdge.
+        Main.layoutManager.addChrome(this.actor, {affectsStruts: false});
     }
 
     destroy() {
