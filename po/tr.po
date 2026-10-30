@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-04 16:47+0300\n"
+"POT-Creation-Date: 2026-10-30 11:04+0300\n"
 "PO-Revision-Date: 2026-09-29 23:00+0300\n"
 "Last-Translator: Umut Öztürk\n"
 "Language-Team: Turkish\n"
@@ -13,102 +13,98 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: extension.js:374
+#: extension.js:363
 msgid "Open Dynamic Island"
 msgstr "Dinamik Adayı aç"
 
-#: extension.js:438
+#: extension.js:417
 msgid "Close Dynamic Island"
 msgstr "Dinamik Adayı kapat"
 
-#: extension.js:469
+#: extension.js:448 extension.js:607
 msgid "Mute or unmute"
 msgstr "Sesi kapat/aç"
 
-#: extension.js:475
+#: extension.js:454 extension.js:613
 msgid "Volume"
 msgstr "Ses düzeyi"
 
-#: extension.js:545
+#: extension.js:524
 msgid "Back"
 msgstr "Geri"
 
-#: extension.js:615
+#: extension.js:594
 msgid "Previous"
 msgstr "Önceki"
 
-#: extension.js:616
+#: extension.js:595
 msgid "Play or pause"
 msgstr "Oynat/duraklat"
 
-#: extension.js:617
+#: extension.js:596
 msgid "Next"
 msgstr "Sonraki"
 
-#: extension.js:631
+#: extension.js:628
 msgid "Open notification"
 msgstr "Bildirimi aç"
 
-#: extension.js:698 center.js:183
+#: extension.js:698 center.js:204
 msgid "Notifications"
 msgstr "Bildirimler"
 
-#: extension.js:730 prefs.js:96
+#: extension.js:734 prefs.js:96
 msgid "Now playing"
 msgstr "Şimdi çalan"
 
-#: extension.js:1089
-msgid "Chat with Harvis"
-msgstr "Harvis ile sohbet"
-
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1814
+#: extension.js:1669
 #, javascript-format
 msgid "%d%%"
 msgstr "%%%d"
 
-#: extension.js:1832
+#: extension.js:1687
 msgid "Fully charged"
 msgstr "Dolu"
 
-#: extension.js:1835
+#: extension.js:1690
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr "Şarj oluyor, %s sonra dolu"
 
-#: extension.js:1836
+#: extension.js:1691
 msgid "Charging"
 msgstr "Şarj oluyor"
 
-#: extension.js:1839
+#: extension.js:1694
 msgid "Plugged in, not charging"
 msgstr "Takılı, şarj beklemede"
 
-#: extension.js:1841
+#: extension.js:1696
 #, javascript-format
 msgid "%s left"
 msgstr "%s kaldı"
 
-#: extension.js:1842
+#: extension.js:1697
 msgid "On battery"
 msgstr "Pilde"
 
-#: extension.js:1850 center.js:291
+#: extension.js:1705 center.js:345
 #, javascript-format
 msgid "%d min"
 msgstr "%d dk"
 
-#: extension.js:1851
+#: extension.js:1706
 #, javascript-format
 msgid "%d h"
 msgstr "%d sa"
 
-#: extension.js:1851
+#: extension.js:1706
 #, javascript-format
 msgid "%d h %d min"
 msgstr "%d sa %d dk"
 
-#: extension.js:1986
+#: extension.js:1854
 msgid "Nothing is playing"
 msgstr "Hiçbir şey çalmıyor"
 
@@ -219,13 +215,15 @@ msgstr "Soldaki zil"
 msgid "The bubble on the right"
 msgstr "Sağdaki baloncuk"
 
-#: prefs.js:98 mind.js:337
-msgid "Chat"
-msgstr "Sohbet"
+#: prefs.js:98
+msgid "Side islands"
+msgstr "Yan adalar"
 
 #: prefs.js:99
-msgid "Next to the bell: write or talk to the assistant"
-msgstr "Zilin yanında: asistana yaz ya da konuş"
+msgid ""
+"Push the pointer against the left or right edge: the launcher and focus on "
+"the left, tools on the right"
+msgstr "İşaretçiyi sol ya da sağ kenara it: solda başlatıcı ve odak, sağda araçlar"
 
 #: prefs.js:100
 msgid "Microphone and camera"
@@ -304,28 +302,28 @@ msgstr "Hakkında"
 msgid "Report a problem or suggest an idea"
 msgstr "Sorun bildir ya da fikir öner"
 
-#: center.js:61 center.js:66
+#: center.js:64 center.js:69
 msgid "Do Not Disturb"
 msgstr "Rahatsız Etme"
 
-#: center.js:105
+#: center.js:108 side.js:1207
 msgid "Clear"
 msgstr "Temizle"
 
-#: center.js:138
+#: center.js:141
 msgid "No notifications"
 msgstr "Bildirim yok"
 
-#: center.js:183
+#: center.js:204
 #, javascript-format
 msgid "Notifications · %d"
 msgstr "Bildirimler · %d"
 
-#: center.js:270 activities.js:289
+#: center.js:324 activities.js:260
 msgid "Dismiss"
 msgstr "Kapat"
 
-#: center.js:289
+#: center.js:343
 msgid "now"
 msgstr "şimdi"
 
@@ -369,7 +367,7 @@ msgstr "Sağlık %{n}"
 msgid "{n} cycles"
 msgstr "{n} döngü"
 
-#: palette.js:34
+#: palette.js:34 side.js:1494
 msgid "Note"
 msgstr "Not"
 
@@ -377,432 +375,288 @@ msgstr "Not"
 msgid "Search, calculate, ? ask Claude, n take a note"
 msgstr "Ara, hesapla, ? Claude'a sor, n not al"
 
-#: palette.js:177
+#: palette.js:219
 msgid "? question"
 msgstr "? soru"
 
-#: palette.js:177
+#: palette.js:219
 msgid "Ask Claude"
 msgstr "Claude'a sor"
 
-#: palette.js:178
+#: palette.js:220
 msgid "n text"
 msgstr "n metin"
 
-#: palette.js:178
+#: palette.js:220
 msgid "Save a quick note"
 msgstr "Hızlı not kaydet"
 
-#: palette.js:179
+#: palette.js:221
 msgid "25 min"
 msgstr "25 dk"
 
-#: palette.js:179
+#: palette.js:221
 msgid "Start a timer"
 msgstr "Zamanlayıcı başlat"
 
-#: palette.js:180
+#: palette.js:222
 msgid "12*7 or 5 km mi"
 msgstr "12*7 ya da 5 km mi"
 
-#: palette.js:180
+#: palette.js:222
 msgid "Calculate and convert"
 msgstr "Hesapla ve çevir"
 
-#: palette.js:198 palette.js:208
+#: palette.js:240 palette.js:250
 msgid "Copy the result"
 msgstr "Sonucu kopyala"
 
-#: palette.js:217
+#: palette.js:259
 #, javascript-format
 msgid "Start a %s timer"
 msgstr "%s zamanlayıcı başlat"
 
-#: palette.js:218
+#: palette.js:260
 msgid "Shown in the island while it runs"
 msgstr "Çalışırken adada görünür"
 
-#: palette.js:235
+#: palette.js:277
 #, javascript-format
 msgid "Search the web for “%s”"
 msgstr "Web'de ara: “%s”"
 
-#: palette.js:348
+#: palette.js:390
 #, javascript-format
 msgid "Save as a note: %s"
 msgstr "Not olarak kaydet: %s"
 
-#: palette.js:364
+#: palette.js:406
 msgid "Note saved"
 msgstr "Not kaydedildi"
 
-#: palette.js:367
+#: palette.js:409 side.js:876
 msgid "Could not save the note"
 msgstr "Not kaydedilemedi"
 
-#: palette.js:384
+#: palette.js:426
 msgid "Copied"
 msgstr "Kopyalandı"
 
-#: palette.js:462
+#: palette.js:504
 #, javascript-format
 msgid "Ask Claude: %s"
 msgstr "Claude'a sor: %s"
 
-#: palette.js:463
+#: palette.js:505
 msgid "The answer appears here"
 msgstr "Cevap burada çıkar"
 
-#: palette.js:494
+#: palette.js:536
 msgid "Copy"
 msgstr "Kopyala"
 
-#: palette.js:496
+#: palette.js:538
 msgid "Save as a note"
 msgstr "Not olarak kaydet"
 
-#: palette.js:522
+#: palette.js:564
 msgid "Thinking…"
 msgstr "Düşünüyor…"
 
-#: palette.js:545 chat.js:482
+#: palette.js:587
 msgid "No answer came back."
 msgstr "Cevap gelmedi."
 
-#: palette.js:547
+#: palette.js:589
 msgid "Claude could not answer."
 msgstr "Claude cevap veremedi."
 
-#: palette.js:551
+#: palette.js:593
 #, javascript-format
 msgid "Claude could not be started: %s"
 msgstr "Claude başlatılamadı: %s"
 
-#: activities.js:171
+#: activities.js:142
 msgid "Timer"
 msgstr "Zamanlayıcı"
 
-#: activities.js:217
+#: activities.js:188
 msgid "Time is up"
 msgstr "Süre doldu"
 
-#: chat.js:84
-msgid "Back to Harvis"
-msgstr "Harvis'e dön"
-
-#: chat.js:86
-msgid "Harvis"
-msgstr "Harvis"
-
-#: chat.js:100
-msgid "Read voice answers aloud"
-msgstr "Sesli cevapları oku"
-
-#: chat.js:107
-msgid "New chat"
-msgstr "Yeni sohbet"
-
-#: chat.js:128
-msgid ""
-"Write, or press the microphone and talk. “Hey Harvis” works from anywhere."
-msgstr ""
-
-#: chat.js:137
-msgid "Message Harvis"
-msgstr "Harvis'e yaz"
-
-#: chat.js:148 mind.js:338
-msgid "Talk"
-msgstr "Konuş"
-
-#: chat.js:150
-msgid "Send"
-msgstr "Gönder"
-
-#: chat.js:345
-msgid "Read aloud"
-msgstr "Sesli oku"
-
-#: chat.js:391
-msgid "The Harvis service is not running (systemctl --user start harvis)."
-msgstr "Harvis servisi çalışmıyor (systemctl --user start harvis)."
-
-#: chat.js:417
-msgid "Neither Harvis nor the claude command is installed."
-msgstr "Ne Harvis ne de claude komutu kurulu."
-
-#: chat.js:466 chat.js:476
-msgid "Could not get an answer"
-msgstr "Cevap alınamadı"
-
-#: mind.js:396
+#: side.js:83
 #, javascript-format
-msgid "Last: “%s”"
-msgstr "Son: “%s”"
-
-#: mind.js:396
-msgid "No conversation yet."
-msgstr "Henüz konuşma yok."
-
-#: mind.js:404
-#, javascript-format
-msgid "Last answer: %s"
-msgstr "Son cevap: %s"
-
-#: mind.js:406
-msgid "Local model"
-msgstr "Yerel model"
-
-#: mind.js:406
-msgid "Claude"
-msgstr "Claude"
-
-#: mind.js:425
-msgid "Ready. Say “Hey Harvis” or snap twice."
-msgstr "Hazır. “Hey Harvis” de ya da iki kez şıklat."
-
-#: mind.js:426
-msgid "Listening"
-msgstr "Dinliyorum"
-
-#: mind.js:427
-msgid "Thinking"
-msgstr "Düşünüyor"
-
-#: mind.js:428
-msgid "Speaking"
-msgstr "Konuşuyor"
-
-#~ msgid "Listening…"
-#~ msgstr "Dinliyor…"
-
-msgid "Harvis stopped"
-msgstr "Harvis durdu"
-
-msgid "A command for Harvis…"
-msgstr "Harvis'e bir komut…"
-
-msgid "Harvis stopped and asleep"
-msgstr "Harvis durdu ve uykuda"
-
-msgid "Today"
-msgstr "Bugün"
-
-msgid "Coming up"
-msgstr "Yaklaşanlar"
-
-msgid "Study"
-msgstr "Ders"
-
-msgid "Code"
-msgstr "Kod"
-
-msgid "Other"
-msgstr "Diğer"
-
-msgid "%s min"
-msgstr "%s dk"
-
 msgid "%s h %s min"
 msgstr "%s sa %s dk"
 
-msgid "Start"
-msgstr "Başlat"
+#: side.js:83
+#, javascript-format
+msgid "%s min"
+msgstr "%s dk"
 
-msgid "Stop"
-msgstr "Durdur"
-
-msgid "%s · today %s"
-msgstr "%s · bugün %s"
-
-msgid "Today %s of focus"
-msgstr "Bugün %s odak"
-
+#: side.js:276
 msgid "Focus session done"
 msgstr "Odak oturumu bitti"
 
+#: side.js:276
+#, javascript-format
 msgid "%s of %s. Today: %s"
 msgstr "%s %s. Bugün: %s"
 
-msgid "CPU"
-msgstr "İşlemci"
+#: side.js:551 side.js:1123
+msgid "Other"
+msgstr "Diğer"
 
-msgid "Memory"
-msgstr "Bellek"
-
-msgid "Heat"
-msgstr "Isı"
-
-msgid "Battery"
-msgstr "Pil"
-
-msgid "Ask Harvis…"
-msgstr "Harvis'e sor…"
-
-msgid "Quick note to the inbox…"
-msgstr "Gelen kutusuna hızlı not…"
-
-msgid "Saved ✓"
-msgstr "Kaydedildi ✓"
-
-msgid "Nothing new"
-msgstr "Yeni bir şey yok"
-
-msgid "Side islands"
-msgstr "Yan adalar"
-
-msgid "Push the pointer against the left or right edge: today and focus on the left, Harvis on the right"
-msgstr "İşaretçiyi sol ya da sağ kenara it: solda bugün ve odak, sağda Harvis"
-
-msgid "Ready"
-msgstr "Hazır"
-
-msgid "Say it"
-msgstr "Söyle"
-
-msgid "Deadlines"
-msgstr "Son tarihler"
-
-msgid "Where was I?"
-msgstr "Nerede kaldım?"
-
-msgid "What is on today? Deadlines, open threads and what I should do first."
-msgstr "Bugün ne var? Son tarihler, açık işler ve ilk ne yapmalıyım."
-
-msgid "Which deadlines and decisions are coming up?"
-msgstr "Yaklaşan son tarihler ve kararlar neler?"
-
-msgid "Where did I leave off last time, and what is the next step?"
-msgstr "En son nerede kaldım, sıradaki adım ne?"
-
-msgid "Last answer"
-msgstr "Son cevap"
-
-msgid "Clear %s"
-msgstr "%s temizle"
-
-msgid "Something went wrong"
-msgstr "Bir sorun çıktı"
-
+#: side.js:841
 msgid "Launch"
 msgstr "Başlat"
 
-msgid "Search apps, or ask Harvis…"
-msgstr "Uygulama ara ya da Harvis'e sor…"
+#: side.js:850
+msgid "Search apps…"
+msgstr "Uygulama ara…"
 
-msgid "Ask Harvis: %s"
-msgstr "Harvis'e sor: %s"
-
+#: side.js:874
 msgid "Save as a quick note"
 msgstr "Hızlı not olarak kaydet"
 
+#: side.js:874
 msgid "Into the inbox of the notes folder"
 msgstr "Not klasörünün gelen kutusuna"
 
+#: side.js:876
+msgid "Saved ✓"
+msgstr "Kaydedildi ✓"
+
+#: side.js:882
 msgid "Apps"
 msgstr "Uygulamalar"
 
+#: side.js:883
 msgid "All apps"
 msgstr "Tümü"
 
+#: side.js:894 side.js:1037
 msgid "Open windows"
 msgstr "Açık pencereler"
 
-msgid "Open windows · %s"
-msgstr "Açık pencereler · %s"
-
-msgid "No open windows"
-msgstr "Açık pencere yok"
-
-msgid "Recent files"
-msgstr "Son dosyalar"
-
-msgid "Focus"
-msgstr "Odak"
-
-msgid "Today %s"
-msgstr "Bugün %s"
-
-msgid "Close"
-msgstr "Kapat"
-
-msgid "Quick settings"
-msgstr "Hızlı ayarlar"
-
-msgid "System"
-msgstr "Sistem"
-
-msgid "Notifications · %s"
-msgstr "Bildirimler · %s"
-
-msgid "Play"
-msgstr "Oynat"
-
-msgid "Wi-Fi"
-msgstr "Wi-Fi"
-
-msgid "Bluetooth"
-msgstr "Bluetooth"
-
-msgid "Dark style"
-msgstr "Karanlık"
-
-msgid "Night light"
-msgstr "Gece ışığı"
-
-msgid "Stay awake"
-msgstr "Uyanık tut"
-
-msgid "Screenshot"
-msgstr "Ekran görüntüsü"
-
-msgid "Lock"
-msgstr "Kilitle"
-
-msgid "Settings"
-msgstr "Ayarlar"
-
-msgid "On"
-msgstr "Açık"
-
-msgid "Calculate"
-msgstr "Hesapla"
-
-msgid "12*7, 5 km mi, 90 min h…"
-msgstr "12*7, 5 km mi, 90 dk sa…"
-
-msgid "Copied ✓"
-msgstr "Kopyalandı ✓"
-
-msgid "Clipboard"
-msgstr "Pano"
-
-msgid "Copied text shows up here"
-msgstr "Kopyaladıkların burada görünür"
-
-msgid "Tools"
-msgstr "Araçlar"
-
-msgid "Pick a color"
-msgstr "Renk seç"
-
-msgid "Record screen"
-msgstr "Ekran kaydı"
-
-msgid "Password"
-msgstr "Şifre üret"
-
-msgid "Color copied"
-msgstr "Renk kopyalandı"
-
-msgid "Ask the screen"
-msgstr "Ekrana sor"
-
+#: side.js:900
 msgid "Modes"
 msgstr "Modlar"
 
+#: side.js:906
+msgid "Focus"
+msgstr "Odak"
+
+#: side.js:911
+msgid "Recent files"
+msgstr "Son dosyalar"
+
+#: side.js:951
 msgid "End"
 msgstr "Bitir"
 
+#: side.js:974
+msgid "Close"
+msgstr "Kapat"
+
+#: side.js:1037
+#, javascript-format
+msgid "Open windows · %s"
+msgstr "Açık pencereler · %s"
+
+#: side.js:1039
+msgid "No open windows"
+msgstr "Açık pencere yok"
+
+#: side.js:1122 side.js:1123
+msgid "Study"
+msgstr "Ders"
+
+#: side.js:1123
+msgid "Code"
+msgstr "Kod"
+
+#: side.js:1146 side.js:1459
+msgid "Stop"
+msgstr "Durdur"
+
+#: side.js:1146
+msgid "Start"
+msgstr "Başlat"
+
+#: side.js:1155
+#, javascript-format
+msgid "Today %s"
+msgstr "Bugün %s"
+
+#: side.js:1174 side.js:1217
+msgid "Tools"
+msgstr "Araçlar"
+
+#: side.js:1177
+msgid "Calculate"
+msgstr "Hesapla"
+
+#: side.js:1180 side.js:1279
+msgid "12*7, 5 km mi, 90 min h…"
+msgstr "12*7, 5 km mi, 90 dk sa…"
+
+#: side.js:1183 side.js:1380
+msgid "Copied ✓"
+msgstr "Kopyalandı ✓"
+
+#: side.js:1206
+msgid "Clipboard"
+msgstr "Pano"
+
+#: side.js:1222
+msgid "Pick a color"
+msgstr "Renk seç"
+
+#: side.js:1223
+msgid "Record screen"
+msgstr "Ekran kaydı"
+
+#: side.js:1227
+msgid "Password"
+msgstr "Şifre üret"
+
+#: side.js:1229
+msgid "Ask the screen"
+msgstr "Ekrana sor"
+
+#: side.js:1234
 msgid "Summarize page"
 msgstr "Sayfayı özetle"
+
+#: side.js:1253
+msgid "System"
+msgstr "Sistem"
+
+#: side.js:1256
+msgid "CPU"
+msgstr "İşlemci"
+
+#: side.js:1256
+msgid "Memory"
+msgstr "Bellek"
+
+#: side.js:1256
+msgid "Heat"
+msgstr "Isı"
+
+#: side.js:1256
+msgid "Battery"
+msgstr "Pil"
+
+#: side.js:1273
+msgid "Coming up"
+msgstr "Yaklaşanlar"
+
+#: side.js:1314
+msgid "Copied text shows up here"
+msgstr "Kopyaladıkların burada görünür"
+
+#: side.js:1351
+msgid "Color copied"
+msgstr "Renk kopyalandı"

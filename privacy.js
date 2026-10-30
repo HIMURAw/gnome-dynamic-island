@@ -9,9 +9,9 @@ import {getMixerControl} from 'resource:///org/gnome/shell/ui/status/volume.js';
 // them), and the island's own meter below.
 const SKIPPED_APPS = ['org.gnome.VolumeControl', 'org.PulseAudio.pavucontrol'];
 const METER_NAME = 'Dynamic Island';
-// Always-listening wake word services: they keep the mic open all the time, so
-// on their own they show as standby rather than in use.
-const STANDBY_NAMES = ['Harvis'];
+// Always-listening wake word services (by their recording's name): they keep the mic
+// open all the time, so on their own they show as standby rather than in use.
+const STANDBY_NAMES = [];
 
 const METER_RATE = 8000;
 const METER_CHUNK = 400; // 50 ms of 16-bit mono
@@ -32,9 +32,8 @@ export class PrivacyWatcher {
         this.mic = 'off';
         this.speaking = false;
         this.camera = false;
-        // 0..1, how far the voice rises above the room; for the listening animation.
+        // 0..1, how far the voice rises above the room.
         this.level = 0;
-        this._forced = false;
 
         this._control = getMixerControl();
         this._controlIds = ['stream-added', 'stream-removed', 'stream-changed', 'state-changed']
@@ -75,15 +74,8 @@ export class PrivacyWatcher {
         this._onChanged?.();
     }
 
-    // Measure the voice while something other than a wake word listener records,
-    // or while the assistant is listening to a command (the island animates).
-    listen(on) {
-        this._forced = on;
-        this._meterNeeded();
-    }
-
     _meterNeeded() {
-        if (this.mic === 'on' || this._forced)
+        if (this.mic === 'on')
             this._startMeter();
         else
             this._stopMeter();
@@ -91,7 +83,7 @@ export class PrivacyWatcher {
 
     // The laptop's own microphone, not the default: the default follows Bluetooth
     // headphones, and opening their microphone drops their music to the telephone
-    // profile. The meter only draws a level; Harvis listens on the same microphone.
+    // profile. The meter only draws a level.
     _builtInSource() {
         if (this._source !== undefined)
             return this._source;

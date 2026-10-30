@@ -25,17 +25,11 @@ import {Glass, RoundedMask, setBlurEnabled, snapshotExclude} from './glass.js';
 import {NotificationCenter, bellIcon} from './center.js';
 import {TileGridLayout, TopCenterLayout} from './layouts.js';
 import {MediaWatcher, squareArt} from './media.js';
-import {ChatView} from './chat.js';
 import {ThemedStylesheet} from './theme.js';
 import {SideIslands} from './side.js';
 import {Palette} from './palette.js';
 import {PrivacyWatcher} from './privacy.js';
-import {MindView, VoiceEnvelope} from './mind.js';
-import {AvatarGlyph} from './face.js';
-import {EdgeGlow} from './edge.js';
 import {GlassMenus} from './menus.js';
-import {Cards} from './cards.js';
-import {CommandBox} from './command.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
 
@@ -65,12 +59,6 @@ const SKIPPED_ROLES = ['dateMenu', 'media-controls'];
 const REVEAL_DELAY = 180;
 // Desktop Icons NG (and forks) let other extensions reserve room on the desktop
 // through an object tagged with this id, the same way Dash to Dock does.
-// Copilot key (ms): held this long stops Harvis; a second press within this long
-// opens the chat; without modifiers to watch, no repeat for this long means released.
-const COPILOT_HOLD = 2000;
-const COPILOT_DOUBLE = 350;
-const COPILOT_REPEAT_GAP = 600;
-
 const DESKTOP_ICONS_ID = '130cbc66-235c-4bd6-8571-98d2d8bba5e2';
 
 const DisplayDeviceProxy = Gio.DBusProxy.makeProxyWrapper(
@@ -96,9 +84,6 @@ export default class DynamicIslandExtension extends Extension {
         this._theme = new ThemedStylesheet(this);
         this._activities = new Activities({
             onChanged: () => this._syncActivities(),
-            onAnswer: (question, answer) => this._showAnswer(question, answer),
-            onScreenshot: phase => this._flashShot(phase),
-            onCard: card => (this._cards ??= new Cards()).show(card),
             onSide: side => this._side?.fromOutside(side),
         });
         // Any change rebuilds the island: disable() puts everything back, so
@@ -137,8 +122,6 @@ export default class DynamicIslandExtension extends Extension {
         this._settings.disconnect(this._settingsId);
         this._teardown();
         this._activities.destroy();
-        this._cards?.destroy();
-        this._cards = null;
         this._activities = null;
         this._settings = null;
     }
@@ -181,25 +164,7 @@ export default class DynamicIslandExtension extends Extension {
         this._safely('desktop icons', () => this._setupDesktopIcons());
         this._safely('palette shortcut', () => this._setupPaletteShortcut());
         if (this._settings.get_boolean('side-islands'))
-            this._safely('side islands', () => {
-                this._voiceEnvelope ??= new VoiceEnvelope();
-                this._side = new SideIslands({
-                    settings: this._settings,
-                    onAsk: text => this._askFromSide(text),
-                    onTalk: () => {
-                        if (this._mode !== 'chat')
-                            this._toggleChat();
-                        this._chat?._listen();
-                    },
-                    onOpenChat: () => {
-                        if (this._mode !== 'chat')
-                            this._toggleChat();
-                    },
-                    avatar: new AvatarGlyph(mode => mode === 'speaking'
-                        ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6, {scale: 2}),
-                });
-                this._side.setMode(this._harvisState().mode);
-            });
+            this._safely('side islands', () => (this._side = new SideIslands({settings: this._settings})));
         if (this._settings.get_boolean('show-privacy-bubble'))
             this._safely('privacy bubble', () => {
                 this._privacyWatcher = new PrivacyWatcher(() => this._syncPrivacy());
@@ -217,17 +182,11 @@ export default class DynamicIslandExtension extends Extension {
         this._timeouts.clear();
         this._collapseTimeout = this._adoptIdle = this._panelIdle = this._positionTimeout = 0;
         this._notificationTimeout = this._revealTimeout = this._overlapIdle = 0;
-        this._centerIdle = this._answerTimeout = this._breathId = 0;
+        this._centerIdle = 0;
         this._safely('compositing', () => this._keepComposited(false));
-        this._listening = false;
-        this._unwatchOutside();
 
         this._safely('releasing palette', () => this._releasePalette());
-        this._safely('releasing command box', () => this._commandBox?.destroy());
-        this._commandBox = null;
         this._safely('releasing privacy bubble', () => this._privacyWatcher?.destroy());
-        this._safely('removing edge glow', () => this._edgeGlow?.destroy());
-        this._edgeGlow = null;
         this._safely('removing side islands', () => this._side?.destroy());
         this._side = null;
         this._privacyWatcher = null;
@@ -255,8 +214,6 @@ export default class DynamicIslandExtension extends Extension {
         this._center = null;
         this._palette?.destroy();
         this._palette = null;
-        this._chat?.destroy();
-        this._chat = null;
         this._activitiesCard = null;
 
         this._glassMenus?.destroy();
@@ -268,7 +225,7 @@ export default class DynamicIslandExtension extends Extension {
             this._strip.destroy();
         }
         snapshotExclude.clear();
-        this._strip = this._island = this._left = this._right = this._privacy = this._chatBubble = null;
+        this._strip = this._island = this._left = this._right = this._privacy = null;
 
         this._power = null;
         this._clock = null;
@@ -336,35 +293,13 @@ export default class DynamicIslandExtension extends Extension {
             width: this._contentWidth,
             onClose: () => this._close(),
         });
-        // Harvis's robot in the chat header and, larger, in the brain view; the same states as the
-        // one in the collapsed island (_syncActivities).
-        this._voiceEnvelope ??= new VoiceEnvelope();
-        const harvisLevel = mode => mode === 'speaking'
-            ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6;
-        this._chatAvatar = new AvatarGlyph(harvisLevel);
-        this._chatAvatar.actor.margin_right = 0;
-        this._mindAvatar = new AvatarGlyph(harvisLevel, {scale: 3});
-        this._chat = new ChatView({settings: this._settings, width: this._contentWidth, onClose: () => this._close(),
-            onMind: () => this._openMind(), avatar: this._chatAvatar, dir: this.dir});
-        this._mind = new MindView({
-            width: this._contentWidth,
-            dir: this.dir,
-            state: () => this._harvisState(),
-            micLevel: () => this._privacyWatcher?.level ?? 0,
-            envelope: this._voiceEnvelope,
-            onChat: () => this._toggleChat(),
-            avatar: this._mindAvatar,
-            onListen: () => this._chat._listen(),
-        });
-        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor, this._chat.actor, this._mind.actor])
+        for (const view of [this._compact, this._controls, this._detail, this._mediaView, this._notificationView, this._center.actor, this._palette.actor])
             this._island.add_child(view);
 
         this._left = this._buildCenterBubble();
         this._right = this._buildMediaBubble();
 
         this._privacy = this._buildPrivacyBubble();
-        this._chatBubble = this._buildChatBubble();
-        this._chatBubble.visible = this._settings.get_boolean('show-chat-bubble');
 
         this._left.visible = this._settings.get_boolean('show-notification-bubble');
         this._right.visible = this._settings.get_boolean('show-media-bubble');
@@ -372,12 +307,10 @@ export default class DynamicIslandExtension extends Extension {
         this._strip.add_child(this._island);
         this._strip.add_child(this._right);
         this._strip.add_child(this._privacy);
-        this._strip.add_child(this._chatBubble);
         this._layout.left = this._left;
         this._layout.center = this._island;
         this._layout.right = this._right;
         this._layout.extraRight = [this._privacy];
-        this._layout.extraLeft = [this._chatBubble];
 
         this._connect(this._compact, 'clicked', () => this._open('controls'));
         this._connect(this._controlsHeader, 'clicked', () => this._close());
@@ -391,7 +324,7 @@ export default class DynamicIslandExtension extends Extension {
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         });
-        for (const actor of [this._island, this._left, this._right, this._privacy, this._chatBubble]) {
+        for (const actor of [this._island, this._left, this._right, this._privacy]) {
             this._connect(actor, 'notify::hover', () => {
                 if (this._mode && !this._anyHover())
                     this._scheduleCollapse();
@@ -399,7 +332,7 @@ export default class DynamicIslandExtension extends Extension {
         }
         // The blur behind the glass follows layout; moving the whole layer needs a nudge.
         this._connect(this._strip, 'notify::translation-y', () => {
-            for (const glass of [this._island, this._left, this._right, this._privacy, this._chatBubble])
+            for (const glass of [this._island, this._left, this._right, this._privacy])
                 glass.syncBackdrop();
         });
     }
@@ -453,11 +386,6 @@ export default class DynamicIslandExtension extends Extension {
         this._compactActivity.add_child(this._compactActivityIcon);
         this._compactActivity.add_child(this._compactActivityLabel);
 
-        // Harvis as its character, always there: it breathes, blinks and watches the pointer (face.js).
-        this._voiceEnvelope ??= new VoiceEnvelope();
-        this._compactBrain = new AvatarGlyph(mode => mode === 'speaking'
-            ? this._voiceEnvelope.level() : (this._voiceLevel?.() ?? 0) * 1.6);
-        box.add_child(this._compactBrain.actor);
         box.add_child(this._compactActivity);
         box.add_child(this._compactTime);
         box.add_child(this._compactDate);
@@ -883,10 +811,6 @@ export default class DynamicIslandExtension extends Extension {
             return this._center.actor;
         case 'palette':
             return this._palette.actor;
-        case 'chat':
-            return this._chat.actor;
-        case 'mind':
-            return this._mind.actor;
         default:
             return this._controls;
         }
@@ -914,7 +838,7 @@ export default class DynamicIslandExtension extends Extension {
         const outgoing = previous ? this._viewFor(previous) : this._compact;
         // A view still fading out from an earlier close would keep its height.
         for (const other of [this._controls, this._detail, this._mediaView, this._notificationView,
-            this._center.actor, this._palette.actor, this._chat.actor, this._mind.actor]) {
+            this._center.actor, this._palette.actor]) {
             if (other !== view && other !== outgoing)
                 other.hide();
         }
@@ -1004,7 +928,6 @@ export default class DynamicIslandExtension extends Extension {
             this._finishNotification();
         if (this._typing(this._mode))
             this._releaseKeyboard();
-        this._unwatchOutside();
         this._mode = null;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
         this._positionTimeout = this._clearTimeout(this._positionTimeout);
@@ -1050,7 +973,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _anyHover() {
-        return [this._island, this._left, this._right, this._privacy, this._chatBubble].some(a => a?.hover);
+        return [this._island, this._left, this._right, this._privacy].some(a => a?.hover);
     }
 
     _anyMenuOpen() {
@@ -1058,10 +981,7 @@ export default class DynamicIslandExtension extends Extension {
     }
 
     _scheduleCollapse() {
-        // The palette and the chat stay until Escape or a click elsewhere while they
-        // hold the keyboard. A chat opened by a voice answer holds nothing, and on
-        // Wayland a click into another window never reaches the shell: it goes once
-        // the pointer has been on it and left (or after its own timer).
+        // The palette stays until Escape or a click elsewhere while it holds the keyboard.
         if (this._collapseTimeout || (this._typing(this._mode) && this._grab))
             return;
         // Collapse once the pointer is outside and no menu is open.
@@ -1085,136 +1005,13 @@ export default class DynamicIslandExtension extends Extension {
         Main.wm.addKeybinding('palette-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._togglePalette());
         this._paletteBound = true;
-        // The Copilot key on laptops that have one sends Super+Shift+F23: a press
-        // opens the command box, two presses make Harvis listen, holding it 2 s
-        // stops Harvis and puts it to sleep (Umut, 2026-10-14).
-        // POPUP too: with the chat open the island holds the keyboard, and two presses close it.
-        Main.wm.addKeybinding('chat-shortcut', this._settings, Meta.KeyBindingFlags.NONE,
-            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW | Shell.ActionMode.POPUP,
-            () => this._onCopilotKey());
-        this._chatBound = true;
-    }
-
-    // ---------- Copilot key: press, double press, hold ----------
-
-    // A keybinding only reports presses. The key is "still held" while its Super and
-    // Shift are down (the keyboard holds them with F23), or, on a keyboard that
-    // releases them at once, while autorepeat keeps pressing it.
-    _onCopilotKey() {
-        const now = GLib.get_monotonic_time() / 1000;
-        const key = this._copilot;
-        if (key && key.released) {
-            this._copilot = null;
-            key.tap = this._clearTimeout(key.tap);
-            // Two presses: Harvis listens, as if the name had been said. An open chat
-            // still closes this way (a voice answer may have opened it keyboardless).
-            if (this._mode === 'chat') {
-                console.log('Dynamic Island: Copilot key pressed twice: chat closed');
-                this._close();
-            } else {
-                console.log('Dynamic Island: Copilot key pressed twice: listen');
-                this._wakeHarvis();
-            }
-            return;
-        }
-        if (key) {
-            key.repeat = now; // autorepeat while held
-            return;
-        }
-        const mods = global.get_pointer()[2];
-        this._copilot = {start: now, repeat: now, released: false, done: false, tap: 0, poll: 0,
-            byMods: this._copilotMods(mods)};
-        this._copilot.poll = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 40, () => this._copilotPoll());
-    }
-
-    _copilotMods(mods) {
-        const SUPER = Clutter.ModifierType.MOD4_MASK | Clutter.ModifierType.SUPER_MASK;
-        return (mods & Clutter.ModifierType.SHIFT_MASK) !== 0 && (mods & SUPER) !== 0;
-    }
-
-    _copilotPoll() {
-        const key = this._copilot;
-        if (!key)
-            return GLib.SOURCE_REMOVE;
-        const now = GLib.get_monotonic_time() / 1000;
-        const held = key.byMods
-            ? this._copilotMods(global.get_pointer()[2])
-            : now - key.repeat < COPILOT_REPEAT_GAP;
-        if (held) {
-            if (!key.done && now - key.start >= COPILOT_HOLD) {
-                key.done = true;
-                console.log('Dynamic Island: Copilot key held: stop Harvis and sleep');
-                // SIGRTMIN+3: the service stops whatever it does AND stops listening
-                // until it is explicitly woken (two presses, or the chat's microphone).
-                this._harvisSignal('SIGRTMIN+3');
-                this._sleepHarvis(true);
-                Main.osdWindowManager.showAll?.(new Gio.ThemedIcon({name: 'media-playback-pause-symbolic'}),
-                    _('Harvis stopped and asleep'), null, null);
-            }
-            return GLib.SOURCE_CONTINUE;
-        }
-        key.poll = 0;
-        if (key.done) {
-            this._copilot = null;
-            return GLib.SOURCE_REMOVE;
-        }
-        // Released quickly: one press, unless a second one follows.
-        key.released = true;
-        key.tap = GLib.timeout_add(GLib.PRIORITY_DEFAULT, COPILOT_DOUBLE, () => {
-            key.tap = 0;
-            if (this._copilot === key) {
-                this._copilot = null;
-                console.log(`Dynamic Island: Copilot key pressed (${key.byMods ? 'modifiers' : 'repeat'}): command box`);
-                this._commandBox ??= new CommandBox({dir: this.dir, onSubmit: text => {
-                    this._chat?.sendText(text);
-                    if (this._chatBadge)
-                        this._chatBadge.visible = true;
-                }});
-                this._commandBox.open();
-            }
-            return GLib.SOURCE_REMOVE;
-        });
-        return GLib.SOURCE_REMOVE;
-    }
-
-    // Waking and sleeping: the robots everywhere follow the Copilot key at once;
-    // the service's own state catches up through its activity.
-    _wakeHarvis() {
-        this._sleepHarvis(false);
-        this._harvisSignal('SIGUSR1');
-    }
-
-    _sleepHarvis(asleep) {
-        for (const avatar of [this._compactBrain, this._chatAvatar, this._mindAvatar])
-            avatar?.sleep?.(asleep);
-    }
-
-    _harvisSignal(signal) {
-        try {
-            Gio.Subprocess.new(['systemctl', '--user', 'kill', '--kill-whom=main', `--signal=${signal}`,
-                'harvis.service'], Gio.SubprocessFlags.STDERR_SILENCE);
-        } catch (e) {
-            console.error('Dynamic Island: could not reach Harvis', e);
-        }
-    }
-
-    _releaseCopilot() {
-        const key = this._copilot;
-        this._copilot = null;
-        if (key?.poll)
-            GLib.source_remove(key.poll);
-        if (key?.tap)
-            GLib.source_remove(key.tap);
     }
 
     _releasePalette() {
-        this._releaseCopilot();
         this._releaseKeyboard();
         if (this._paletteBound)
             Main.wm.removeKeybinding('palette-shortcut');
-        if (this._chatBound)
-            Main.wm.removeKeybinding('chat-shortcut');
-        this._paletteBound = this._chatBound = false;
+        this._paletteBound = false;
     }
 
     _togglePalette() {
@@ -1234,138 +1031,7 @@ export default class DynamicIslandExtension extends Extension {
 
     // Views that take the keyboard while open.
     _typing(mode) {
-        return mode === 'palette' || mode === 'chat';
-    }
-
-    // A question typed into the right side island: into the chat, which opens to show the answer.
-    _askFromSide(text) {
-        this._chat?.sendText(text);
-        if (this._mode !== 'chat')
-            this._toggleChat();
-    }
-
-    _toggleChat() {
-        if (this._mode === 'chat' && this._grab) {
-            this._close();
-            return;
-        }
-        if (this._chatBadge)
-            this._chatBadge.visible = false;
-        if (Main.overview.visible)
-            Main.overview.hide();
-        // Shown by a voice answer without the keyboard: take it now.
-        if (this._mode === 'chat') {
-            this._unwatchOutside();
-            this._answerTimeout = this._clearTimeout(this._answerTimeout);
-            this._grabKeyboard();
-            this._chat.focus();
-            return;
-        }
-        if (this._hidden)
-            this._setHidden(false);
-        this._open('chat');
-        this._grabKeyboard();
-        this._chat.focus();
-    }
-
-    // Left of the bell: opens the chat with the assistant.
-    _buildChatBubble() {
-        const bubble = this._bubble();
-        // Placed by hand like the bell: a dot for an answer not seen yet.
-        const size = PILL_HEIGHT - 2 * BORDER;
-        const content = new St.Widget({width: size, height: size});
-        const icon = new St.Icon({
-            gicon: new Gio.FileIcon({file: this.dir.get_child('icons').get_child('dynada-chat-symbolic.svg')}),
-            icon_size: 16,
-        });
-        icon.set_position((size - 16) / 2, (size - 16) / 2);
-        this._chatBadge = new St.Widget({style_class: 'dynada-badge', visible: false});
-        this._chatBadge.set_position(size - 7 - 10, 9);
-        content.add_child(icon);
-        content.add_child(this._chatBadge);
-        const button = new St.Button({
-            style_class: 'dynada-bubble-button',
-            can_focus: true,
-            accessible_name: _('Chat with Harvis'),
-            x_expand: true,
-            y_expand: true,
-            child: content,
-        });
-        bubble.add_child(button);
-        this._connect(button, 'clicked', () => this._openMind());
-        return bubble;
-    }
-
-    // The Harvis bubble opens its brain view; Chat is one button away (and the
-    // Copilot key still goes straight to the chat).
-    _openMind() {
-        if (this._mode === 'mind') {
-            this._close();
-            return;
-        }
-        if (this._chatBadge)
-            this._chatBadge.visible = false;
-        if (Main.overview.visible)
-            Main.overview.hide();
-        if (this._hidden)
-            this._setHidden(false);
-        this._open('mind');
-    }
-
-    // What Harvis is doing, from the activity its service keeps up to date.
-    _harvisState() {
-        const harvis = this._activities?.items.find(item => item.id === 'harvis');
-        if (!harvis)
-            return {mode: 'idle', text: ''};
-        const mode = {
-            'audio-input-microphone-symbolic': 'listening',
-            'audio-speakers-symbolic': 'speaking',
-            'dialog-error-symbolic': 'failed',
-        }[harvis.icon] ?? 'thinking';
-        return {mode, text: harvis.subtitle ?? ''};
-    }
-
-    // A spoken exchange from the voice assistant goes into the chat, which does not
-    // open by itself (Umut: "chat açılmasın, ben istersem açıp göreyim"): the
-    // answer is spoken, and a dot on the chat bubble says there is one to read.
-    _showAnswer(question, answer) {
-        if (!this._chat || this._stripGone)
-            return;
-        this._chat.addExchange(question, answer);
-        this._compactBrain?.emote('joy');
-        this._chatAvatar?.emote('joy');
-        if (this._mode !== 'chat' && this._chatBadge)
-            this._chatBadge.visible = true;
-    }
-
-    // The chat opened by a voice answer holds no keyboard, so a click elsewhere
-    // (another window, the desktop) or switching windows closes it instead.
-    _watchOutside() {
-        this._unwatchOutside();
-        this._outsideId = global.stage.connect('captured-event', (_stage, event) => {
-            const type = event.type();
-            if (type !== Clutter.EventType.BUTTON_PRESS && type !== Clutter.EventType.TOUCH_BEGIN)
-                return Clutter.EVENT_PROPAGATE;
-            const source = global.stage.get_event_actor(event);
-            if (!source || !this._island?.contains(source))
-                this._closeOutside();
-            return Clutter.EVENT_PROPAGATE;
-        });
-        this._focusId = global.display.connect('notify::focus-window', () => this._closeOutside());
-    }
-
-    _closeOutside() {
-        this._unwatchOutside();
-        if (this._mode === 'chat' && !this._grab)
-            this._close();
-    }
-
-    _unwatchOutside() {
-        if (this._outsideId)
-            global.stage.disconnect(this._outsideId);
-        if (this._focusId)
-            global.display.disconnect(this._focusId);
-        this._outsideId = this._focusId = 0;
+        return mode === 'palette';
     }
 
     // While the palette is open, keys go to it, and a click anywhere else closes it.
@@ -1428,55 +1094,7 @@ export default class DynamicIslandExtension extends Extension {
         // Also called by the activities' clock, which outlives a torn-down island.
         if (!this._compactActivity || this._stripGone)
             return;
-        const harvis = this._activities.items.find(item => item.id === 'harvis');
-        // The service marks listening with the microphone icon.
-        const listening = harvis?.icon === 'audio-input-microphone-symbolic';
-        this._setListening(listening);
-        const {mode} = this._harvisState();
-        this._compactBrain.setMode(mode);
-        this._chatAvatar?.setMode(mode);
-        this._mindAvatar?.setMode(mode);
-        this._side?.setMode(mode);
-        if (harvis)
-            this._sleepHarvis(false);
-        // Small reactions: a wave at the first morning meeting, a surprised hop when
-        // something fails, a happy hop when a long job comes good (robot.js emotes).
-        const emote = name => {
-            for (const avatar of [this._compactBrain, this._chatAvatar, this._mindAvatar])
-                avatar?.emote?.(name);
-        };
-        const now = GLib.DateTime.new_now_local();
-        if (harvis) {
-            if (this._waveDay !== now.format('%F') && now.get_hour() >= 5 && now.get_hour() < 12) {
-                this._waveDay = now.format('%F');
-                emote('wave');
-            }
-            this._harvisSince ??= now.to_unix();
-        } else {
-            if (this._harvisSince && now.to_unix() - this._harvisSince > 60 && this._lastHarvisMode !== 'failed')
-                emote('joy');
-            this._harvisSince = null;
-        }
-        if (mode === 'failed' && this._lastHarvisMode !== 'failed')
-            emote('surprise');
-        this._lastHarvisMode = mode;
-        // Harvis on the edges (edge.js): green while it speaks (with the voice),
-        // yellow while it works, purple while it drives the screen.
-        const controlling = this._activities.items.some(item => item.id === 'harvis-control');
-        const glow = mode === 'speaking' ? 'speaking'
-            : controlling ? 'control'
-                : mode === 'thinking' ? 'working' : null;
-        if (glow && !this._edgeGlow) {
-            this._voiceEnvelope ??= new VoiceEnvelope();
-            this._edgeGlow = new EdgeGlow(() => this._voiceEnvelope.level());
-            this._edgeGlow.keepBelow(this._island);
-        }
-        this._edgeGlow?.setMode(glow);
-        for (const m of ['thinking', 'speaking', 'failed'])
-            (m === mode ? this._island.add_style_class_name : this._island.remove_style_class_name)
-                .call(this._island, `dynada-${m}`);
-        // Harvis shows as its motion, not as a line of text.
-        const [first] = this._activities.items.filter(item => item !== harvis);
+        const [first] = this._activities.items;
         this._compactActivity.visible = !!first;
         if (first) {
             this._compactActivityIcon.icon_name = first.icon;
@@ -1488,57 +1106,6 @@ export default class DynamicIslandExtension extends Extension {
         }
         if (this._mode === 'controls')
             this._activitiesCard?.sync();
-        // The voice assistant's progress ("Listening…", "Reading files…") shows in the chat.
-        if (harvis || this._harvisShown)
-            this._chat?.setStatus(harvis?.subtitle ?? '', listening ? this._voiceLevel : null);
-        this._harvisShown = !!harvis;
-    }
-
-    // The assistant looked at the screen: a quick shutter-white pulse on the island,
-    // so it never happens unseen.
-    _flashShot(phase) {
-        if (!this._island || this._stripGone)
-            return;
-        if (phase === 'before') {
-            this._strip.opacity = 0;
-            return;
-        }
-        this._strip.opacity = 255;
-        if (phase === 'quiet')
-            return;
-        this._island.add_style_pseudo_class('shot');
-        this._timeout(450, () => {
-            this._island?.remove_style_pseudo_class('shot');
-            return GLib.SOURCE_REMOVE;
-        });
-    }
-
-    // Listening: the voice meter runs, the collapsed island shows a waveform and its
-    // edge breathes green.
-    _setListening(on) {
-        if (on === !!this._listening)
-            return;
-        this._listening = on;
-        this._voiceLevel ??= () => this._privacyWatcher?.level ?? 0;
-        this._privacyWatcher?.listen(on);
-        if (on) {
-            this._island.add_style_class_name('dynada-listening');
-            let bright = false;
-            this._breathId = this._timeout(900, () => {
-                bright = !bright;
-                (bright ? this._island.add_style_pseudo_class : this._island.remove_style_pseudo_class)
-                    .call(this._island, 'breath');
-                return GLib.SOURCE_CONTINUE;
-            });
-            // A small bounce, so the eye goes to it.
-            this._island.ease({scale_x: 1.06, scale_y: 1.06, duration: 140, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => this._island?.ease({scale_x: 1, scale_y: 1, duration: 420,
-                    mode: Clutter.AnimationMode.EASE_OUT_BACK})});
-        } else {
-            this._breathId = this._clearTimeout(this._breathId);
-            this._island.remove_style_class_name('dynada-listening');
-            this._island.remove_style_pseudo_class('breath');
-        }
     }
 
     // ---------- Notifications ----------

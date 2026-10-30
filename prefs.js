@@ -95,10 +95,8 @@ export default class DynamicIslandPreferences extends ExtensionPreferences {
             _('The bell on the left')));
         parts.add(switchRow('show-media-bubble', _('Now playing'),
             _('The bubble on the right')));
-        parts.add(switchRow('show-chat-bubble', _('Chat'),
-            _('Next to the bell: write or talk to the assistant')));
         parts.add(switchRow('side-islands', _('Side islands'),
-            _('Push the pointer against the left or right edge: today and focus on the left, Harvis on the right')));
+            _('Push the pointer against the left or right edge: the launcher and focus on the left, tools on the right')));
         parts.add(switchRow('show-privacy-bubble', _('Microphone and camera'),
             _('Shows while they are in use; the microphone turns green while you talk')));
         parts.add(switchRow('show-connectivity', _('Connectivity'),

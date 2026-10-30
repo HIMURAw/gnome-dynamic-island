@@ -1,7 +1,6 @@
 /* cam: the Cam Panel look. Appended (not recoloured) to the stylesheet when the colour theme is
    cam; glass.js rounds the corners for it. Neutral white frost instead of violet, a white hairline,
-   pill buttons, the soft blue accent (#8fb4ff on #101a33) for what is on. Harvis's robot keeps
-   its violet: nothing here touches face.js or robot.js. */
+   pill buttons, the soft blue accent (#8fb4ff on #101a33) for what is on. */
 
 /* Glass */
 .dynada-glass-tint {
@@ -151,24 +150,6 @@
 .popup-menu .dynada-glass-menu .message:hover,
 .popup-menu .dynada-glass-menu .message:focus {
   background-color: rgb(54, 50, 76);
-}
-
-/* Chat */
-.dynada-chat-bubble {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.dynada-chat-bubble.dynada-chat-mine {
-  background-color: rgba(143, 180, 255, 0.28);
-}
-
-.dynada-chat-send {
-  color: #101a33;
-  background-color: #8fb4ff;
-}
-
-.dynada-chat-send:hover {
-  background-color: #a9c5ff;
 }
 
 /* Side islands */

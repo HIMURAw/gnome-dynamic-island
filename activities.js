@@ -1,14 +1,11 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {BarLevel} from 'resource:///org/gnome/shell/ui/barLevel.js';
-
-import {Control} from './control.js';
 
 // Live activities: things in progress that the island keeps in view, like
 // iPhone's Live Activities. Timers are built in; anything else (a build, a
@@ -36,24 +33,6 @@ const IFACE = `
     <method name="Clear">
       <arg type="s" direction="in" name="id"/>
     </method>
-    <method name="ShowAnswer">
-      <arg type="s" direction="in" name="question"/>
-      <arg type="s" direction="in" name="answer"/>
-    </method>
-    <method name="ShowCard">
-      <arg type="s" direction="in" name="card"/>
-    </method>
-    <method name="Screenshot">
-      <arg type="s" direction="in" name="name"/>
-      <arg type="b" direction="out" name="ok"/>
-      <arg type="s" direction="out" name="path"/>
-    </method>
-    <method name="Control">
-      <arg type="s" direction="in" name="action"/>
-      <arg type="s" direction="in" name="args"/>
-      <arg type="b" direction="out" name="ok"/>
-      <arg type="s" direction="out" name="info"/>
-    </method>
     <method name="Side">
       <arg type="s" direction="in" name="side"/>
     </method>
@@ -69,10 +48,6 @@ const IFACE = `
   </interface>
 </node>`;
 const OBJECT_PATH = '/io/github/himuraw/DynamicIsland';
-// Screenshots for the assistant only ever land here, under a plain file name.
-const SHOTS = GLib.build_filenamev([GLib.get_user_cache_dir(), 'harvis', 'screen']);
-
-Gio._promisify(Shell.Screenshot.prototype, 'screenshot');
 // An activity nobody has updated for this long has lost its reporter (ms).
 const STALE_AFTER = 30 * 60 * 1000;
 
@@ -88,14 +63,9 @@ function clock(seconds) {
 
 export class Activities {
     // onChanged(): the list or a countdown changed.
-    // onAnswer(question, answer): a voice assistant has an answer to show.
-    // onScreenshot(): a screenshot was taken for the assistant (the island flashes).
     // onSide(side): open or close a side island (side.js).
-    constructor({onChanged, onAnswer, onScreenshot, onCard, onSide}) {
+    constructor({onChanged, onSide}) {
         this._onChanged = onChanged;
-        this._onAnswer = onAnswer;
-        this._onCard = onCard;
-        this._onScreenshot = onScreenshot;
         this._onSide = onSide;
         this._items = new Map();
         this._timerCount = 0;
@@ -109,8 +79,6 @@ export class Activities {
     }
 
     destroy() {
-        this._control?.destroy();
-        this._control = null;
         this._dbus?.unexport();
         this._dbus = null;
         if (this._tickId)
@@ -154,89 +122,6 @@ export class Activities {
     Clear(id) {
         if (this._items.delete(id))
             this._onChanged();
-    }
-
-    ShowAnswer(question, answer) {
-        this._onAnswer?.(question, answer);
-    }
-
-    // A visual card (cards.js) in an empty part of the screen.
-    ShowCard(card) {
-        this._onCard?.(card);
-    }
-
-    // The whole screen with the pointer in it, so "this green thing" can be found.
-    // GNOME keeps its own screenshot API to a few programs; the island lives in the
-    // shell, so the voice assistant asks here. Files go to SHOTS only.
-    async ScreenshotAsync([name], invocation) {
-        const base = GLib.path_get_basename(name || 'screen').replace(/[^\w.-]/g, '_');
-        const path = GLib.build_filenamev([SHOTS, base.endsWith('.png') ? base : `${base}.png`]);
-        try {
-            GLib.mkdir_with_parents(SHOTS, 0o700);
-            const file = Gio.File.new_for_path(path);
-            const stream = file.replace(null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
-            // The island itself ("Harvis · Listening…") is not part of what is on screen:
-            // out of the picture while it is taken, then a flash to say it was.
-            // A watcher looks every half minute: out of the picture, but no flash.
-            const quiet = base.startsWith('watch-');
-            this._onScreenshot?.('before');
-            try {
-                await new Shell.Screenshot().screenshot(true, stream);
-            } finally {
-                this._onScreenshot?.(quiet ? 'quiet' : 'after');
-            }
-            stream.close(null);
-            invocation.return_value(new GLib.Variant('(bs)', [true, path]));
-        } catch (e) {
-            console.error('Dynamic Island: screenshot failed', e);
-            invocation.return_value(new GLib.Variant('(bs)', [false, '']));
-        }
-    }
-
-    // The assistant's hands (control.js): size, windows, move, click, drag, scroll, type,
-    // key, hide. args is JSON: {x, y, button, count, x2, y2, direction, amount, text, combo}.
-    // Answers once Harvis's own pointer has arrived, so the next screenshot sees the result.
-    async ControlAsync([action, args], invocation) {
-        const reply = (ok, info = '') => invocation.return_value(new GLib.Variant('(bs)', [ok, info]));
-        try {
-            this._control ??= new Control();
-            const a = args ? JSON.parse(args) : {};
-            const c = this._control;
-            switch (action) {
-            case 'size':
-                return reply(true, c.size().join('x'));
-            case 'windows':
-                return reply(true, JSON.stringify(c.windows()));
-            case 'hide':
-                c.hide();
-                break;
-            case 'move':
-                await c.move(a.x, a.y);
-                break;
-            case 'click':
-                await c.click(a.x, a.y, a.button ?? 1, a.count ?? 1);
-                break;
-            case 'drag':
-                await c.drag(a.x, a.y, a.x2, a.y2);
-                break;
-            case 'scroll':
-                await c.scroll(a.x, a.y, a.direction ?? 'down', a.amount ?? 3);
-                break;
-            case 'type':
-                c.type(String(a.text ?? ''));
-                break;
-            case 'key':
-                if (!c.key(String(a.combo ?? '')))
-                    return reply(false, `unknown key: ${a.combo}`);
-                break;
-            default:
-                return reply(false, `unknown action: ${action}`);
-            }
-            return reply(true);
-        } catch (e) {
-            console.error('Dynamic Island: control failed', e);
-            return reply(false, String(e));
-        }
     }
 
     // A side island from outside (the touchpad edge swipe): left, right, or toggle-left / toggle-right.

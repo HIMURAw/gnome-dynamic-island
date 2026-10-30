@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Dynamic Island\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-04 16:47+0300\n"
+"POT-Creation-Date: 2026-10-30 11:04+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,102 +17,98 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: extension.js:374
+#: extension.js:363
 msgid "Open Dynamic Island"
 msgstr ""
 
-#: extension.js:438
+#: extension.js:417
 msgid "Close Dynamic Island"
 msgstr ""
 
-#: extension.js:469
+#: extension.js:448 extension.js:607
 msgid "Mute or unmute"
 msgstr ""
 
-#: extension.js:475
+#: extension.js:454 extension.js:613
 msgid "Volume"
 msgstr ""
 
-#: extension.js:545
+#: extension.js:524
 msgid "Back"
 msgstr ""
 
-#: extension.js:615
+#: extension.js:594
 msgid "Previous"
 msgstr ""
 
-#: extension.js:616
+#: extension.js:595
 msgid "Play or pause"
 msgstr ""
 
-#: extension.js:617
+#: extension.js:596
 msgid "Next"
 msgstr ""
 
-#: extension.js:631
+#: extension.js:628
 msgid "Open notification"
 msgstr ""
 
-#: extension.js:698 center.js:183
+#: extension.js:698 center.js:204
 msgid "Notifications"
 msgstr ""
 
-#: extension.js:730 prefs.js:96
+#: extension.js:734 prefs.js:96
 msgid "Now playing"
 msgstr ""
 
-#: extension.js:1089
-msgid "Chat with Harvis"
-msgstr ""
-
 #. Translators: battery percentage, e.g. "78%". Use %% for the percent sign.
-#: extension.js:1814
+#: extension.js:1669
 #, javascript-format
 msgid "%d%%"
 msgstr ""
 
-#: extension.js:1832
+#: extension.js:1687
 msgid "Fully charged"
 msgstr ""
 
-#: extension.js:1835
+#: extension.js:1690
 #, javascript-format
 msgid "Charging, full in %s"
 msgstr ""
 
-#: extension.js:1836
+#: extension.js:1691
 msgid "Charging"
 msgstr ""
 
-#: extension.js:1839
+#: extension.js:1694
 msgid "Plugged in, not charging"
 msgstr ""
 
-#: extension.js:1841
+#: extension.js:1696
 #, javascript-format
 msgid "%s left"
 msgstr ""
 
-#: extension.js:1842
+#: extension.js:1697
 msgid "On battery"
 msgstr ""
 
-#: extension.js:1850 center.js:291
+#: extension.js:1705 center.js:345
 #, javascript-format
 msgid "%d min"
 msgstr ""
 
-#: extension.js:1851
+#: extension.js:1706
 #, javascript-format
 msgid "%d h"
 msgstr ""
 
-#: extension.js:1851
+#: extension.js:1706
 #, javascript-format
 msgid "%d h %d min"
 msgstr ""
 
-#: extension.js:1986
+#: extension.js:1854
 msgid "Nothing is playing"
 msgstr ""
 
@@ -218,12 +214,14 @@ msgstr ""
 msgid "The bubble on the right"
 msgstr ""
 
-#: prefs.js:98 mind.js:337
-msgid "Chat"
+#: prefs.js:98
+msgid "Side islands"
 msgstr ""
 
 #: prefs.js:99
-msgid "Next to the bell: write or talk to the assistant"
+msgid ""
+"Push the pointer against the left or right edge: the launcher and focus on "
+"the left, tools on the right"
 msgstr ""
 
 #: prefs.js:100
@@ -301,28 +299,28 @@ msgstr ""
 msgid "Report a problem or suggest an idea"
 msgstr ""
 
-#: center.js:61 center.js:66
+#: center.js:64 center.js:69
 msgid "Do Not Disturb"
 msgstr ""
 
-#: center.js:105
+#: center.js:108 side.js:1207
 msgid "Clear"
 msgstr ""
 
-#: center.js:138
+#: center.js:141
 msgid "No notifications"
 msgstr ""
 
-#: center.js:183
+#: center.js:204
 #, javascript-format
 msgid "Notifications · %d"
 msgstr ""
 
-#: center.js:270 activities.js:289
+#: center.js:324 activities.js:260
 msgid "Dismiss"
 msgstr ""
 
-#: center.js:289
+#: center.js:343
 msgid "now"
 msgstr ""
 
@@ -366,7 +364,7 @@ msgstr ""
 msgid "{n} cycles"
 msgstr ""
 
-#: palette.js:34
+#: palette.js:34 side.js:1494
 msgid "Note"
 msgstr ""
 
@@ -374,198 +372,288 @@ msgstr ""
 msgid "Search, calculate, ? ask Claude, n take a note"
 msgstr ""
 
-#: palette.js:177
+#: palette.js:219
 msgid "? question"
 msgstr ""
 
-#: palette.js:177
+#: palette.js:219
 msgid "Ask Claude"
 msgstr ""
 
-#: palette.js:178
+#: palette.js:220
 msgid "n text"
 msgstr ""
 
-#: palette.js:178
+#: palette.js:220
 msgid "Save a quick note"
 msgstr ""
 
-#: palette.js:179
+#: palette.js:221
 msgid "25 min"
 msgstr ""
 
-#: palette.js:179
+#: palette.js:221
 msgid "Start a timer"
 msgstr ""
 
-#: palette.js:180
+#: palette.js:222
 msgid "12*7 or 5 km mi"
 msgstr ""
 
-#: palette.js:180
+#: palette.js:222
 msgid "Calculate and convert"
 msgstr ""
 
-#: palette.js:198 palette.js:208
+#: palette.js:240 palette.js:250
 msgid "Copy the result"
 msgstr ""
 
-#: palette.js:217
+#: palette.js:259
 #, javascript-format
 msgid "Start a %s timer"
 msgstr ""
 
-#: palette.js:218
+#: palette.js:260
 msgid "Shown in the island while it runs"
 msgstr ""
 
-#: palette.js:235
+#: palette.js:277
 #, javascript-format
 msgid "Search the web for “%s”"
 msgstr ""
 
-#: palette.js:348
+#: palette.js:390
 #, javascript-format
 msgid "Save as a note: %s"
 msgstr ""
 
-#: palette.js:364
+#: palette.js:406
 msgid "Note saved"
 msgstr ""
 
-#: palette.js:367
+#: palette.js:409 side.js:876
 msgid "Could not save the note"
 msgstr ""
 
-#: palette.js:384
+#: palette.js:426
 msgid "Copied"
 msgstr ""
 
-#: palette.js:462
+#: palette.js:504
 #, javascript-format
 msgid "Ask Claude: %s"
 msgstr ""
 
-#: palette.js:463
+#: palette.js:505
 msgid "The answer appears here"
 msgstr ""
 
-#: palette.js:494
+#: palette.js:536
 msgid "Copy"
 msgstr ""
 
-#: palette.js:496
+#: palette.js:538
 msgid "Save as a note"
 msgstr ""
 
-#: palette.js:522
+#: palette.js:564
 msgid "Thinking…"
 msgstr ""
 
-#: palette.js:545 chat.js:482
+#: palette.js:587
 msgid "No answer came back."
 msgstr ""
 
-#: palette.js:547
+#: palette.js:589
 msgid "Claude could not answer."
 msgstr ""
 
-#: palette.js:551
+#: palette.js:593
 #, javascript-format
 msgid "Claude could not be started: %s"
 msgstr ""
 
-#: activities.js:171
+#: activities.js:142
 msgid "Timer"
 msgstr ""
 
-#: activities.js:217
+#: activities.js:188
 msgid "Time is up"
 msgstr ""
 
-#: chat.js:84
-msgid "Back to Harvis"
-msgstr ""
-
-#: chat.js:86
-msgid "Harvis"
-msgstr ""
-
-#: chat.js:100
-msgid "Read voice answers aloud"
-msgstr ""
-
-#: chat.js:107
-msgid "New chat"
-msgstr ""
-
-#: chat.js:128
-msgid ""
-"Write, or press the microphone and talk. “Hey Harvis” works from anywhere."
-msgstr ""
-
-#: chat.js:137
-msgid "Message Harvis"
-msgstr ""
-
-#: chat.js:148 mind.js:338
-msgid "Talk"
-msgstr ""
-
-#: chat.js:150
-msgid "Send"
-msgstr ""
-
-#: chat.js:345
-msgid "Read aloud"
-msgstr ""
-
-#: chat.js:391
-msgid "The Harvis service is not running (systemctl --user start harvis)."
-msgstr ""
-
-#: chat.js:417
-msgid "Neither Harvis nor the claude command is installed."
-msgstr ""
-
-#: chat.js:466 chat.js:476
-msgid "Could not get an answer"
-msgstr ""
-
-#: mind.js:396
+#: side.js:83
 #, javascript-format
-msgid "Last: “%s”"
+msgid "%s h %s min"
 msgstr ""
 
-#: mind.js:396
-msgid "No conversation yet."
-msgstr ""
-
-#: mind.js:404
+#: side.js:83
 #, javascript-format
-msgid "Last answer: %s"
+msgid "%s min"
 msgstr ""
 
-#: mind.js:406
-msgid "Local model"
+#: side.js:276
+msgid "Focus session done"
 msgstr ""
 
-#: mind.js:406
-msgid "Claude"
+#: side.js:276
+#, javascript-format
+msgid "%s of %s. Today: %s"
 msgstr ""
 
-#: mind.js:425
-msgid "Ready. Say “Hey Harvis” or snap twice."
+#: side.js:551 side.js:1123
+msgid "Other"
 msgstr ""
 
-#: mind.js:426
-msgid "Listening"
+#: side.js:841
+msgid "Launch"
 msgstr ""
 
-#: mind.js:427
-msgid "Thinking"
+#: side.js:850
+msgid "Search apps…"
 msgstr ""
 
-#: mind.js:428
-msgid "Speaking"
+#: side.js:874
+msgid "Save as a quick note"
+msgstr ""
+
+#: side.js:874
+msgid "Into the inbox of the notes folder"
+msgstr ""
+
+#: side.js:876
+msgid "Saved ✓"
+msgstr ""
+
+#: side.js:882
+msgid "Apps"
+msgstr ""
+
+#: side.js:883
+msgid "All apps"
+msgstr ""
+
+#: side.js:894 side.js:1037
+msgid "Open windows"
+msgstr ""
+
+#: side.js:900
+msgid "Modes"
+msgstr ""
+
+#: side.js:906
+msgid "Focus"
+msgstr ""
+
+#: side.js:911
+msgid "Recent files"
+msgstr ""
+
+#: side.js:951
+msgid "End"
+msgstr ""
+
+#: side.js:974
+msgid "Close"
+msgstr ""
+
+#: side.js:1037
+#, javascript-format
+msgid "Open windows · %s"
+msgstr ""
+
+#: side.js:1039
+msgid "No open windows"
+msgstr ""
+
+#: side.js:1122 side.js:1123
+msgid "Study"
+msgstr ""
+
+#: side.js:1123
+msgid "Code"
+msgstr ""
+
+#: side.js:1146 side.js:1459
+msgid "Stop"
+msgstr ""
+
+#: side.js:1146
+msgid "Start"
+msgstr ""
+
+#: side.js:1155
+#, javascript-format
+msgid "Today %s"
+msgstr ""
+
+#: side.js:1174 side.js:1217
+msgid "Tools"
+msgstr ""
+
+#: side.js:1177
+msgid "Calculate"
+msgstr ""
+
+#: side.js:1180 side.js:1279
+msgid "12*7, 5 km mi, 90 min h…"
+msgstr ""
+
+#: side.js:1183 side.js:1380
+msgid "Copied ✓"
+msgstr ""
+
+#: side.js:1206
+msgid "Clipboard"
+msgstr ""
+
+#: side.js:1222
+msgid "Pick a color"
+msgstr ""
+
+#: side.js:1223
+msgid "Record screen"
+msgstr ""
+
+#: side.js:1227
+msgid "Password"
+msgstr ""
+
+#: side.js:1229
+msgid "Ask the screen"
+msgstr ""
+
+#: side.js:1234
+msgid "Summarize page"
+msgstr ""
+
+#: side.js:1253
+msgid "System"
+msgstr ""
+
+#: side.js:1256
+msgid "CPU"
+msgstr ""
+
+#: side.js:1256
+msgid "Memory"
+msgstr ""
+
+#: side.js:1256
+msgid "Heat"
+msgstr ""
+
+#: side.js:1256
+msgid "Battery"
+msgstr ""
+
+#: side.js:1273
+msgid "Coming up"
+msgstr ""
+
+#: side.js:1314
+msgid "Copied text shows up here"
+msgstr ""
+
+#: side.js:1351
+msgid "Color copied"
 msgstr ""

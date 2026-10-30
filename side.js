@@ -18,10 +18,10 @@ import {calculate, convert, formatNumber} from './calc.js';
 import {spring, stopSpring} from './spring.js';
 
 // Side islands (Umut, 2026-10-25): push the pointer against the left or right edge of the
-// screen and a tall glass island grows out of it. Left, the launcher: search (apps, a question
-// for Harvis, a quick note), favourite and most used apps, open windows, recent files, a focus
-// timer that logs to the notes folder. Right, the control center: Harvis, now playing, nine
-// quick settings, volume and brightness, the machine, what is coming up, notifications.
+// screen and a tall glass island grows out of it. Left, the launcher: search (apps, a quick
+// note), favourite and most used apps, open windows, recent files, a focus timer that logs to
+// the notes folder. Right, tools: a calculator, the clipboard history, small tools, what uses
+// the machine, what is coming up.
 //
 // Cheap on purpose. Closed, there is nothing on screen and nothing running: the edges are two
 // pressure barriers (the same mechanism as GNOME's hot corner), which only wake up when the
@@ -418,14 +418,8 @@ class SidePanel {
 // ---------- The two islands and their edges ----------
 
 export class SideIslands {
-    // onAsk(text): send to the island's chat and show it. onTalk(): ask Harvis to listen.
-    // onOpenChat(): show the island's chat. avatar: a live AvatarGlyph for the right island's header.
-    constructor({settings, onAsk, onTalk, onOpenChat, avatar}) {
+    constructor({settings}) {
         this._settings = settings;
-        this._onAsk = onAsk;
-        this._onTalk = onTalk;
-        this._onOpenChat = onOpenChat;
-        this._avatar = avatar;
         this._panels = {};
         this._open = null;
         this._closeId = 0;
@@ -467,9 +461,6 @@ export class SideIslands {
         for (const panel of Object.values(this._panels))
             panel.destroy();
         this._panels = {};
-        // Never opened: the robot was never put on the stage.
-        if (this._avatar && !this._avatar.actor.get_parent())
-            this._avatar.actor.destroy();
     }
 
     // ---------- Edges ----------
@@ -849,21 +840,14 @@ export class SideIslands {
     _buildLauncher() {
         const panel = new SidePanel('left', _('Launch'));
 
-        // Search: apps as you type; Enter opens the first; nothing found offers Harvis.
+        // Search: apps as you type; Enter opens the first; or keep it as a quick note.
         const searchCard = new St.BoxLayout({style_class: 'dynada-side-search', x_expand: true});
         searchCard.add_child(new St.Icon({icon_name: 'system-search-symbolic', icon_size: 18,
             style_class: 'dynada-side-search-icon', y_align: Clutter.ActorAlign.CENTER}));
         const results = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, style_class: 'dynada-side-list',
             x_expand: true, visible: false});
         let first = null;
-        const search = this._entry(panel, _('Search apps, or ask Harvis…'), text => {
-            if (first)
-                first();
-            else {
-                this.close(true);
-                this._onAsk(text);
-            }
-        }, 'dynada-side-search-entry');
+        const search = this._entry(panel, _('Search apps…'), () => first?.(), 'dynada-side-search-entry');
         searchCard.add_child(search);
         panel.column.insert_child_at_index(searchCard, 1);
 
@@ -886,11 +870,6 @@ export class SideIslands {
                 first ??= launch;
                 results.add_child(this._row(app.create_icon_texture(28), app.get_name(), app.get_description() ?? '', launch));
             }
-            results.add_child(this._row(new St.Icon({icon_name: 'dialog-question-symbolic', icon_size: 20}),
-                fmt(_('Ask Harvis: %s'), q), '', () => {
-                    this.close(true);
-                    this._onAsk(q);
-                }));
             results.add_child(this._row(new St.Icon({icon_name: 'document-edit-symbolic', icon_size: 20}),
                 _('Save as a quick note'), _('Into the inbox of the notes folder'), () => {
                     search.text = '';
@@ -1189,71 +1168,10 @@ export class SideIslands {
 
     // ---------- Right: tools ----------
     // Nothing here repeats the island (Wi-Fi, sliders, music and notifications live there):
-    // Harvis, a calculator, the clipboard history, small tools, what uses the machine, what is coming up.
+    // a calculator, the clipboard history, small tools, what uses the machine, what is coming up.
 
     _buildControl() {
-        const panel = new SidePanel('right', _('Harvis'));
-
-        // Header: the live robot (it moves only while on screen), the name, what it is doing.
-        panel.header.add_style_class_name('dynada-side-harvis-header');
-        if (this._avatar) {
-            this._avatar.actor.y_align = Clutter.ActorAlign.CENTER;
-            panel.header.insert_child_at_index(this._avatar.actor, 0);
-        }
-        const names = new St.BoxLayout({orientation: Clutter.Orientation.VERTICAL, x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER});
-        panel.header.remove_child(panel.title);
-        names.add_child(panel.title);
-        this._harvisStatus = label(_('Ready'), 'dynada-side-status');
-        names.add_child(this._harvisStatus);
-        panel.header.insert_child_at_index(names, this._avatar ? 1 : 0);
-
-        // Ask: type and Enter, the arrow, or the microphone to say it; three one-tap questions.
-        const ask = panel.section(null, 'dynada-side-ask');
-        const askRow = new St.BoxLayout({style_class: 'dynada-side-ask-row', x_expand: true});
-        const askEntry = this._entry(panel, _('Ask Harvis…'), (text, entry) => {
-            entry.text = '';
-            this.close(true);
-            this._onAsk(text);
-        });
-        askRow.add_child(askEntry);
-        askRow.add_child(this._round('audio-input-microphone-symbolic', _('Say it'), 'dynada-side-mic', () => {
-            this.close(true);
-            this._onTalk();
-        }));
-        askRow.add_child(this._round('go-up-symbolic', _('Send'), 'dynada-side-send', () => {
-            const text = askEntry.text.trim();
-            if (!text)
-                return;
-            askEntry.text = '';
-            this.close(true);
-            this._onAsk(text);
-        }));
-        ask.add_child(askRow);
-        const quick = new St.BoxLayout({style_class: 'dynada-side-chips', x_expand: true});
-        for (const [text, prompt] of [
-            [_('Today'), _('What is on today? Deadlines, open threads and what I should do first.')],
-            [_('Deadlines'), _('Which deadlines and decisions are coming up?')],
-            [_('Where was I?'), _('Where did I leave off last time, and what is the next step?')],
-        ]) {
-            const b = new St.Button({style_class: 'dynada-pill-button dynada-side-chip', label: text, can_focus: true});
-            b.connect('clicked', () => {
-                this.close(true);
-                this._onAsk(prompt);
-            });
-            quick.add_child(b);
-        }
-        ask.add_child(quick);
-        this._lastAnswerLabel = label('', 'dynada-side-last-text', {x_expand: true, x_align: Clutter.ActorAlign.START});
-        this._lastAnswerLabel.clutter_text.line_wrap = true;
-        this._lastAnswerLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
-        const last = new St.Button({style_class: 'dynada-side-last', can_focus: true, x_expand: true,
-            child: this._lastAnswerLabel});
-        last.connect('clicked', () => {
-            this.close(true);
-            this._onOpenChat();
-        });
-        ask.add_child(last);
+        const panel = new SidePanel('right', _('Tools'));
 
         // Calculator: arithmetic, units and durations as you type (calc.js); Enter copies.
         const calc = panel.section(_('Calculate'), 'dynada-side-calc');
@@ -1357,9 +1275,6 @@ export class SideIslands {
         agenda.add_child(agendaList);
 
         panel.refresh = () => {
-            const answer = this._lastAnswer();
-            last.visible = !!answer;
-            this._lastAnswerLabel.text = answer.length > 160 ? `${answer.slice(0, 158).trimEnd()}…` : answer;
             calcEntry.text = '';
             calcEntry.hint_text = _('12*7, 5 km mi, 90 min h…');
             this._fillClips(clips, clipList);
@@ -1560,31 +1475,6 @@ export class SideIslands {
                 row.add_child(stop);
             }
             list.add_child(row);
-        }
-    }
-
-    // The newest assistant message of the island's chat (chat.js keeps the last 60).
-    _lastAnswer() {
-        try {
-            const path = GLib.build_filenamev([GLib.get_user_data_dir(), 'dynamic-island', 'chat.json']);
-            const messages = JSON.parse(readText(path) ?? '[]');
-            const m = [...messages].reverse().find(x => x.role === 'assistant' && x.text);
-            return m ? m.text.replace(/\s+/g, ' ').trim() : '';
-        } catch {
-            return '';
-        }
-    }
-
-    // Harvis's state from the island (idle, listening, thinking, speaking, failed).
-    setMode(mode) {
-        this._avatar?.setMode(mode);
-        if (this._harvisStatus) {
-            this._harvisStatus.text = {
-                listening: _('Listening'),
-                thinking: _('Thinking'),
-                speaking: _('Speaking'),
-                failed: _('Something went wrong'),
-            }[mode] ?? _('Ready');
         }
     }
 
