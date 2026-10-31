@@ -82,13 +82,18 @@ function animateBlur(actor, to, {delay = 0, duration, mode}) {
     timeline.start();
 }
 
-// Arrives: from transparent, a little low and soft, to in place and sharp.
-export function reveal(actor, {delay = 0, duration = 420, rise = 10, soft = SOFT} = {}) {
-    actor.remove_transition('opacity');
-    actor.remove_transition('translation-y');
-    actor.set({opacity: 0, translation_y: rise});
+// Arrives: from transparent, a little low and soft (and, with grow < 1, a little small), to in
+// place and sharp.
+export function reveal(actor, {delay = 0, duration = 420, rise = 10, soft = SOFT, grow = 1} = {}) {
+    for (const p of ['opacity', 'translation-y', 'scale-x', 'scale-y'])
+        actor.remove_transition(p);
+    actor.set_pivot_point(0.5, 0.5);
+    actor.set({opacity: 0, translation_y: rise, scale_x: grow, scale_y: grow});
     setBlur(actor, soft);
     const mode = Clutter.AnimationMode.EASE_OUT_CUBIC;
+    // The size settles with a touch of overshoot, the rest glides in.
+    if (grow !== 1)
+        actor.ease({scale_x: 1, scale_y: 1, delay, duration: duration + 80, mode: Clutter.AnimationMode.EASE_OUT_BACK});
     actor.ease({opacity: 255, translation_y: 0, delay, duration, mode});
     animateBlur(actor, 0, {delay, duration: Math.round(duration * 0.85), mode});
 }

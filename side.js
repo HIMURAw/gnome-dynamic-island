@@ -9,7 +9,6 @@ import St from 'gi://St';
 
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {PressureBarrier} from 'resource:///org/gnome/shell/ui/layout.js';
 
 
 import {Glass, snapshotExclude} from './glass.js';
@@ -37,7 +36,8 @@ const TOP_ROOM = 64;        // below the island
 const BOTTOM_ROOM = 96;     // above the dock
 const EDGE_GAP = 14;        // from the screen edge
 const SPAN = 0.7;           // middle share of the edge that reacts: corners stay the island's and the dock's
-const PRESSURE = 70;        // px of push before the island opens (hot corner uses 100)
+const EDGE_DWELL = 160;     // ms the pointer rests at the edge before the island opens
+const EDGE_POLL = 60;       // ms between looks at the pointer (closed islands cost only this)
 const CLOSE_DELAY = 350;    // ms off the island before closing
 const STATS_EVERY = 2000;   // ms, system figures while the right island is open
 const MAX_AGENDA = 4;
@@ -481,33 +481,57 @@ export class SideIslands {
             .sort((a, b) => (side === 'left' ? a.x - b.x : b.x + b.width - (a.x + a.width)))[0] ?? null;
     }
 
+    // The edges are watched by a light poll of the pointer (one call, a few times a second), not by
+    // pointer barriers. A barrier there sat on the same line as Desktop Cube's own full-height edge
+    // barrier, and at Umut's 1.5 scale the pointer got caught against the left edge, able to move only
+    // up and down until it left the top ("mouse sadece aşağı yukarı hareket ediyor", 2026-11-01);
+    // a push also had to be quick and straight to count, so it sometimes did not open at all.
+    // Now resting the pointer at the edge for EDGE_DWELL ms opens it, with no barrier anywhere.
     _buildEdges() {
         this._clearEdges();
         this._edgeMons = {left: this._edgeMonitor('left'), right: this._edgeMonitor('right')};
-        this._edges = ['left', 'right'].filter(side => this._edgeMons[side]).map(side => {
-            const mon = this._edgeMons[side];
-            const y1 = Math.round(mon.y + mon.height * (1 - SPAN) / 2);
-            const y2 = Math.round(mon.y + mon.height * (1 + SPAN) / 2);
-            const x = side === 'left' ? mon.x : mon.x + mon.width;
-            const barrier = new Meta.Barrier({
-                backend: global.backend,
-                x1: x, x2: x, y1, y2,
-                directions: side === 'left' ? Meta.BarrierDirection.POSITIVE_X : Meta.BarrierDirection.NEGATIVE_X,
-            });
-            const pressure = new PressureBarrier(PRESSURE, 1000, Shell.ActionMode.NORMAL);
-            pressure.addBarrier(barrier);
-            pressure.connect('trigger', () => this._onEdge(side));
-            return {barrier, pressure};
+        this._edgeSince = {left: 0, right: 0};
+        // After opening (or a push that did not count) the pointer has to leave the edge first.
+        this._edgeArmed = {left: true, right: true};
+        this._edgeId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, EDGE_POLL, () => {
+            this._pollEdges();
+            return GLib.SOURCE_CONTINUE;
         });
     }
 
-    _clearEdges() {
-        for (const {barrier, pressure} of this._edges ?? []) {
-            pressure.removeBarrier(barrier);
-            pressure.destroy();
-            barrier.destroy();
+    _pollEdges() {
+        const [x, y, mods] = global.get_pointer();
+        const now = GLib.get_monotonic_time() / 1000;
+        // A button held is a drag (a window, a scrollbar at the edge): not a call for the island.
+        const held = mods & (Clutter.ModifierType.BUTTON1_MASK | Clutter.ModifierType.BUTTON2_MASK |
+            Clutter.ModifierType.BUTTON3_MASK);
+        for (const side of ['left', 'right']) {
+            const mon = this._edgeMons[side];
+            const atEdge = mon && y >= mon.y + mon.height * (1 - SPAN) / 2 && y <= mon.y + mon.height * (1 + SPAN) / 2 &&
+                (side === 'left' ? x <= mon.x + 1 : x >= mon.x + mon.width - 2);
+            if (!atEdge) {
+                this._edgeSince[side] = 0;
+                this._edgeArmed[side] = true;
+                continue;
+            }
+            if (held || !this._edgeArmed[side] || this._open === side)
+                continue;
+            if (!this._edgeSince[side]) {
+                this._edgeSince[side] = now;
+                continue;
+            }
+            if (now - this._edgeSince[side] >= EDGE_DWELL) {
+                this._edgeArmed[side] = false;
+                this._edgeSince[side] = 0;
+                this._onEdge(side);
+            }
         }
-        this._edges = [];
+    }
+
+    _clearEdges() {
+        if (this._edgeId)
+            GLib.source_remove(this._edgeId);
+        this._edgeId = 0;
     }
 
     _onEdge(side) {

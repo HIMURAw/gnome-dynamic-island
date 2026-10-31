@@ -324,15 +324,9 @@ export default class DynamicIslandExtension extends Extension {
         this._connect(this._compact, 'clicked', () => this._open('controls'));
         this._connect(this._controlsHeader, 'clicked', () => this._close());
         this._connect(this._notificationView, 'clicked', () => this._activateNotification());
-        this._connect(this._compact, 'notify::pressed', () => {
-            const scale = this._compact.pressed ? 0.95 : 1;
-            this._island.ease({
-                scale_x: scale,
-                scale_y: scale,
-                duration: 140,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            });
-        });
+        this._connect(this._compact, 'notify::pressed', () => this._syncLift());
+        // Smoke: the resting pill swells a little under the pointer, as if it were picked up.
+        this._connect(this._island, 'notify::hover', () => this._syncLift());
         for (const actor of [this._island, this._left, this._right, this._privacy]) {
             this._connect(actor, 'notify::hover', () => {
                 if (this._mode && !this._anyHover())
@@ -343,6 +337,20 @@ export default class DynamicIslandExtension extends Extension {
         this._connect(this._strip, 'notify::translation-y', () => {
             for (const glass of [this._island, this._left, this._right, this._privacy])
                 glass.syncBackdrop();
+        });
+    }
+
+    // The pill's scale: pressed in, lifted under the pointer (smoke), or at rest; open is always 1.
+    _syncLift() {
+        const lifted = !this._mode && this._island.hover && smokeOn();
+        const scale = this._compact.pressed ? 0.95 : lifted ? 1.045 : 1;
+        if (this._island.scale_x === scale)
+            return;
+        this._island.ease({
+            scale_x: scale,
+            scale_y: scale,
+            duration: lifted ? 320 : 160,
+            mode: lifted ? Clutter.AnimationMode.EASE_OUT_BACK : Clutter.AnimationMode.EASE_OUT_QUAD,
         });
     }
 
@@ -838,6 +846,7 @@ export default class DynamicIslandExtension extends Extension {
         const previous = this._mode;
         this._mode = mode;
         this._collapseTimeout = this._clearTimeout(this._collapseTimeout);
+        this._shrinkTimeout = this._clearTimeout(this._shrinkTimeout);
         if (this._typing(previous))
             this._releaseKeyboard();
         if (mode === 'controls')
@@ -910,12 +919,15 @@ export default class DynamicIslandExtension extends Extension {
         view.translation_x = nav * PAGE_SLIDE;
         const [, height] = view.get_preferred_height(this._contentWidth);
 
+        if (smoke)
+            this._syncLift();
         spring(this._island, {
             width: mode === 'osd' ? OSD_WIDTH : this._expandedWidth,
             height: height + 2 * BORDER,
         }, {
-            response: 0.5,
-            damping: 0.76,
+            // Smoke: a calmer glass, one soft overshoot instead of a wobble.
+            response: smoke ? 0.56 : 0.5,
+            damping: smoke ? 0.84 : 0.76,
             onComplete: () => {
                 // Natural size from here on, so the island follows content changes.
                 if (this._mode === mode)
@@ -923,7 +935,9 @@ export default class DynamicIslandExtension extends Extension {
             },
         });
         if (smoke) {
-            this._smokeIn(view, mode);
+            // From the pill the glass opens first; from another view there is a beat of empty glass,
+            // the old page gone before the new one comes (as in the dashboard Umut liked).
+            this._smokeIn(view, mode, previous ? 190 : 130);
             return;
         }
         clearSmoke(view);
@@ -955,15 +969,15 @@ export default class DynamicIslandExtension extends Extension {
 
     // The view's rows arrive out of a blur one after another; a quick view (a volume OSD, a
     // notification) arrives whole, without the wait.
-    _smokeIn(view, mode) {
+    _smokeIn(view, mode, delay) {
         view.set({opacity: 255, scale_x: 1, scale_y: 1, translation_x: 0});
         const rows = view.get_children().filter(c => c.visible);
         if (mode === 'osd' || mode === 'notification' || rows.length < 2) {
-            reveal(view, {delay: 60, duration: mode === 'osd' ? 260 : 360, rise: 6});
+            reveal(view, {delay: 60, duration: mode === 'osd' ? 260 : 380, rise: 8, grow: 0.97});
             return;
         }
         clearSmoke(view);
-        revealAll(rows, {delay: 90, step: 55});
+        revealAll(rows, {delay, step: 50, duration: 480, rise: 14, grow: 0.97});
     }
 
     _close() {
@@ -995,12 +1009,12 @@ export default class DynamicIslandExtension extends Extension {
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             });
         }
-        spring(this._island, {
+        const shrink = () => spring(this._island, {
             width: width + 2 * BORDER,
             height: PILL_HEIGHT,
         }, {
-            response: 0.42,
-            damping: 0.86,
+            response: smoke ? 0.46 : 0.42,
+            damping: smoke ? 0.88 : 0.86,
             onComplete: () => {
                 if (this._mode)
                     return;
@@ -1008,11 +1022,23 @@ export default class DynamicIslandExtension extends Extension {
                 this._island.remove_style_pseudo_class('expanded');
                 this._island.set_size(-1, -1);
                 this._maybeHide();
+                // Still under the pointer: back to the lifted pill.
+                this._syncLift();
             },
         });
+        // Smoke: the content softens away first, then the glass draws in around nothing.
+        if (smoke)
+            this._shrinkTimeout = this._timeout(70, () => {
+                this._shrinkTimeout = 0;
+                if (!this._mode)
+                    shrink();
+                return GLib.SOURCE_REMOVE;
+            });
+        else
+            shrink();
         if (smoke) {
             this._compact.set_scale(1, 1);
-            reveal(this._compact, {delay: 110, duration: 300, rise: 0, soft: 8});
+            reveal(this._compact, {delay: 230, duration: 320, rise: 0, soft: 8, grow: 0.92});
             return;
         }
         clearSmoke(this._compact);
