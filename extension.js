@@ -32,6 +32,7 @@ import {PrivacyWatcher} from './privacy.js';
 import {GlassMenus} from './menus.js';
 import {QuickSettingsAdopter} from './quicksettings.js';
 import {spring, stopAllSprings, stopSpring} from './spring.js';
+import {clearSmoke, conceal, reveal, revealAll, smokeOn} from './motion.js';
 
 const TOP_MARGIN = 6;
 const PILL_HEIGHT = 38;
@@ -873,20 +874,35 @@ export default class DynamicIslandExtension extends Extension {
         // Into a toggle's menu the pages slide sideways, like going one level
         // deeper; everything else zooms in place.
         const nav = mode === 'detail' ? 1 : previous === 'detail' ? -1 : 0;
-        const scale = nav ? 1 : 0.94;
-        outgoing.ease({
-            opacity: 0,
-            scale_x: scale,
-            scale_y: scale,
-            translation_x: -nav * PAGE_SLIDE,
-            duration: nav ? 200 : 140,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                outgoing.translation_x = 0;
-                if (outgoing !== this._currentView())
-                    outgoing.hide();
-            },
-        });
+        // Smoke (fume theme): the old view dissolves into a blur, the new one's rows arrive out
+        // of one, top to bottom. Sideways page moves keep their slide.
+        const smoke = smokeOn() && !nav;
+        const scale = nav || smoke ? 1 : 0.94;
+        if (smoke) {
+            outgoing.set_scale(1, 1);
+            conceal(outgoing, {
+                duration: 150,
+                onStopped: () => {
+                    if (outgoing !== this._currentView())
+                        outgoing.hide();
+                },
+            });
+        } else {
+            clearSmoke(outgoing);
+            outgoing.ease({
+                opacity: 0,
+                scale_x: scale,
+                scale_y: scale,
+                translation_x: -nav * PAGE_SLIDE,
+                duration: nav ? 200 : 140,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => {
+                    outgoing.translation_x = 0;
+                    if (outgoing !== this._currentView())
+                        outgoing.hide();
+                },
+            });
+        }
 
         view.show();
         view.opacity = 0;
@@ -906,6 +922,11 @@ export default class DynamicIslandExtension extends Extension {
                     this._island.set_size(-1, -1);
             },
         });
+        if (smoke) {
+            this._smokeIn(view, mode);
+            return;
+        }
+        clearSmoke(view);
         view.ease({
             opacity: 255,
             scale_x: 1,
@@ -932,6 +953,19 @@ export default class DynamicIslandExtension extends Extension {
         }
     }
 
+    // The view's rows arrive out of a blur one after another; a quick view (a volume OSD, a
+    // notification) arrives whole, without the wait.
+    _smokeIn(view, mode) {
+        view.set({opacity: 255, scale_x: 1, scale_y: 1, translation_x: 0});
+        const rows = view.get_children().filter(c => c.visible);
+        if (mode === 'osd' || mode === 'notification' || rows.length < 2) {
+            reveal(view, {delay: 60, duration: mode === 'osd' ? 260 : 360, rise: 6});
+            return;
+        }
+        clearSmoke(view);
+        revealAll(rows, {delay: 90, step: 55});
+    }
+
     _close() {
         if (!this._mode)
             return;
@@ -949,13 +983,18 @@ export default class DynamicIslandExtension extends Extension {
         this._compact.show();
         const [, width] = this._compact.get_preferred_width(-1);
 
-        view.ease({
-            opacity: 0,
-            scale_x: 0.94,
-            scale_y: 0.94,
-            duration: 120,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        });
+        const smoke = smokeOn();
+        if (smoke) {
+            conceal(view, {duration: 140});
+        } else {
+            view.ease({
+                opacity: 0,
+                scale_x: 0.94,
+                scale_y: 0.94,
+                duration: 120,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        }
         spring(this._island, {
             width: width + 2 * BORDER,
             height: PILL_HEIGHT,
@@ -971,6 +1010,12 @@ export default class DynamicIslandExtension extends Extension {
                 this._maybeHide();
             },
         });
+        if (smoke) {
+            this._compact.set_scale(1, 1);
+            reveal(this._compact, {delay: 110, duration: 300, rise: 0, soft: 8});
+            return;
+        }
+        clearSmoke(this._compact);
         this._compact.ease({
             opacity: 255,
             scale_x: 1,

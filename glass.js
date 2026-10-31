@@ -313,8 +313,10 @@ class Backdrop extends St.Widget {
     setRound(round) {
         if (!this._blur)
             return;
-        this._blur.brightness = round ? ROUND_BRIGHTNESS : 0.9;
-        this._blurMax = round ? Math.round(BLUR_RADIUS * ROUND_BLUR) : BLUR_RADIUS;
+        // A theme may tune its frost: blur (times the radius) and brightness (fume: heavier, darker).
+        const p = currentPalette();
+        this._blur.brightness = round ? p.brightness ?? ROUND_BRIGHTNESS : 0.9;
+        this._blurMax = round ? Math.round(BLUR_RADIUS * (p.blur ?? ROUND_BLUR)) : BLUR_RADIUS;
         this.queue_relayout();
     }
 
@@ -391,11 +393,13 @@ class Glass extends St.Widget {
         const round = isRound();
         const [ok, css] = this.get_theme_node().lookup_length('-glass-radius', false);
         const radius = ok ? css : -1;
-        if (round === this._round && radius === this._cssRadius)
+        const theme = currentPalette().name;
+        if (round === this._round && theme === this._theme && radius === this._cssRadius)
             return;
-        if (round !== this._round)
+        if (round !== this._round || theme !== this._theme)
             this.backdrop.setRound(round);
         this._round = round;
+        this._theme = theme;
         this._cssRadius = radius;
         this.queue_relayout();
     }
