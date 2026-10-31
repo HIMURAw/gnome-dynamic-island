@@ -16,6 +16,7 @@ import {Glass, snapshotExclude} from './glass.js';
 import {TileGridLayout} from './layouts.js';
 import {calculate, convert, formatNumber} from './calc.js';
 import {spring, stopSpring} from './spring.js';
+import {clearSmoke, concealAll, revealAll, smokeOn} from './motion.js';
 
 // Side islands (Umut, 2026-10-25): push the pointer against the left or right edge of the
 // screen and a tall glass island grows out of it. Left, the launcher: search (apps, a question
@@ -615,7 +616,8 @@ export class SideIslands {
         actor.remove_all_transitions();
         const from = side === 'left' ? -16 : 16;
         const parts = [panel.header, ...panel.content.get_children()];
-        actor.set({scale_x: 0.3, scale_y: 0.9, opacity: 0});
+        // Smoke: the glass only settles a little; the motion is in the sections coming out of the blur.
+        actor.set(smokeOn() ? {scale_x: 0.94, scale_y: 0.97, opacity: 0} : {scale_x: 0.3, scale_y: 0.9, opacity: 0});
         for (const child of parts) {
             child.remove_all_transitions();
             child.set({opacity: 0, translation_x: from});
@@ -625,6 +627,12 @@ export class SideIslands {
                 return;
             actor.ease({opacity: 255, duration: 140, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
             spring(actor, {scale_x: 1, scale_y: 1}, {response: 0.48, damping: 0.78});
+            // Smoke (fume theme): the sections come out of a blur instead of sliding in.
+            if (smokeOn()) {
+                parts.forEach(child => child.set({translation_x: 0}));
+                revealAll(parts, {delay: 40, step: 40, duration: 380});
+                return;
+            }
             parts.forEach((child, i) => child.ease({
                 opacity: 255,
                 translation_x: 0,
@@ -713,11 +721,18 @@ export class SideIslands {
                 return GLib.SOURCE_REMOVE;
             });
         }
+        const parts = [panel.header, ...panel.content.get_children()];
         if (now) {
+            parts.forEach(clearSmoke);
             actor.set({visible: false, opacity: 0});
             return;
         }
+        // Smoke: the sections blur away first, the glass follows.
+        const smoke = smokeOn();
+        if (smoke)
+            concealAll(parts, {duration: 150, step: 20});
         actor.ease({
+            delay: smoke ? 90 : 0,
             opacity: 0,
             scale_x: 0.55,
             scale_y: 0.94,

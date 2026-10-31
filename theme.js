@@ -20,6 +20,9 @@ const THEMES = {
     mor: {hue: 258, sat: 1.0, lum: 1.0},
     cam: {hue: 220, sat: 0.75, lum: 1.0, round: true},
     gri: {hue: 0, sat: 0.0, lum: 0.85},
+    // Smoke: dark smoked glass with an amber accent, things arriving out of a blur (motion.js);
+    // from the glassy dashboard Umut liked, 2026-11-01.
+    fume: {hue: 28, sat: 0.95, lum: 0.9, round: true, smoke: true, blur: 1.9, brightness: 0.75},
 };
 
 let cached = null;
