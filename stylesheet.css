@@ -104,6 +104,15 @@
   spacing: 16px;
 }
 
+/* The scrolling body of the control center and its menu pages (extension.js _scrollBox). */
+.dynada-expanded-scroll {
+  -st-vfade-offset: 32px;
+}
+
+.dynada-expanded-box {
+  spacing: 16px;
+}
+
 .dynada-chip {
   background-color: rgba(255, 255, 255, 0.07);
   border-radius: 18px;

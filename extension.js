@@ -45,6 +45,10 @@ const PILL_HEIGHT = 38;
 const BORDER = 1;
 const BUBBLE_GAP = 8;
 const EXPANDED_RADIUS = 34;
+// Room an expanded view must leave: the view's own padding (stylesheet, .dynada-expanded) and a
+// gap above the screen's bottom edge. Taller content scrolls (see _scrollBox).
+const EXPANDED_PADDING = 42;
+const BOTTOM_GAP = 24;
 // How long to wait after the pointer leaves before collapsing (ms).
 const COLLAPSE_DELAY = 700;
 // In fullscreen, hide again once the pointer is this far below the island (px).
@@ -277,6 +281,7 @@ export default class DynamicIslandExtension extends Extension {
         }
         snapshotExclude.clear();
         this._strip = this._island = this._left = this._right = this._privacy = this._chatBubble = null;
+        this._scrolls = this._controlsBox = null;
 
         this._power = null;
         this._clock = null;
@@ -495,8 +500,40 @@ export default class DynamicIslandExtension extends Extension {
         });
     }
 
+    // The scrolling body of an expanded view. A 1080-row monitor holds less than the laptop's
+    // 1200 logical rows, and the control center ran off its bottom edge (2026-11-03): the body
+    // scrolls instead, capped to the island's monitor in _fitToMonitor at every open.
+    _scrollBox(view) {
+        const box = new St.BoxLayout({
+            style_class: 'dynada-expanded-box',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+        });
+        const scroll = new St.ScrollView({
+            style_class: 'dynada-expanded-scroll vfade',
+            hscrollbar_policy: St.PolicyType.NEVER,
+            // Wheel and touchpad only; a bar would sit on the tiles.
+            vscrollbar_policy: St.PolicyType.EXTERNAL,
+            x_expand: true,
+            child: box,
+        });
+        view.add_child(scroll);
+        (this._scrolls ??= []).push(scroll);
+        return box;
+    }
+
+    _fitToMonitor() {
+        const monitor = this._monitor();
+        if (!monitor || !this._scrolls)
+            return;
+        const room = monitor.height - TOP_MARGIN - 2 * BORDER - EXPANDED_PADDING - BOTTOM_GAP;
+        for (const scroll of this._scrolls)
+            scroll.style = `max-height: ${Math.max(200, room)}px;`;
+    }
+
     _buildControls() {
         const view = this._expandedView();
+        const box = this._controlsBox = this._scrollBox(view);
 
         // Header: big time and date on the left, battery on the right. Clicking it collapses.
         const header = new St.BoxLayout({x_expand: true});
@@ -524,10 +561,10 @@ export default class DynamicIslandExtension extends Extension {
 
         header.add_child(left);
         header.add_child(this._batteryColumn);
-        view.add_child(this._controlsHeader);
+        box.add_child(this._controlsHeader);
 
         this._activitiesCard = new ActivitiesCard(this._activities);
-        view.add_child(this._activitiesCard.actor);
+        box.add_child(this._activitiesCard.actor);
 
         // Volume
         this._volumeRow = new St.BoxLayout({style_class: 'dynada-volume dynada-chip', x_expand: true});
@@ -545,7 +582,7 @@ export default class DynamicIslandExtension extends Extension {
         this._volumeRow.add_child(this._muteButton);
         this._volumeRow.add_child(this._slider);
         this._volumeRow.add_child(this._volumeLabel);
-        view.add_child(this._volumeRow);
+        box.add_child(this._volumeRow);
 
         // Control center: GNOME's quick settings, sorted into modules (see
         // _adoptQuickSettings). Connectivity and what is playing share the top row.
@@ -560,7 +597,7 @@ export default class DynamicIslandExtension extends Extension {
         this._ccTop.add_child(this._ccConnect);
         this._apps = new AppsCard({onActivated: () => this._close()});
         this._ccTop.add_child(this._apps.actor);
-        view.add_child(this._ccTop);
+        box.add_child(this._ccTop);
 
         this._ccSliders = new St.BoxLayout({
             style_class: 'dynada-cc-sliders',
@@ -568,7 +605,7 @@ export default class DynamicIslandExtension extends Extension {
             x_expand: true,
             visible: false,
         });
-        view.add_child(this._ccSliders);
+        box.add_child(this._ccSliders);
 
         this._ccTiles = new St.Widget({
             style_class: 'dynada-cc-tiles',
@@ -576,7 +613,7 @@ export default class DynamicIslandExtension extends Extension {
             layout_manager: new TileGridLayout(2, TILE_HEIGHT, 10),
             visible: false,
         });
-        view.add_child(this._ccTiles);
+        box.add_child(this._ccTiles);
 
         // Panel indicators, including other extensions', are moved here.
         this._tray = new St.Widget({
@@ -585,7 +622,7 @@ export default class DynamicIslandExtension extends Extension {
             layout_manager: new TileGridLayout(6, 44, 8, 3),
             visible: false,
         });
-        view.add_child(this._tray);
+        box.add_child(this._tray);
 
         // GNOME's background apps list is left out; it only holds its place so it
         // goes back to GNOME on disable.
@@ -595,10 +632,10 @@ export default class DynamicIslandExtension extends Extension {
             x_expand: true,
             visible: false,
         });
-        view.add_child(this._ccExtra);
+        box.add_child(this._ccExtra);
 
         this._ccSystem = new St.BoxLayout({style_class: 'dynada-cc-system', x_expand: true, visible: false});
-        view.add_child(this._ccSystem);
+        box.add_child(this._ccSystem);
 
         return view;
     }
@@ -608,6 +645,7 @@ export default class DynamicIslandExtension extends Extension {
     _buildDetail() {
         const view = this._expandedView();
         view.add_style_class_name('dynada-detail');
+        const box = this._scrollBox(view);
         const content = new St.BoxLayout({style_class: 'dynada-back-content'});
         content.add_child(new St.Icon({icon_name: 'go-previous-symbolic', style_class: 'dynada-back-icon'}));
         content.add_child(new St.Label({text: _('Back'), y_align: Clutter.ActorAlign.CENTER}));
@@ -617,13 +655,13 @@ export default class DynamicIslandExtension extends Extension {
             x_align: Clutter.ActorAlign.START,
             child: content,
         });
-        view.add_child(this._backButton);
+        box.add_child(this._backButton);
         this._detailBox = new St.BoxLayout({
             style_class: 'dynada-detail-box',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
         });
-        view.add_child(this._detailBox);
+        box.add_child(this._detailBox);
 
         this._connect(this._backButton, 'clicked', () => this._qsAdopter?.closeMenu());
         // A menu left open would pop up again next time.
@@ -932,6 +970,7 @@ export default class DynamicIslandExtension extends Extension {
         if (previous === 'osd')
             this._osdTimeout = this._clearTimeout(this._osdTimeout);
 
+        this._fitToMonitor();
         const view = this._viewFor(mode);
         const outgoing = previous ? this._viewFor(previous) : this._compact;
         // A view still fading out from an earlier close would keep its height.
@@ -1029,7 +1068,7 @@ export default class DynamicIslandExtension extends Extension {
 
         // The control center's modules drift up one after another.
         if (mode === 'controls' && !nav) {
-            this._controls.get_children().filter(c => c.visible).forEach((child, i) => {
+            this._controlsBox.get_children().filter(c => c.visible).forEach((child, i) => {
                 child.opacity = 0;
                 child.translation_y = 14;
                 child.ease({
